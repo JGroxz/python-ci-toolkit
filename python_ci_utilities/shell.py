@@ -8,7 +8,6 @@ import shlex
 import subprocess
 from typing import Tuple
 
-import rich
 from rich.style import Style
 from rich.table import Table
 from rich.text import Text

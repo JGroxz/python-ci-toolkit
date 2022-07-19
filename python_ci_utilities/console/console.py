@@ -3,10 +3,13 @@ Functions for setting up a CI console.
 """
 
 import logging
+import os
+from pathlib import Path
 
 from rich.console import Console
 
 from ..environment import is_running_in_bitbucket_ci, get_ci_environment_name
+from ..versions import get_project_version_string
 
 
 _INITIALIZED = False
@@ -79,8 +82,16 @@ def initialize_ci_console() -> Console:
 
     ci_environment_name = get_ci_environment_name()
 
-    initialized_notification = f"[green]>_[/][rgb(146,202,85)] Python CI console initialized[/] [bright_black](triggered by the import of [i]python_ci_utilities.console[/])[/]\n" \
-                               f"   Environment: [blue]{ci_environment_name}[/]"
+    try:
+        import pkg_resources
+        version = pkg_resources.get_distribution('python-ci-utilities').version
+    except Exception:
+        version = get_project_version_string(Path(os.path.dirname(__file__), "../../"))
+
+    initialized_notification = f"[green]>_[/][rgb(146,202,85)] Python CI console initialized[/] [bright_black](triggered by the import of [i]python_ci_utilities.console[/])[/]\n"
+    initialized_notification += f"     CI utilities version: [blue]{version}[/]\n"
+    initialized_notification += f"     CI environment: [blue]{ci_environment_name}[/]\n"
+
     logging.info(initialized_notification)
 
     _INITIALIZED = True

@@ -6,16 +6,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .pip import ensure_package_installed
-
-try:
-    ensure_package_installed("semver")
-    ensure_package_installed("toml")
-except RuntimeError:
-    raise ImportError("'python_ci_utilities.versions' requires 'semver' and 'toml' packages in order to work, but they could not be located.")
-
-from semver import VersionInfo
 import toml
+from semver import VersionInfo
 
 
 def get_project_version_string(project_root_folder_path: str | Path) -> str:
