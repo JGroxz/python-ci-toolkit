@@ -9,6 +9,10 @@ from rich.console import Console
 from ..environment import is_running_in_bitbucket_ci
 
 
+_INITIALIZED = False
+"""Whether the console was initialized. Used to make initialize_ci_console() logic run only once."""
+
+
 def get_ci_console() -> Console:
     """
     Returns:
@@ -50,14 +54,20 @@ def setup_ci_logging() -> None:
     )
 
 
-def initialize_ci_environment() -> Console:
+def initialize_ci_console() -> Console:
+    global _INITIALIZED
+    if _INITIALIZED:
+        return ci_console
+
     setup_ci_logging()
 
     initialized_notification = "[green_yellow]>_[/][rgb(146,202,85)] Python CI console initialized[/] " \
                                "[grey50](triggered by the import of [i]python_ci_utilities.console[/])[/]"
     logging.info(initialized_notification)
 
+    _INITIALIZED = True
+
     return ci_console
 
 
-initialize_ci_environment()
+initialize_ci_console()
