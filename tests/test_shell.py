@@ -10,6 +10,14 @@ print = test_console.print
 
 
 def run():
+    aws_domain = "pyci"
+    aws_domain_owner = "755432789552"
+    aws_region = "eu-west-1"
+
+    error, output = run_shell_command(
+        f"aws codeartifact get-authorization-token --domain {aws_domain} --domain-owner {aws_domain_owner} --query authorizationToken --output text")
+
+
     test_command = "ls -a"
     test_cwd = "../"
 

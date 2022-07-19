@@ -53,9 +53,9 @@ def run_shell_command(command: str, cwd: str = os.getcwd(), silence_output: bool
             # print to console if not silenced
             if not silence_output:
                 grid = Table.grid()
-                grid.add_column(style=SHELL_OUTPUT_PREFIX_STYLE, min_width=SHELL_OUTPUT_PREFIX_WIDTH_MIN, max_width=SHELL_OUTPUT_PREFIX_WIDTH_MAX, no_wrap=True)
+                grid.add_column(style=SHELL_OUTPUT_PREFIX_STYLE, min_width=SHELL_OUTPUT_PREFIX_WIDTH_MIN, max_width=SHELL_OUTPUT_PREFIX_WIDTH_MAX, overflow="ellipsis", no_wrap=True)
                 grid.add_column(style=SHELL_OUTPUT_PREFIX_STYLE)
-                grid.add_column()
+                grid.add_column(overflow="fold")
                 grid.add_row(
                     Text(f" > shell: {command}"), " │ ", decoded_line.strip()
                 )
