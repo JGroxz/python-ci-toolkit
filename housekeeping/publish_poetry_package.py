@@ -35,10 +35,17 @@ def authenticate() -> None:
     run_shell_command(f"poetry config repositories.{ENV_AWS_PYPI_REPO_NAME} https://{pypi_url}", cwd=project_root, use_wsl_on_windows=False)
 
 
+def publish() -> None:
+    project_root = Path(__file__).parent.parent
+
+    # TODO: Check if the package with the same version already exists in the repository and skip publishing if so.
+    run_shell_command("pip index versions pylibmc")
+
+    run_shell_command(f"poetry publish --repository {ENV_AWS_PYPI_REPO_NAME}", cwd=project_root, use_wsl_on_windows=False)
+
+
 def cli():
     initialize_ci_console()
-
-    project_root = Path(__file__).parent.parent
 
     ensure_package_installed("poetry")
 
@@ -48,7 +55,7 @@ def cli():
 
     logging.info(f"Publishing package to the PYPI repository '{ENV_AWS_PYPI_REPO_NAME}'...")
 
-    run_shell_command(f"poetry publish --repository {ENV_AWS_PYPI_REPO_NAME}", cwd=project_root, use_wsl_on_windows=False)
+    publish()
 
     logging.info(f"Package published.")
 
