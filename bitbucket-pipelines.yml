@@ -15,7 +15,6 @@ definitions:
         script:
           - python housekeeping/setup_aws_cli.py
           - python housekeeping/build_poetry_package.py
-          - python housekeeping/authenticate_pypi.py
           - python housekeeping/publish_poetry_package.py
 
 pipelines:
