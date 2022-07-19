@@ -26,7 +26,9 @@ def get_ci_console() -> Console:
 
 ci_console = get_ci_console()
 """
-A main entrypoint for printing CI logs.
+Console for the current CI session.
+
+See initialize_ci_console() for more details.
 """
 
 
@@ -55,6 +57,20 @@ def setup_ci_logging() -> None:
 
 
 def initialize_ci_console() -> Console:
+    """
+    Sets up the console for the current CI session. Run this in the beginning of each CI script.
+
+    Notes:
+        This call configures rich and logging module for the current CI environment and terminal type, be it Bitbucket pipelines or a local machine.
+        This enables nicely formatted logs and detailed, well-readable tracebacks.
+
+        After running this method, you can:
+         - use the returned console object to print rich-formatted text and objects
+         - use logging.*() methods to get nicely formatted log messages in the output
+
+    Returns:
+        An initialized rich Console instance which can be used for formatting output in the console.
+    """
     global _INITIALIZED
     if _INITIALIZED:
         return ci_console
