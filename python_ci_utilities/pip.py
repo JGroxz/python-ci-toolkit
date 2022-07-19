@@ -2,8 +2,6 @@
 Utility functions for managing Python PIP packages.
 """
 
-import sys
-
 import pkg_resources
 
 from .shell import run_shell_command
@@ -36,7 +34,7 @@ def install_package(package_name: str, silence_pip_stdout: bool = False) -> None
         package_name: Name of the package to install.
         silence_pip_stdout: If set to True, PIP installation logs will not be sent to stdout.
     """
-    error = run_shell_command(f"pip install {package_name}", silence_output=silence_pip_stdout)
+    error, _ = run_shell_command(f"pip install {package_name}", silence_output=silence_pip_stdout)
     if error:
         raise RuntimeError(f"Failed to install PIP package '{package_name}'.")
 

@@ -4,13 +4,6 @@ Functions for setting up a CI console.
 
 import logging
 
-from ..pip import ensure_package_installed
-
-try:
-    ensure_package_installed("rich")
-except RuntimeError:
-    raise ImportError("'python_ci_utilities.console' requires 'rich' package in order to work, but it could not be located.")
-
 from rich.console import Console
 
 from ..environment import is_running_in_bitbucket_ci
