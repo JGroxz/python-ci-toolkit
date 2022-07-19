@@ -33,7 +33,7 @@ def cli():
     run_shell_command(f"pip config set global.extra-index-url https://{pypi_user}:{pypi_token}@{pypi_url}", cwd=project_root, use_wsl_on_windows=False)
 
     # Poetry
-    run_shell_command(f"poetry config http-basic.{ENV_AWS_PYPI_REPO_NAME} {pypi_user} {pypi_token}", cwd=project_root, use_wsl_on_windows=False)
+    run_shell_command(f"poetry config http-basic.pyci {pypi_user} {pypi_token}", cwd=project_root, use_wsl_on_windows=False)
 
 
 if __name__ == '__main__':
