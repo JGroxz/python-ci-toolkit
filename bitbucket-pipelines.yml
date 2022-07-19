@@ -18,5 +18,5 @@ definitions:
 
 pipelines:
   branches:
-    main:
+    feature/ci:
       - step: *build_poetry_package
