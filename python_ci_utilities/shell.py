@@ -19,7 +19,10 @@ SHELL_OUTPUT_PREFIX_WIDTH_MAX = 30
 SHELL_OUTPUT_PREFIX_STYLE = Style(color="blue")
 
 
-def run_shell_command(command: str, cwd: str = os.getcwd(), silence_output: bool = False) -> Tuple[int, str | None]:
+def run_shell_command(command: str,
+                      cwd: str = os.getcwd(),
+                      silence_output: bool = False,
+                      throw_exception_on_error: bool = True) -> Tuple[int, str | None]:
     """
     Executes the given command in a subprocess.
 
@@ -30,9 +33,14 @@ def run_shell_command(command: str, cwd: str = os.getcwd(), silence_output: bool
         command: Command to execute.
         cwd: Working directory to execute the command in. Defaults to current working directory.
         silence_output: If set to True, command output will be suppressed.
+        throw_exception_on_error: If set to True (default), an exception will be thrown if the executed command exits with a non-zero exit code.
 
     Returns:
         Command exit code.
+
+    Raises:
+        RuntimeError:
+            if the executed command completes with a non-zero exit code.
     """
 
     if os.name == 'nt':
@@ -69,5 +77,10 @@ def run_shell_command(command: str, cwd: str = os.getcwd(), silence_output: bool
             capture_subprocess_output(process.stdout)
             capture_subprocess_output(process.stderr)
     exitcode = process.wait()
+
+    if (exitcode != 0) and throw_exception_on_error:
+        raise RuntimeError(f"Error executing command (exit code {exitcode})\n"
+                           f"    Command: {command}\n"
+                           f"    Output: {captured_output}\n")
 
     return exitcode, captured_output
