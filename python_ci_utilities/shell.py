@@ -6,6 +6,7 @@ from __future__ import annotations
 import os
 import shlex
 import subprocess
+from pathlib import Path
 from typing import Tuple
 
 from rich.style import Style
@@ -17,13 +18,14 @@ from .console import ci_console
 SHELL_OUTPUT_PREFIX_WIDTH_MIN = 15
 SHELL_OUTPUT_PREFIX_WIDTH_MAX = 30
 SHELL_OUTPUT_PREFIX_STYLE = Style(color="blue")
-SHELL_OUTPUT_COMMAND_STYLE = Style(color="deep_sky_blue4")
+SHELL_OUTPUT_COMMAND_STYLE = Style(color="deep_sky_blue4", italic=True)
 
 
 def run_shell_command(command: str,
-                      cwd: str = os.getcwd(),
+                      cwd: str | Path = os.getcwd(),
                       silence_output: bool = False,
-                      throw_exception_on_error: bool = True) -> Tuple[int, str | None]:
+                      throw_exception_on_error: bool = True,
+                      use_wsl_on_windows: bool = True) -> Tuple[int, str | None]:
     """
     Executes the given command in a subprocess.
 
@@ -35,6 +37,7 @@ def run_shell_command(command: str,
         cwd: Working directory to execute the command in. Defaults to current working directory.
         silence_output: If set to True, command output will be suppressed.
         throw_exception_on_error: If set to True (default), an exception will be thrown if the executed command exits with a non-zero exit code.
+        use_wsl_on_windows: If set to True (default) and running on Windows, the provided command will be run in WSL.
 
     Returns:
         Command exit code.
@@ -44,7 +47,7 @@ def run_shell_command(command: str,
             if the executed command completes with a non-zero exit code.
     """
 
-    if os.name == 'nt':
+    if os.name == 'nt' and use_wsl_on_windows:
         # use WSL on Windows
         command = f"wsl {command}"
 
