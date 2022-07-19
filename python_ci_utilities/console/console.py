@@ -9,7 +9,7 @@ from ..pip import ensure_package_installed
 try:
     ensure_package_installed("rich")
 except RuntimeError:
-    raise ImportError("CI console requires rich package in order to work, but it could not be located.")
+    raise ImportError("'python_ci_utilities.console' requires 'rich' package in order to work, but it could not be located.")
 
 from rich.console import Console
 
