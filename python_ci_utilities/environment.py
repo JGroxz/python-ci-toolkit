@@ -1,5 +1,5 @@
 """
-Utility functions for inspecting current CI environment.
+Utility functions for inspecting and interacting with current CI environment.
 """
 
 import os
@@ -26,3 +26,14 @@ def get_ci_environment_name() -> str:
         return "Bitbucket CI"
 
     return "Default/Local"
+
+
+def assert_environment_variable_set(variable_name: str) -> None:
+    """
+    Assert that the given environment variable is set and available.
+
+    Args:
+        variable_name: Name of the environment variable to assert.
+    """
+    assert os.environ.get(variable_name), f"'{variable_name}' environment variable is not set, but is required by CI logic."
+
