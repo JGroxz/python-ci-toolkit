@@ -79,7 +79,7 @@ def initialize_ci_console() -> Console:
 
     ci_environment_name = get_ci_environment_name()
 
-    initialized_notification = f"[green_yellow]>_[/][rgb(146,202,85)] Python CI console initialized[/] [grey50](triggered by the import of [i]python_ci_utilities.console[/])[/]\n" \
+    initialized_notification = f"[green]>_[/][rgb(146,202,85)] Python CI console initialized[/] [bright_black](triggered by the import of [i]python_ci_utilities.console[/])[/]\n" \
                                f"   Environment: [blue]{ci_environment_name}[/]"
     logging.info(initialized_notification)
 

@@ -13,6 +13,8 @@ from rich.style import Style
 from rich.table import Table
 from rich.text import Text
 
+from .console import ci_console
+
 SHELL_OUTPUT_PREFIX_WIDTH_MIN = 15
 SHELL_OUTPUT_PREFIX_WIDTH_MAX = 30
 SHELL_OUTPUT_PREFIX_STYLE = Style(color="blue")
@@ -60,7 +62,7 @@ def run_shell_command(command: str, cwd: str = os.getcwd(), silence_output: bool
                     Text(f" > shell: {command}"), " │ ", decoded_line.strip()
                 )
 
-                rich.print(grid, end="")
+                ci_console.print(grid, end="")
 
     process = subprocess.Popen(args, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     with process.stdout:
