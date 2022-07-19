@@ -1,0 +1,22 @@
+
+image: &python_ci_runner
+  name: 755432789552.dkr.ecr.eu-west-1.amazonaws.com/pyci/runner:python
+  aws:
+    oidc-role: $AWS_OIDC_ROLE_ARN
+
+definitions:
+  steps:
+    - step: &build_poetry_package
+        name: Build and publish Poetry package
+        oidc: true
+        image: *python_ci_runner
+        services:
+          - docker
+        script:
+          - python housekeeping/setup_aws_cli.py
+          - python housekeeping/build_poetry_package.py
+
+pipelines:
+  branches:
+    main:
+      - step: *build_poetry_package
