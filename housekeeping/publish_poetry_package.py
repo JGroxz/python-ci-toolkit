@@ -28,12 +28,12 @@ def authenticate() -> None:
     pypi_url_simple = f"{pypi_url}simple/"
 
     from rich.pretty import Pretty
-    logging.info(Pretty(
+    logging.info(Pretty((
         pypi_token,
         pypi_user,
         pypi_url,
         pypi_url_simple
-    ))
+    )))
 
     # PIP
     run_shell_command(f"pip config set global.extra-index-url https://{pypi_user}:{pypi_token}@{pypi_url_simple}", cwd=project_root, use_wsl_on_windows=False)
