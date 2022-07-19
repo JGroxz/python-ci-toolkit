@@ -39,7 +39,8 @@ def publish() -> None:
     project_root = Path(__file__).parent.parent
 
     # TODO: Check if the package with the same version already exists in the repository and skip publishing if so.
-    run_shell_command("pip index versions pylibmc")
+    package_name = "python-ci-utilities"
+    run_shell_command(f"pip index versions {package_name}")
 
     run_shell_command(f"poetry publish --repository {ENV_AWS_PYPI_REPO_NAME}", cwd=project_root, use_wsl_on_windows=False)
 
