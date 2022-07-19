@@ -58,7 +58,7 @@ def run_shell_command(command: str, cwd: str = os.getcwd(), silence_output: bool
                 grid.add_column(style=SHELL_OUTPUT_PREFIX_STYLE)
                 grid.add_column(overflow="fold")
                 grid.add_row(
-                    Text(f" > shell: {command}"), " │ ", decoded_line.strip()
+                    Text(f" > shell: ") + Text(command, style="italic"), " │ ", decoded_line.strip()
                 )
 
                 ci_console.print(grid, end="")

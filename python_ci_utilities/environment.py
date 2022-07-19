@@ -23,7 +23,7 @@ def get_ci_environment_name() -> str:
         Name of the CI environment.
     """
     if is_running_in_bitbucket_ci():
-        return "Bitbucket CI"
+        return "Bitbucket Pipelines"
 
     return "Default/Local"
 
