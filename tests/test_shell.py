@@ -3,7 +3,7 @@ from rich.console import Console
 from rich.panel import Panel
 import rich.pretty
 
-from python_ci_utilities.shell import run_shell_command
+from python_ci_toolkit.shell import run_shell_command
 
 test_console = Console()
 print = test_console.print

@@ -1,4 +1,4 @@
-from python_ci_utilities.versions import get_project_version_string
+from python_ci_toolkit.versions import get_project_version_string
 
 
 def run():

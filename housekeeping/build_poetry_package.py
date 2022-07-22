@@ -4,9 +4,9 @@ Builds a Poetry package from the current project.
 import logging
 from pathlib import Path
 
-from python_ci_utilities.console import initialize_ci_console
-from python_ci_utilities.shell import run_shell_command
-from python_ci_utilities.pip import ensure_package_installed
+from python_ci_toolkit.console import initialize_ci_console
+from python_ci_toolkit.shell import run_shell_command
+from python_ci_toolkit.pip import ensure_package_installed
 
 
 def cli():

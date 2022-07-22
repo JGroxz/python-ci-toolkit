@@ -4,10 +4,10 @@ Authenticates and publishes a package to the custom PyPI repository.
 import logging
 from pathlib import Path
 
-from python_ci_utilities.console import initialize_ci_console, ci_console
-from python_ci_utilities.environment import assert_environment_variable_set
-from python_ci_utilities.shell import run_shell_command
-from python_ci_utilities.pip import ensure_package_installed
+from python_ci_toolkit.console import initialize_ci_console, ci_console
+from python_ci_toolkit.environment import assert_environment_variable_set
+from python_ci_toolkit.shell import run_shell_command
+from python_ci_toolkit.pip import ensure_package_installed
 
 ENV_AWS_DOMAIN = assert_environment_variable_set("AWS_DOMAIN")
 ENV_AWS_DOMAIN_OWNER = assert_environment_variable_set("AWS_DOMAIN_OWNER")

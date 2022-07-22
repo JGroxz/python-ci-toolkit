@@ -5,8 +5,8 @@ import logging
 import os
 from pathlib import Path
 
-from python_ci_utilities.console import initialize_ci_console
-from python_ci_utilities.environment import assert_environment_variable_set
+from python_ci_toolkit.console import initialize_ci_console
+from python_ci_toolkit.environment import assert_environment_variable_set
 
 AWS_CONFIG_FOLDER_PATH = "~/.aws/"
 AWS_CREDENTIALS_FILE_NAME = "credentials"

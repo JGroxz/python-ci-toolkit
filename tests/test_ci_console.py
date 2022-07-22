@@ -1,4 +1,4 @@
-from python_ci_utilities.console import ci_console
+from python_ci_toolkit.console import ci_console
 
 
 def run():

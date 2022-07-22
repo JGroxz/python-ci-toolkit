@@ -84,7 +84,7 @@ def initialize_ci_console() -> Console:
 
     try:
         import pkg_resources
-        version = pkg_resources.get_distribution('python-ci-utilities').version
+        version = pkg_resources.get_distribution('python-ci-toolkit').version
     except Exception:
         version = get_project_version_string(Path(os.path.dirname(__file__), "../../"))
 
