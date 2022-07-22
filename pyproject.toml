@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "python-ci-toolkit"
-version = "0.2.1"
+version = "0.2.2"
 description = "A collection of tools for building CI Python scripts used by PyCI"
 authors = ["PyCI <hello@pyci.dev>"]
 
@@ -9,6 +9,7 @@ python = "^3.8"
 rich = ">=1"
 semver = ">=2"
 toml = ">=0.10"
+deprecation = "^2.1.0"
 
 [tool.poetry.dev-dependencies]
 

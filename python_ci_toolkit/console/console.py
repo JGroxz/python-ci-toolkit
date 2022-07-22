@@ -9,8 +9,6 @@ from pathlib import Path
 from rich.console import Console
 
 from ..environment import is_running_in_bitbucket_ci, get_ci_environment_name
-from ..versions import get_project_version_string
-
 
 _INITIALIZED = False
 """Whether the console was initialized. Used to make initialize_ci_console() logic run only once."""
@@ -86,7 +84,8 @@ def initialize_ci_console() -> Console:
         import pkg_resources
         version = pkg_resources.get_distribution('python-ci-toolkit').version
     except Exception:
-        version = get_project_version_string(Path(os.path.dirname(__file__), "../../"))
+        from ..versions import get_project_version_from_file
+        version = get_project_version_from_file(Path(os.path.dirname(__file__), "../../"))
 
     initialized_notification = f"[green]>_[/][rgb(146,202,85)] Python CI console initialized[/]\n"
     initialized_notification += f"     CI toolkit version: [blue]{version}[/]\n"

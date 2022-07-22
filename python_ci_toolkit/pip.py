@@ -1,7 +1,6 @@
 """
 Utility functions for managing Python PIP packages.
 """
-
 import pkg_resources
 
 from .shell import run_shell_command

@@ -1,7 +1,6 @@
 """
 Utility functions for inspecting and interacting with current CI environment.
 """
-
 import os
 
 

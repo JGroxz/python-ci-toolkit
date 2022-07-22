@@ -17,7 +17,6 @@ def run():
     error, output = run_shell_command(
         f"aws codeartifact get-authorization-token --domain {aws_domain} --domain-owner {aws_domain_owner} --query authorizationToken --output text")
 
-
     test_command = "ls -a"
     test_cwd = "../"
 
