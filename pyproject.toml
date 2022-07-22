@@ -1,6 +1,6 @@
 [tool.poetry]
-name = "python-ci-utilities"
-version = "0.1.16"
+name = "python-ci-toolkit"
+version = "0.2.0"
 description = "A collection of tools for building CI Python scripts used by PyCI"
 authors = ["PyCI <hello@pyci.dev>"]
 
