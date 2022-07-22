@@ -88,9 +88,10 @@ def initialize_ci_console() -> Console:
     except Exception:
         version = get_project_version_string(Path(os.path.dirname(__file__), "../../"))
 
-    initialized_notification = f"[green]>_[/][rgb(146,202,85)] Python CI console initialized[/] [bright_black](triggered by the import of [i]python_ci_utilities.console[/])[/]\n"
-    initialized_notification += f"     CI utilities version: [blue]{version}[/]\n"
-    initialized_notification += f"     CI environment: [blue]{ci_environment_name}[/]\n"
+    initialized_notification = f"[green]>_[/][rgb(146,202,85)] Python CI console initialized[/]\n"
+    initialized_notification += f"     CI toolkit version: [blue]{version}[/]\n"
+    initialized_notification += f"     CI environment: [blue]{ci_environment_name}[/]\n" \
+                                f"     [bright_black](from [i]python_ci_utilities.console[/])[/]"
 
     logging.info(initialized_notification)
 
