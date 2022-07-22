@@ -19,6 +19,8 @@ ENV_AWS_PYPI_REPO_NAME = assert_environment_variable_set("AWS_PYPI_REPO_NAME")
 
 
 def authenticate() -> None:
+    logging.info(f"Authenticating to PyPI repository '{ENV_AWS_PYPI_REPO_NAME}'...")
+
     project_root = Path(__file__).parent.parent
 
     _, output = run_shell_command(
@@ -39,6 +41,8 @@ def authenticate() -> None:
 
 
 def publish() -> None:
+    logging.info(f"Publishing package to the PYPI repository '{ENV_AWS_PYPI_REPO_NAME}'...")
+
     project_root = Path(__file__).parent.parent
 
     package_name = get_poetry_project_package_name()
@@ -56,6 +60,8 @@ def publish() -> None:
         exit(1)
 
     run_shell_command(f"poetry publish --repository {ENV_AWS_PYPI_REPO_NAME}", cwd=project_root, use_wsl_on_windows=False)
+
+    logging.info(f"Package '{package_name}' version '{local_version}' successfully published to '{ENV_AWS_PYPI_REPO_NAME}' repository.")
 
 
 def get_poetry_project_package_name() -> str:
@@ -80,15 +86,8 @@ def cli():
 
     ensure_package_installed("poetry")
 
-    logging.info(f"Authenticating to PyPI repository '{ENV_AWS_PYPI_REPO_NAME}'...")
-
     authenticate()
-
-    logging.info(f"Publishing package to the PYPI repository '{ENV_AWS_PYPI_REPO_NAME}'...")
-
     publish()
-
-    logging.info(f"Done.")
 
 
 if __name__ == '__main__':
