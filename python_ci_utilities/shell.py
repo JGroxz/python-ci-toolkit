@@ -70,7 +70,7 @@ def run_shell_command(command: str,
                 grid.add_column(style=SHELL_OUTPUT_PREFIX_STYLE)
                 grid.add_column(overflow="fold")
                 grid.add_row(
-                    Text(f" > shell: ") + Text(command, style=SHELL_OUTPUT_COMMAND_STYLE), " │ ", decoded_line.strip()
+                    Text(f" > shell: ") + Text(command, style=SHELL_OUTPUT_COMMAND_STYLE), " │ ", decoded_line.rstrip(" \n")
                 )
 
                 ci_console.print(grid, end="")
