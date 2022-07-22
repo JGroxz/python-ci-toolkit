@@ -4,10 +4,13 @@ Authenticates and publishes a package to the custom PyPI repository.
 import logging
 from pathlib import Path
 
-from python_ci_toolkit.console import initialize_ci_console, ci_console
+import toml
+
+from python_ci_toolkit.console import initialize_ci_console
 from python_ci_toolkit.environment import assert_environment_variable_set
-from python_ci_toolkit.shell import run_shell_command
 from python_ci_toolkit.pip import ensure_package_installed
+from python_ci_toolkit.shell import run_shell_command
+from python_ci_toolkit.versions import get_latest_pypi_package_version, get_project_version_from_file
 
 ENV_AWS_DOMAIN = assert_environment_variable_set("AWS_DOMAIN")
 ENV_AWS_DOMAIN_OWNER = assert_environment_variable_set("AWS_DOMAIN_OWNER")
@@ -38,11 +41,32 @@ def authenticate() -> None:
 def publish() -> None:
     project_root = Path(__file__).parent.parent
 
-    # TODO: Check if the package with the same version already exists in the repository and skip publishing if so.
-    package_name = "python-ci-utilities"
-    run_shell_command(f"pip index versions {package_name}")
+    package_name = get_poetry_project_package_name()
+
+    latest_version = get_latest_pypi_package_version(package_name)
+    local_version = get_project_version_from_file(project_root)
+
+    # check if we need to publish by comparing our local version to the latest one in the remote repo
+    if latest_version == local_version:
+        logging.info(f"Package version '{latest_version}' already exists in the target repository '{ENV_AWS_PYPI_REPO_NAME}'. Will not publish.")
+        return
+    if latest_version > local_version:
+        logging.warning(f"Local version of the package ('{local_version}') is lower than the latest version in the target repository '{ENV_AWS_PYPI_REPO_NAME}' ('{latest_version}').\n"
+                        f"    Something could be wrong. Please check the CI logic.")
+        exit(1)
 
     run_shell_command(f"poetry publish --repository {ENV_AWS_PYPI_REPO_NAME}", cwd=project_root, use_wsl_on_windows=False)
+
+
+def get_poetry_project_package_name() -> str:
+    project_root = Path(__file__).parent.parent
+
+    with open(project_root, "r") as file:
+        contents = file.read()
+        project_config = toml.loads(contents)
+        package_name = project_config.get("tool").get("poetry").get("name")
+
+    return package_name
 
 
 def cli():
@@ -58,7 +82,7 @@ def cli():
 
     publish()
 
-    logging.info(f"Package published.")
+    logging.info(f"Done.")
 
 
 if __name__ == '__main__':
