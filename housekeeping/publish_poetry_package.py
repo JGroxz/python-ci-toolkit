@@ -48,10 +48,10 @@ def publish() -> None:
 
     # check if we need to publish by comparing our local version to the latest one in the remote repo
     if latest_version == local_version:
-        logging.info(f"Package version '{latest_version}' already exists in the target repository '{ENV_AWS_PYPI_REPO_NAME}'. Will not publish.")
+        logging.info(f"Version '{latest_version}' of '{package_name}' already exists in the target repository '{ENV_AWS_PYPI_REPO_NAME}'. Will not publish.")
         return
     if latest_version > local_version:
-        logging.warning(f"Local version of the package ('{local_version}') is lower than the latest version in the target repository '{ENV_AWS_PYPI_REPO_NAME}' ('{latest_version}').\n"
+        logging.warning(f"Local version of the package '{package_name}' ('{local_version}') is lower than the latest version in the target repository '{ENV_AWS_PYPI_REPO_NAME}' ('{latest_version}').\n"
                         f"    Something could be wrong. Please check the CI logic.")
         exit(1)
 
