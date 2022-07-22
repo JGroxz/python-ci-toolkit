@@ -47,7 +47,7 @@ def run_shell_command(command: str,
             if the executed command completes with a non-zero exit code.
     """
 
-    if os.name == 'nt' and use_wsl_on_windows:
+    if os.name == "nt" and use_wsl_on_windows:
         # use WSL on Windows
         command = f"wsl {command}"
 

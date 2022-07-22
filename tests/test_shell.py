@@ -1,7 +1,7 @@
 import rich
+import rich.pretty
 from rich.console import Console
 from rich.panel import Panel
-import rich.pretty
 
 from python_ci_toolkit.shell import run_shell_command
 
