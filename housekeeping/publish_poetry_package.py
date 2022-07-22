@@ -61,7 +61,13 @@ def publish() -> None:
 def get_poetry_project_package_name() -> str:
     project_root = Path(__file__).parent.parent
 
-    with open(project_root, "r") as file:
+    pyproject_toml_path = Path(project_root, "pyproject.toml")
+    if not pyproject_toml_path.exists():
+        logging.error(f"'pyproject.toml' was not found in the project root folder ('{project_root}').\n"
+                      f"    Make sure you are trying to publish a poetry project.")
+        exit(1)
+
+    with open(pyproject_toml_path, "r") as file:
         contents = file.read()
         project_config = toml.loads(contents)
         package_name = project_config.get("tool").get("poetry").get("name")
