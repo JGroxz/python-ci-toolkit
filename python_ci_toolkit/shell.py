@@ -16,7 +16,7 @@ from rich.text import Text
 from .console import ci_console
 
 SHELL_OUTPUT_PREFIX_WIDTH_MIN = 15
-SHELL_OUTPUT_PREFIX_WIDTH_MAX = 30
+SHELL_OUTPUT_PREFIX_WIDTH_MAX = 26
 SHELL_OUTPUT_PREFIX_STYLE = Style(color="blue")
 SHELL_OUTPUT_COMMAND_STYLE = Style(color="deep_sky_blue4", italic=True)
 
