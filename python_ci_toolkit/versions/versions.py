@@ -9,7 +9,7 @@ from typing import List, Callable
 
 from semver import VersionInfo
 
-from .version_file_handlers import VERSION_FILE_HANDLERS
+from .version_file_handlers import VERSION_FILE_HANDLERS, VersionFileHandler
 from ..shell import run_shell_command
 
 
@@ -70,13 +70,10 @@ def get_project_version(project_root_folder_path: str | Path) -> VersionInfo:
         return Path(project_root_folder_path, file_name)
 
     # keep trying to parse supported version files until we get the version
-    for version_file_handler in VERSION_FILE_HANDLERS:
-        version_file_path = get_file_in_project_root(version_file_handler.file_name)
+    for (version_file_name, version_file_handler) in VERSION_FILE_HANDLERS.items():
+        version_file_path = get_file_in_project_root(version_file_name)
         if version_file_path.exists():
-            with open(version_file_path, "r") as file:
-                contents = file.read()
-                version = version_file_handler.read_version(contents)
-                return version
+            return version_file_handler.read_version(version_file_path)
 
     # if version could not be read using any of the above options, we can't find it
     raise FileNotFoundError(f"Could not find a valid version file in the given project directory ('{project_root_folder_path}').")
@@ -126,18 +123,13 @@ def write_project_version(project_root_folder_path: str | Path, version: Version
 
     # Update version in every supported version file in the project root folder
     updated_version_files: List[str] = []
-    for version_file_handler in VERSION_FILE_HANDLERS:
-        version_file_name = version_file_handler.file_name
+    for (version_file_name, version_file_handler) in VERSION_FILE_HANDLERS.items():
+        version_file_handler: VersionFileHandler = version_file_handler
         version_file_path = Path(project_root_folder_path, version_file_name)
         if version_file_path.exists():
-            with open(version_file_path, "r+") as file:
-                contents = file.read()
-                previous_version = version_file_handler.read_version(contents)
-                updated_contents = version_file_handler.update_version(contents, version)
-                file.write(updated_contents)
-
-                updated_version_files.append(version_file_name)
-                logging.info(f"Changed version in file '{version_file_name}' from {previous_version} to {version}.")
+            previous_version = version_file_handler.read_version(version_file_path)
+            version_file_handler.write_version(version_file_path, version)
+            logging.info(f"Changed version in file '{version_file_name}' from {previous_version} to {version}.")
 
     if (len(updated_version_files) == 0):
         # If version could not be read using any of the above options, we can't find it
