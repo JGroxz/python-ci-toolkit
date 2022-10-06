@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 
 from rich.console import Console
+from rich.text import Text
 
 from ..environment import is_running_in_bitbucket_ci, get_ci_environment_name
 
@@ -51,7 +52,9 @@ def setup_ci_logging() -> None:
                 console=ci_console,
                 show_path=False,
                 tracebacks_show_locals=False,
-                markup=True,
+                # disable Rich markup by default to avoid character clashes when printing logs;
+                # markup can still be processed on demand by explicitly using Text.from_markup(...) on strings before logging them
+                markup=False
             )
         ]
     )
@@ -87,10 +90,12 @@ def initialize_ci_console() -> Console:
         from ..versions import get_project_version
         version = get_project_version(Path(os.path.dirname(__file__), "../../"))
 
+
     initialized_notification = f"[green]>_[/][rgb(146,202,85)] Python CI console initialized[/]\n"
     initialized_notification += f"     CI toolkit version: [blue]{version}[/]\n"
     initialized_notification += f"     CI environment: [blue]{ci_environment_name}[/]\n" \
                                 f"     [bright_black](from [i]python_ci_utilities.console[/])[/]"
+    initialized_notification = Text.from_markup(initialized_notification)
 
     logging.info(initialized_notification)
 
