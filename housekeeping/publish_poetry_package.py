@@ -10,7 +10,7 @@ from python_ci_toolkit.console import initialize_ci_console
 from python_ci_toolkit.environment import assert_environment_variable_set, ci_project_root
 from python_ci_toolkit.pip import ensure_package_installed
 from python_ci_toolkit.shell import run_shell_command
-from python_ci_toolkit.versions import get_latest_pypi_package_version, get_project_version_from_file
+from python_ci_toolkit.versions import get_latest_pypi_package_version, get_project_version
 
 ENV_AWS_DOMAIN = assert_environment_variable_set("AWS_DOMAIN")
 ENV_AWS_DOMAIN_OWNER = assert_environment_variable_set("AWS_DOMAIN_OWNER")
@@ -44,7 +44,7 @@ def publish() -> None:
     package_name = get_poetry_project_package_name()
 
     latest_version = get_latest_pypi_package_version(package_name)
-    local_version = get_project_version_from_file(ci_project_root)
+    local_version = get_project_version(ci_project_root)
 
     # check if we need to publish by comparing our local version to the latest one in the remote repo
     if latest_version == local_version:
