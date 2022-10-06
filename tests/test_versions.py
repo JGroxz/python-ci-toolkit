@@ -1,16 +1,17 @@
-import logging
 from pathlib import Path
 
-import rich
 from semver import VersionInfo
 
-import python_ci_toolkit.versions.version_file_handlers
-from python_ci_toolkit.versions import get_project_version, get_latest_pypi_package_version, get_all_available_pypi_package_versions, parse_semantic_version
+from python_ci_toolkit import versions
+from python_ci_toolkit.versions import read_project_version, get_latest_pypi_package_version, parse_semantic_version
+from python_ci_toolkit.versions.version_file_handlers import VERSION_FILE_HANDLERS, VersionFileHandler, PyProjectVersionFileHandler
+
+TEST_VERSION_FILES_FOLDER = Path("./test_version_files")
 
 
 def test_project_version():
     project_root = "../"
-    version = get_project_version(project_root)
+    version = read_project_version(project_root)
     print(f"Project version: {version}")
 
 
@@ -42,18 +43,15 @@ def test_version_parsing():
 
 
 def test_version_write():
-    from python_ci_toolkit.versions.version_file_handlers import VERSION_FILE_HANDLERS, VersionFileHandler
-
     for (version_file_name, version_file_handler) in VERSION_FILE_HANDLERS.items():
         version_file_handler_name = type(version_file_handler).__name__
         print(f"Testing version file handler '{version_file_handler_name}'...")
 
         version_file_handler: VersionFileHandler = version_file_handler
 
-        test_files_folder = Path("./test_version_files")
-        version_file_path = Path(test_files_folder, version_file_name)
-        if not version_file_path.exists():
-            print(f"Version file '{version_file_name}' does not exist in the test folder '{test_files_folder}'.")
+        version_file_path = Path(TEST_VERSION_FILES_FOLDER, version_file_name)
+        if not version_file_path.exists():  # TODO: assert
+            print(f"Version file '{version_file_name}' does not exist in the test folder '{TEST_VERSION_FILES_FOLDER}'.")
             continue
 
         print("Reading current version...")
@@ -77,15 +75,41 @@ def test_version_write():
         reset_version = version_file_handler.read_version(version_file_path)
         print(f"Reset version from '{version_file_name}' is '{original_version}'")
 
-        if (reset_version == original_version):
+        if (reset_version == original_version):  # TODO: assert
             print(f"Reset version matches the original ({reset_version} == {original_version}). Handler '{version_file_handler_name}' works correctly.")
         else:
             raise RuntimeError(f"Reset version does not match the original ({reset_version} != {original_version}). Handler '{version_file_handler_name}' must be fixed.")
+
+
+def test_version_bump():
+    original_version = "v1.1.1"
+    original_version = parse_semantic_version(original_version)
+
+    # Test patch bump
+    new_version = original_version.bump_patch()
+    print(f"Patch bump: {original_version} -> {new_version}")
+    assert f"{new_version}" == "1.1.2"
+
+    # Test minor bump
+    new_version = original_version.bump_minor()
+    print(f"Minor bump: {original_version} -> {new_version}")
+    assert f"{new_version}" == "1.2.0"
+
+    # Test major bump
+    new_version = original_version.bump_major()
+    print(f"Major bump: {original_version} -> {new_version}")
+    assert f"{new_version}" == "2.0.0"
 
 
 if __name__ == '__main__':
     # test_project_version()
     # test_latest()
     # test_version_parsing()
-    test_version_write()
+    # test_version_write()
+    test_version_bump()
 
+    # handler = PyProjectVersionFileHandler()
+    # path = Path("../", "pyproject.toml")
+    # version = handler.read_version(path)
+    # new_version = version.bump_minor()
+    # handler.write_version(path, new_version)
