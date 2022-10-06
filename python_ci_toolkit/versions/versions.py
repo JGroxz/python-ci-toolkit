@@ -43,7 +43,7 @@ def parse_semantic_version(version_string: str) -> VersionInfo:
     return VersionInfo.parse(version_string)
 
 
-def get_project_version(project_root_folder_path: str | Path) -> VersionInfo:
+def read_project_version(project_root_folder_path: str | Path) -> VersionInfo:
     """
     Retrieves semantic version from the version file in the given project folder.
 

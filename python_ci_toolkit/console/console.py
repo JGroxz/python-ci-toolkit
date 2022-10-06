@@ -87,8 +87,8 @@ def initialize_ci_console() -> Console:
         import pkg_resources
         version = pkg_resources.get_distribution('python-ci-toolkit').version
     except Exception:
-        from ..versions import get_project_version
-        version = get_project_version(Path(os.path.dirname(__file__), "../../"))
+        from ..versions import read_project_version
+        version = read_project_version(Path(os.path.dirname(__file__), "../../"))
 
 
     initialized_notification = f"[green]>_[/][rgb(146,202,85)] Python CI console initialized[/]\n"
