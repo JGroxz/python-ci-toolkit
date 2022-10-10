@@ -133,9 +133,11 @@ def write_project_version(project_root_folder_path: str | Path, version: Version
         if version_file_path.exists():
             previous_version = version_file_handler.read_version(version_file_path)
             version_file_handler.write_version(version_file_path, version)
+
+            updated_version_files.append(version_file_name)
             logging.info(f"Changed version in file '{version_file_name}' from {previous_version} to {version}.")
 
-    if (len(updated_version_files) == 0):
+    if len(updated_version_files) == 0:
         # If version could not be read using any of the above options, we can't find it
         raise FileNotFoundError(f"Could not find a valid version file in the given project directory ('{project_root_folder_path}').")
     else:
