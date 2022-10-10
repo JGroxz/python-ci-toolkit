@@ -13,6 +13,10 @@ from .version_file_handlers import VERSION_FILE_HANDLERS, VersionFileHandler
 from ..shell import run_shell_command
 
 
+SUPPORTED_VERSION_FILES: List[str] = list(VERSION_FILE_HANDLERS.keys())
+"""List of version file names supported by Python CI Toolkit."""
+
+
 def parse_semantic_version(version_string: str) -> VersionInfo:
     """
     Tries to parse semantic VersionInfo from the given string.
