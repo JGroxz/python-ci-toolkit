@@ -89,9 +89,10 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
     else:
         # find branches or tags matching the given version
         _, output = run_shell_command(f'git ls-remote "{git_repo_url}"', silence_output=True, use_wsl_on_windows=False)
+        output_lines = output.split("\n")
         branch_exists = False
         tag_exists = False
-        for line in output:
+        for line in output_lines:
             if f"refs/heads/{action_version}" in line:
                 branch_exists = True
             if f"refs/tags/{action_version}" in line:
