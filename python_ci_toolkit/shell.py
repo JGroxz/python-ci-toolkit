@@ -107,7 +107,9 @@ def run_shell_command(command: str,
 
     if (exitcode != 0) and throw_exception_on_error:
         raise RuntimeError(f"Error executing command (exit code {exitcode})\n"
-                           f"    Command: {command}\n"
-                           f"    Output: {captured_output}\n")
+                           f"  Command:\n"
+                           f"    {command}\n"
+                           f"  Output:\n"
+                           f"    {''.join(captured_output)}\n")
 
     return exitcode, captured_output
