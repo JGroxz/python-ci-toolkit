@@ -187,7 +187,8 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
             ssh_private_key=actions_ssh_private_key
         )
 
-        action_source = f"'{action_version}' at '{actions_git_repo_url}'"
+        branch_or_tag_name = "main" if (action_version is None) else action_version
+        action_source = f"'{branch_or_tag_name}' at '{actions_git_repo_url}'"
 
         duration = time.perf_counter() - start_time
         logging.info(f"Retrieved action '{action_display_name}' from Git in {duration:.3f} seconds.")
