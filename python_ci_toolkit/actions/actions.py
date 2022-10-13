@@ -112,7 +112,7 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
         if (not tag_exists) and (not branch_exists):
             logging.error(f"Cannot pull action '{action_name}:{action_version}' from Git: "
                           f"remote repository '{git_repo_url}' has neither a branch nor a tag named '{action_version}'.\n"
-                          f"Please make that sure the corresponding branch or tag ('{action_version}') exists before pulling this version again.")
+                          f"Please make sure that the corresponding branch or tag ('{action_version}') exists before pulling this version again.")
             sys.exit(3)
 
         # clear the way for the new clone
@@ -125,7 +125,7 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
     # check if the repo had the requested action script
     if not action_script_cloned_path.exists():
         logging.error(f"Cloned repository '{git_repo_url}' does include action '{action_name}' (expected script path is '{action_script_cloned_path}').\n"
-                      f"Please make that sure that the remote repository has the required action script.")
+                      f"Please make sure that the remote repository has the required action script.")
         sys.exit(4)
 
     # copy the action script over to the downloaded actions directory
