@@ -7,7 +7,7 @@ import os
 import shlex
 import subprocess
 from pathlib import Path
-from typing import Tuple, List
+from typing import Tuple
 
 from rich.style import Style
 from rich.table import Table
@@ -27,7 +27,7 @@ def run_shell_command(command: str,
                       silence_output: bool = False,
                       raw_output: bool = False,
                       throw_exception_on_error: bool = True,
-                      use_wsl_on_windows: bool = True) -> Tuple[int, List[str]]:
+                      use_wsl_on_windows: bool = True) -> Tuple[int, str]:
     """
     Executes the given command in a subprocess.
 
@@ -70,7 +70,7 @@ def run_shell_command(command: str,
     # prepare command args
     args = shlex.split(command)
 
-    captured_output: List[str] = []
+    captured_output = ""
 
     # helper function for handling the executed shell command's output
     def capture_subprocess_output(pipe, stderr: bool = False):
@@ -79,7 +79,7 @@ def run_shell_command(command: str,
 
             # capture output
             nonlocal captured_output
-            captured_output.append(decoded_line)
+            captured_output += decoded_line
 
             # print to console if not silenced
             if not silence_output:
