@@ -148,7 +148,8 @@ def retrieve_ci_action_script_local(action_name: str) -> Path:
     action_file_path = Path(local_ci_actions_folder, f"{action_name}.py")
 
     if not action_file_path.exists():
-        raise FileNotFoundError(f"Cannot run action '{action_name}' from local file '{action_file_path}': file does not exist.")
+        raise FileNotFoundError(f"Cannot run action '{action_name}' from local file '{action_file_path}': file does not exist.\n"
+                                f"When you run actions in local mode, make sure that the corresponding action file exists in '.ci/actions' folder in your CI project's root.")
 
     return action_file_path
 
@@ -170,8 +171,10 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
         # Git repo
         start_time = time.perf_counter()
 
-        actions_ssh_private_key = assert_environment_variable_set("PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY")
-        actions_git_repo_url = assert_environment_variable_set("PYTHON_CI_ACTIONS_GIT_REPO_URL")
+        actions_git_repo_url = assert_environment_variable_set("PYTHON_CI_ACTIONS_GIT_REPO_URL",
+                                                               f"URL address of the Git repository is required to pull the code for action '{action_display_name}'.")
+        actions_ssh_private_key = assert_environment_variable_set("PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY",
+                                                                  "SSH private key is required to pull actions from the private remote Git repositories.")
 
         action_script_path = retrieve_ci_action_script_from_git(
             git_repo_url=actions_git_repo_url,
@@ -208,8 +211,6 @@ def cli() -> None:
     Executes CI action.
     """
 
-    initialize_ci_console()
-
     def cli_print_usage() -> None:
         message = ("Usage: python-ci-action action_name[:action_version] [action_args]\n"
                    "\n"
@@ -234,6 +235,8 @@ def cli() -> None:
     # sanity checks
     if len(sys.argv) <= 1:
         cli_error_and_exit(1, "No CI action name given.")
+
+    initialize_ci_console()
 
     # parse action name/version from the first argument
     first_arg = sys.argv[1]
