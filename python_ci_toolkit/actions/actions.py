@@ -11,8 +11,7 @@ import time
 from pathlib import Path
 from typing import List
 
-from python_ci_toolkit.console import initialize_ci_console
-from ..environment import assert_environment_variable_set, ci_project_root
+from ..environment import assert_environment_variable_set, ci_project_root, assert_multiline_environment_variable_set
 from ..python import import_module_from_file
 from ..shell import run_shell_command
 
@@ -178,8 +177,8 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
 
         actions_git_repo_url = assert_environment_variable_set("PYTHON_CI_ACTIONS_GIT_REPO_URL",
                                                                f"URL address of the Git repository is required to pull the code for action '{action_display_name}'.")
-        actions_ssh_private_key = assert_environment_variable_set("PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY",
-                                                                  "SSH private key is required to pull actions from the private remote Git repositories.")
+        actions_ssh_private_key = assert_multiline_environment_variable_set("PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY",
+                                                                            "SSH private key is required to pull actions from the private remote Git repositories.")
 
         action_script_path = retrieve_ci_action_script_from_git(
             git_repo_url=actions_git_repo_url,
@@ -241,6 +240,8 @@ def cli() -> None:
     if len(sys.argv) <= 1:
         cli_error_and_exit(1, "No CI action name given.")
 
+    # initialize CI console for formatted output
+    from ..console import initialize_ci_console
     initialize_ci_console()
 
     # parse action name/version from the first argument

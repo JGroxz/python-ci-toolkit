@@ -5,6 +5,7 @@ import logging
 import os
 from enum import Enum
 from pathlib import Path
+from typing import List
 
 
 class CiEnvironmentType(Enum):
@@ -79,6 +80,44 @@ def assert_environment_variable_set(variable_name: str, usage_explanation: str =
     assert os.environ.get(variable_name), message
 
     return os.environ[variable_name]
+
+
+def assert_multiline_environment_variable_set(variable_name: str, usage_explanation: str = None, newline_substitution_character: str = "|") -> str:
+    """
+    A version of assert_environment_variable_set() function which recovers multiline environment variable from its inlined form on platforms which don't support multiline ones.
+
+    Notes:
+        Use this function when you need to read a multiline environment variable from your CI environment.
+
+        If the current CI environment supports multiline environment variables,
+        this function will return variable's original value without modifying it.
+
+        Certain CI environments (e.g. BitBucket Pipelines) do not support multiline environment variables.
+        A workaround is to use a substitution character instead of newline ('\\\\n') in their values when defining them in the CI interface,
+        and then recover the value back to multi-line one when running. This is exactly what this function does.
+
+    Args:
+        variable_name: Name of the variable to assert and recover.
+        usage_explanation: Optional string with an explanation of why the given environment variable must be set.
+        newline_substitution_character: Character used in the environment variable instead of newline.
+            The default value is pipe ('|').
+
+    Returns:
+        Recovered multiline value of the given environment variable.
+    """
+    value = assert_environment_variable_set(variable_name, usage_explanation)
+
+    # list of CI environment types which do not support defining multiline environment variables
+    unsupported_environments: List[CiEnvironmentType] = [
+        CiEnvironmentType.BitbucketPipelines
+    ]
+
+    # recover if we are in an unsupported environment
+    if ci_environment_type in unsupported_environments:
+        return value.replace(newline_substitution_character, "\n")
+
+    # return original value otherwise
+    return value
 
 
 def get_project_root_directory_path() -> Path:
