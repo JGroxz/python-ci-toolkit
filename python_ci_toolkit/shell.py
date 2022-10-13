@@ -7,7 +7,7 @@ import os
 import shlex
 import subprocess
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, List
 
 from rich.style import Style
 from rich.table import Table
@@ -26,7 +26,7 @@ def run_shell_command(command: str,
                       silence_output: bool = False,
                       raw_output: bool = False,
                       throw_exception_on_error: bool = True,
-                      use_wsl_on_windows: bool = True) -> Tuple[int, str | None]:
+                      use_wsl_on_windows: bool = True) -> Tuple[int, List[str]]:
     """
     Executes the given command in a subprocess.
 
@@ -44,7 +44,7 @@ def run_shell_command(command: str,
         use_wsl_on_windows: If set to True (default) and running on Windows, the provided command will be run in WSL.
 
     Returns:
-        Command exit code.
+        Command exit code and captured output (list of lines).
 
     Raises:
         RuntimeError:
@@ -57,19 +57,19 @@ def run_shell_command(command: str,
         from .console import ci_console as c
         ci_console = c
 
+    # use WSL if required on Windows
+    if os.name == "nt" and use_wsl_on_windows:
+        command = f"wsl {command}"
+
     # print header if using pretty output
     if (not silence_output) and (not raw_output):
         header = Text("Running shell command:", style=SHELL_OUTPUT_PREFIX_STYLE) + " " + Text(f"{command}", style=SHELL_OUTPUT_COMMAND_STYLE)
         ci_console.print(header)
 
-    # use WSL if required on Windows
-    if os.name == "nt" and use_wsl_on_windows:
-        command = f"wsl {command}"
-
     # prepare command args
     args = shlex.split(command)
 
-    captured_output = ""
+    captured_output: List[str] = []
 
     # helper function for handling the executed shell command's output
     def capture_subprocess_output(pipe):
@@ -78,7 +78,7 @@ def run_shell_command(command: str,
 
             # capture output
             nonlocal captured_output
-            captured_output += decoded_line
+            captured_output.append(decoded_line)
 
             # print to console if not silenced
             if not silence_output:
