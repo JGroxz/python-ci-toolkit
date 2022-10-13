@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 from typing import List
 
+from python_ci_toolkit.console import initialize_ci_console
 from ..environment import assert_environment_variable_set, ci_project_root
 from ..python import import_module_from_file
 from ..shell import run_shell_command
@@ -18,7 +19,7 @@ from ..shell import run_shell_command
 CI_SCRIPTS_DIRECTORY_NAME = ".ci"
 CI_SCRIPTS_DIRECTORY_PATH: Path = Path(ci_project_root, CI_SCRIPTS_DIRECTORY_NAME)
 TEMP_CI_DIRECTORY_PATH: Path = Path(CI_SCRIPTS_DIRECTORY_PATH, "temp")
-DOWNLOADED_ACTIONS_DIRECTORY_PATH: Path = Path(CI_SCRIPTS_DIRECTORY_PATH, "downloaded_actions")
+DOWNLOADED_ACTIONS_DIRECTORY_PATH: Path = Path(TEMP_CI_DIRECTORY_PATH, "downloaded_actions")
 
 
 def delete_git_repo(repo_path: Path) -> None:
@@ -41,7 +42,7 @@ def delete_git_repo(repo_path: Path) -> None:
     shutil.rmtree(repo_path, onerror=on_rm_error)
 
 
-def retrieve_ci_action_script_from_git(action_name: str, version: str = None) -> Path:
+def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, action_version: str = None, ssh_private_key: str = None) -> Path:
     """
     Retrieves Python CI script file with the given name from Git repository specified in 'PYTHON_CI_ACTIONS_GIT_REPO_URL' environment variable.
     If the repository is private, a private SSH key can be supplied in 'PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY' environment variable.
@@ -54,17 +55,14 @@ def retrieve_ci_action_script_from_git(action_name: str, version: str = None) ->
         Downloaded scripts will be placed in the folder named '.ci' at the root of the current CI project.
 
     Args:
+        git_repo_url: URL of the Git repository to pull the action from.
         action_name: Name of the action to download.
-        version: Version of the action to pull. Can be either a Git branch or a Git tag in the source repository.
+        action_version: Version of the action to pull. Can be either a Git branch or a Git tag in the source repository.
+        ssh_private_key: Private SSH key to be used when accessing the specified Git repository (string value).
 
     Returns:
         Local path to the downloaded action file.
     """
-
-    # retrieve configuration from env
-    actions_git_repo_url = assert_environment_variable_set("PYTHON_CI_ACTIONS_GIT_REPO_URL")
-    actions_ssh_private_key = assert_environment_variable_set("PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY")
-
     # prepare paths
     action_script_name = f"{action_name}.py"
     ssh_key_file_path = Path(TEMP_CI_DIRECTORY_PATH, "actions_repo_ssh_key")
@@ -76,40 +74,41 @@ def retrieve_ci_action_script_from_git(action_name: str, version: str = None) ->
     os.makedirs(DOWNLOADED_ACTIONS_DIRECTORY_PATH, exist_ok=True)
     os.makedirs(TEMP_CI_DIRECTORY_PATH, exist_ok=True)
 
-    # save Git SSH key to file
-    with io.open(ssh_key_file_path, "w", newline="\n") as file:
-        file.write(actions_ssh_private_key)
+    if ssh_private_key is not None:
+        # save Git SSH key to file
+        with io.open(ssh_key_file_path, "w", newline="\n") as file:
+            file.write(ssh_private_key)
 
-    # tell Git to use the new SSH key file
-    os.environ["GIT_SSH_COMMAND"] = f"ssh -i \"{ssh_key_file_path}\" -o IdentitiesOnly=yes"
+        # tell Git to use the new SSH key file
+        os.environ["GIT_SSH_COMMAND"] = f"ssh -i \"{ssh_key_file_path}\" -o IdentitiesOnly=yes"
 
     # clone the repo
-    if version is None:
+    if action_version is None:
         # if no version specified, just clone the main branch
-        run_shell_command(f'git clone --depth 1 "{actions_git_repo_url}" "{cloned_repo_path}"', silence_output=True, use_wsl_on_windows=False)
+        run_shell_command(f'git clone --depth 1 "{git_repo_url}" "{cloned_repo_path}"', silence_output=True, use_wsl_on_windows=False)
     else:
         # find branches or tags matching the given version
-        _, output = run_shell_command(f'git ls-remote "{actions_git_repo_url}"', silence_output=True, use_wsl_on_windows=False)
+        _, output = run_shell_command(f'git ls-remote "{git_repo_url}"', silence_output=True, use_wsl_on_windows=False)
         branch_exists = False
         tag_exists = False
         for line in output:
-            if f"refs/heads/{version}" in line:
+            if f"refs/heads/{action_version}" in line:
                 branch_exists = True
-            if f"refs/tags/{version}" in line:
+            if f"refs/tags/{action_version}" in line:
                 tag_exists = True
 
         # if both a branch and a tag exist with the same name, do not pull to avoid ambiguity
         if tag_exists and branch_exists:
-            logging.error(f"Both a branch and a tag named '{version}' exist in remote repository '{actions_git_repo_url}'.\n"
-                          f"The action '{action_name}:{version}' wil not be pulled to avoid ambiguity.\n"
-                          f"Please remove the redundant branch or tag ('{version}') from the repo before pulling this version again.")
+            logging.error(f"Both a branch and a tag named '{action_version}' exist in remote repository '{git_repo_url}'.\n"
+                          f"The action '{action_name}:{action_version}' wil not be pulled to avoid ambiguity.\n"
+                          f"Please remove the redundant branch or tag ('{action_version}') from the repo before pulling this version again.")
             sys.exit(2)
 
         # if nothing matches the version, there is nothing we can do
         if (not tag_exists) and (not branch_exists):
-            logging.error(f"Cannot pull action '{action_name}:{version}' from Git: "
-                          f"remote repository '{actions_git_repo_url}' has neither a branch nor a tag named '{version}'.\n"
-                          f"Please make that sure the corresponding branch or tag ('{version}') exists before pulling this version again.")
+            logging.error(f"Cannot pull action '{action_name}:{action_version}' from Git: "
+                          f"remote repository '{git_repo_url}' has neither a branch nor a tag named '{action_version}'.\n"
+                          f"Please make that sure the corresponding branch or tag ('{action_version}') exists before pulling this version again.")
             sys.exit(3)
 
         # clear the way for the new clone
@@ -117,11 +116,11 @@ def retrieve_ci_action_script_from_git(action_name: str, version: str = None) ->
             delete_git_repo(cloned_repo_path)
 
         # pull whatever is available
-        run_shell_command(f'git clone --depth 1 --branch "{version}" "{actions_git_repo_url}" "{cloned_repo_path}"', silence_output=True, use_wsl_on_windows=False)
+        run_shell_command(f'git clone --depth 1 --branch "{action_version}" "{git_repo_url}" "{cloned_repo_path}"', silence_output=True, use_wsl_on_windows=False)
 
     # check if the repo had the requested action script
     if not action_script_cloned_path.exists():
-        logging.error(f"Cloned repository '{actions_git_repo_url}' does include action '{action_name}' (expected script path is '{action_script_cloned_path}').\n"
+        logging.error(f"Cloned repository '{git_repo_url}' does include action '{action_name}' (expected script path is '{action_script_cloned_path}').\n"
                       f"Please make that sure that the remote repository has the required action script.")
         sys.exit(4)
 
@@ -159,17 +158,32 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
     Executes CI action by the given action name.
     """
     action_display_name = action_name if (action_version is None) else f"{action_name}:{action_version}"
+    logging.info(f"Locating action '{action_display_name}'...")
 
     # locate action script
-    start_time = time.perf_counter()
-
     if action_version == "local":
+        # local folder
         action_script_path = retrieve_ci_action_script_local(action_name)
-        print(f"Retrieved local action '{action_display_name}'. Running...")
+        action_source = f"'{action_script_path}'"
+        logging.info(f"Retrieved local action '{action_name}'. Running...")
     else:
-        action_script_path = retrieve_ci_action_script_from_git(action_name, action_version)
+        # Git repo
+        start_time = time.perf_counter()
+
+        actions_ssh_private_key = assert_environment_variable_set("PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY")
+        actions_git_repo_url = assert_environment_variable_set("PYTHON_CI_ACTIONS_GIT_REPO_URL")
+
+        action_script_path = retrieve_ci_action_script_from_git(
+            git_repo_url=actions_git_repo_url,
+            action_name=action_name,
+            action_version=action_version,
+            ssh_private_key=actions_ssh_private_key
+        )
+
+        action_source = f"'{action_version}' at '{actions_git_repo_url}'"
+
         duration = time.perf_counter() - start_time
-        print(f"Retrieved action '{action_display_name}' in {duration:.3f} seconds. Running...")
+        logging.info(f"Retrieved action '{action_display_name}' from Git in {duration:.3f} seconds.")
 
     # prepare action's CLI arguments
     sys.argv = sys.argv[:1]
@@ -177,7 +191,15 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
         sys.argv.extend(argv)
 
     # run CI action using its cli() method with the given arguments
-    action_module = import_module_from_file(f"{action_name}", f"{action_script_path}")
+    try:
+        action_module = import_module_from_file(f"{action_name}", f"{action_script_path}")
+    except Exception:
+        logging.error(f"Error when importing Python module from action script '{action_script_path}' (action '{action_display_name}' from {action_source}).")
+        raise
+
+    logging.info(f"> Running action '{action_name}':\n"
+                 f"    Version: '{action_version}'\n"
+                 f"    Source: {action_source}")
     action_module.cli()
 
 
@@ -185,6 +207,8 @@ def cli() -> None:
     """
     Executes CI action.
     """
+
+    initialize_ci_console()
 
     def cli_print_usage() -> None:
         message = ("Usage: python-ci-action action_name[:action_version] [action_args]\n"
@@ -203,8 +227,7 @@ def cli() -> None:
         print(message)
 
     def cli_error_and_exit(error_code: int, error_text: str) -> None:
-        print(f"Error: {error_text}")
-        print()
+        print(f"Error: {error_text}\n")
         cli_print_usage()
         sys.exit(error_code)
 
