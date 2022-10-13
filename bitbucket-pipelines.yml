@@ -13,9 +13,9 @@ definitions:
         services:
           - docker
         script:
-          - python housekeeping/setup_aws_cli.py
-          - python housekeeping/build_poetry_package.py
-          - python housekeeping/publish_poetry_package.py
+          - python-ci-action setup_aws_cli
+          - python-ci-action build_poetry_package
+          - python-ci-action publish_poetry_package
 
 pipelines:
   branches:
