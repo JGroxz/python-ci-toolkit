@@ -60,17 +60,23 @@ def get_ci_environment_name() -> str:
         return "Unknown/Local"
 
 
-def assert_environment_variable_set(variable_name: str) -> str:
+def assert_environment_variable_set(variable_name: str, usage_explanation: str = None) -> str:
     """
     Assert that the given environment variable is set and available.
 
     Args:
         variable_name: Name of the environment variable to assert.
+        usage_explanation: Optional string with an explanation of why the given environment variable must be set.
 
     Returns:
         Value of the given environment variable.
     """
-    assert os.environ.get(variable_name), f"'{variable_name}' environment variable is not set, but is required by CI logic."
+    message = f"'{variable_name}' environment variable is not set, but is required by CI logic."
+    if usage_explanation is not None:
+        message = (f"{message}\n"
+                   f"Explanation: {usage_explanation}")
+
+    assert os.environ.get(variable_name), message
 
     return os.environ[variable_name]
 
