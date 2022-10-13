@@ -79,6 +79,10 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
         with io.open(ssh_key_file_path, "w", newline="\n") as file:
             file.write(ssh_private_key)
 
+        # adjust SSH key permissions on UNIX-like systems to prevent 'ssh' command from complaining
+        if os.name == "posix":
+            os.chmod(ssh_key_file_path, 600)
+
         # tell Git to use the new SSH key file
         os.environ["GIT_SSH_COMMAND"] = f"ssh -i \"{ssh_key_file_path}\" -o IdentitiesOnly=yes"
 
