@@ -221,15 +221,15 @@ def cli() -> None:
                    "\n"
                    "Notes:\n"
                    "  - Action name must correspond to the name of action's Python file without a '.py' extension.\n"
-                   "  - Action version can be either a Git branch name or a Git tag. The corresponding branch/tag will be pulled from the version repository.\n"
+                   "  - Action version can be either a Git branch name or a Git tag. The corresponding branch/tag will be pulled from the action repository.\n"
                    "  - If action version is set to 'local', utility will look for the action file in '.ci/actions' folder inside your CI project's root directory.\n"
                    "  - Any arguments passed after the action name/tag will be passed to the executed action script.\n"
                    "\n"
                    "Examples:\n"
-                   "  python-ci-action build_dockers          # Run 'build_dockers' action from Git branch 'main'\n"
-                   "  python-ci-action build_dockers:develop  # Run 'build_dockers' action from Git branch 'develop'\n"
-                   "  python-ci-action build_dockers:v1.0.0   # Run 'build_dockers' action from Git tag 'v1.0.0'\n"
-                   "  python-ci-action build_dockers:local    # Run 'build_dockers' located at '.ci/action/build_dockers.py' at your CI project's root folder\n")
+                   "  python-ci-action build_dockers          # Runs 'build_dockers' action from Git branch 'main'\n"
+                   "  python-ci-action build_dockers:develop  # Runs 'build_dockers' action from Git branch 'develop'\n"
+                   "  python-ci-action build_dockers:v1.0.0   # Runs 'build_dockers' action from Git tag 'v1.0.0'\n"
+                   "  python-ci-action build_dockers:local    # Runs 'build_dockers' located at '.ci/actions/build_dockers.py' at your CI project's root folder\n")
         print(message)
 
     def cli_error_and_exit(error_code: int, error_text: str) -> None:
