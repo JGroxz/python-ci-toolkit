@@ -60,17 +60,23 @@ def get_ci_environment_name() -> str:
         return "Unknown/Local"
 
 
-def assert_environment_variable_set(variable_name: str) -> str:
+def assert_environment_variable_set(variable_name: str, usage_explanation: str = None) -> str:
     """
     Assert that the given environment variable is set and available.
 
     Args:
         variable_name: Name of the environment variable to assert.
+        usage_explanation: Optional string with an explanation of why the given environment variable must be set.
 
     Returns:
         Value of the given environment variable.
     """
-    assert os.environ.get(variable_name), f"'{variable_name}' environment variable is not set, but is required by CI logic."
+    message = f"'{variable_name}' environment variable is not set, but is required by CI logic."
+    if usage_explanation is not None:
+        message = (f"{message}\n"
+                   f"Explanation: {usage_explanation}")
+
+    assert os.environ.get(variable_name), message
 
     return os.environ[variable_name]
 
@@ -81,8 +87,8 @@ def get_project_root_directory_path() -> Path:
 
     Notes:
         This is guaranteed to be accurate in cloud CI environments (e.g. Bitbucket Pipelines).
-        When run on a local machine, this function will assume that python_ci_toolkit module is inside the venv folder in the project root directory;
-        otherwise, the folder won't be possible to locate.
+        When run on a local machine, this function will assume that python_ci_toolkit module is inside the venv folder in the project root directory when searching;
+        otherwise, current working directory will be assumed to be project's root.
 
     Returns:
         Absolute path to the root folder of the current CI project.
@@ -123,7 +129,6 @@ Absolute path to the current project's root folder.
 
 Notes:
     This is guaranteed to be accurate in cloud CI environments (e.g. Bitbucket Pipelines).
-    When run on a local machine, this function will assume that python-ci-toolkit package 
-    is inside the venv folder in the project's root directory; if that is not the case, 
-    current working directory will be assumed to be  folder won't be possible to locate.
+    When on a local machine, it will assume that python_ci_toolkit module is inside the venv folder in the project root directory when searching;
+    otherwise, current working directory will be assumed to be project's root.
 """
