@@ -17,6 +17,7 @@ SHELL_OUTPUT_PREFIX_WIDTH_MIN = 15
 SHELL_OUTPUT_PREFIX_WIDTH_MAX = 26
 SHELL_OUTPUT_PREFIX_STYLE = Style(color="blue")
 SHELL_OUTPUT_COMMAND_STYLE = Style(color="deep_sky_blue4", italic=True)
+SHELL_OUTPUT_STDERR_STYLE = Style(color="red")
 
 ci_console = None
 
@@ -72,7 +73,7 @@ def run_shell_command(command: str,
     captured_output: List[str] = []
 
     # helper function for handling the executed shell command's output
-    def capture_subprocess_output(pipe):
+    def capture_subprocess_output(pipe, stderr: bool = False):
         for line in iter(pipe.readline, b''):  # b'\n'-separated lines
             decoded_line = line.decode("utf-8")
 
@@ -91,7 +92,7 @@ def run_shell_command(command: str,
                     grid.add_column(style=SHELL_OUTPUT_PREFIX_STYLE)
                     grid.add_column(overflow="fold")
                     grid.add_row(
-                        Text(f" > shell: ") + Text(command, style=SHELL_OUTPUT_COMMAND_STYLE), " │ ", decoded_line
+                        Text(f" > shell: ") + Text(command, style=SHELL_OUTPUT_COMMAND_STYLE), " │ ", (decoded_line if (not stderr) else Text(decoded_line, style=SHELL_OUTPUT_STDERR_STYLE))
                     )
 
                     ci_console.print(grid, end="")
@@ -101,7 +102,7 @@ def run_shell_command(command: str,
     with process.stdout:
         with process.stderr:
             capture_subprocess_output(process.stdout)
-            capture_subprocess_output(process.stderr)
+            capture_subprocess_output(process.stderr, stderr=True)
     exitcode = process.wait()
 
     if (exitcode != 0) and throw_exception_on_error:
