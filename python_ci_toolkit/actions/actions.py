@@ -81,7 +81,7 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
 
         # adjust SSH key permissions on UNIX-like systems to prevent 'ssh' command from complaining
         if os.name == "posix":
-            os.chmod(ssh_key_file_path, 600)
+            os.chmod(ssh_key_file_path, 0o600)
 
         # tell Git to use the new SSH key file
         os.environ["GIT_SSH_COMMAND"] = f"ssh -i \"{ssh_key_file_path}\" -o IdentitiesOnly=yes"
