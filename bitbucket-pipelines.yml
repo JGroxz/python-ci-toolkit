@@ -16,8 +16,17 @@ definitions:
           - python-ci-action setup_aws_cli
           - python-ci-action build_poetry_package
           - python-ci-action publish_poetry_package
+    - step: &update_python_ci_containers
+        name: Update self dependency in python-ci-containers
+        oidc: true
+        image: *python_ci_runner
+        services:
+          - docker
+        script:
+          - python-ci-action update_dependency_in_python_ci_containers:local
 
 pipelines:
   branches:
     feature/ci:
       - step: *build_poetry_package
+      - step: *update_python_ci_containers
