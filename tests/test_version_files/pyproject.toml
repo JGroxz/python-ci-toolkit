@@ -3,18 +3,16 @@ requires = [ "poetry-core>=1.0.0",]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
-name = "python-ci-toolkit"
-version = "0.5.8"
+name = "epic-dummy-pyproject-file-to-test-version-parsing"
+version = "1.0.0-test"
 description = "A collection of tools for building CI Python scripts used by PyCI"
 authors = [ "PyCI <hello@pyci.dev>",]
 
 [tool.poetry.dependencies]
 python = "^3.8"
-rich = ">=1"
-semver = ">=2"
-toml = ">=0.10"
+hopes = ">=2.0"
+prayers = ">=9.1"
+pure-determination = "1.0.0-dev"
 
 [tool.poetry.dev-dependencies]
-
-[tool.poetry.scripts]
-python-ci-action="python_ci_toolkit.actions:cli"
+fuck = "ass"
