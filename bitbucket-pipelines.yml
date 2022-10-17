@@ -39,4 +39,7 @@ pipelines:
     develop:
       - step: *handle_semver
       - step: *build_poetry_package
+    main:
+      - step: *handle_semver
+      - step: *build_poetry_package
       - step: *update_python_ci_containers
