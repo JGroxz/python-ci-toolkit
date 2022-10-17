@@ -6,6 +6,15 @@ image: &python_ci_runner
 
 definitions:
   steps:
+    - step: &handle_semver
+        name: Handle semantic version
+        oidc: true
+        image: *python_ci_runner
+        services:
+          - docker
+        script:
+          - python-ci-action generate_semantic_version_from_git
+          - python-ci-action push_committed_changes_and_tags_to_git
     - step: &build_poetry_package
         name: Build and publish Poetry package
         oidc: true
@@ -28,5 +37,6 @@ definitions:
 pipelines:
   branches:
     feature/ci:
+      - step: *handle_semver
       - step: *build_poetry_package
       - step: *update_python_ci_containers
