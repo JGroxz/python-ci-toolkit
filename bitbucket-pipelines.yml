@@ -15,7 +15,7 @@ definitions:
         script:
           - python-ci-action generate_semantic_version_from_git
           - python-ci-action push_committed_changes_and_tags_to_git
-    - step: &build_poetry_package
+    - step: &release_poetry_package
         <<: *use_python_ci_runner_image
         name: Build and publish Poetry package
         script:
@@ -32,10 +32,9 @@ pipelines:
   branches:
     develop:
       - step: *handle_semver
-      - step: *build_poetry_package
     main:
       - step: *handle_semver
-      - step: *build_poetry_package
       - step: *update_python_ci_containers
-    feature/ci:
-      - step: *handle_semver
+  tags:
+    'v*':
+      - step: *release_poetry_package
