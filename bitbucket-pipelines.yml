@@ -1,6 +1,6 @@
 definitions:
   anchors:
-    - &use_python_ci_runner # step settings to use python-ci-runner Docker image
+    - &use_python_ci_runner_image # step settings to use python-ci-runner Docker image
       oidc: true
       services:
         - docker
@@ -10,21 +10,21 @@ definitions:
           oidc-role: $AWS_OIDC_ROLE_ARN
   steps:
     - step: &handle_semver
+        <<: *use_python_ci_runner_image
         name: Handle semantic version
-        <<: *use_python_ci_runner
         script:
           - python-ci-action generate_semantic_version_from_git
           - python-ci-action push_committed_changes_and_tags_to_git
     - step: &build_poetry_package
+        <<: *use_python_ci_runner_image
         name: Build and publish Poetry package
-        <<: *use_python_ci_runner
         script:
           - python-ci-action setup_aws_cli
           - python-ci-action build_poetry_package
           - python-ci-action publish_poetry_package
     - step: &update_python_ci_containers
+        <<: *use_python_ci_runner_image
         name: Update self dependency in python-ci-containers
-        <<: *use_python_ci_runner
         script:
           - python-ci-action update_dependency_in_python_ci_containers:local
 
@@ -37,3 +37,5 @@ pipelines:
       - step: *handle_semver
       - step: *build_poetry_package
       - step: *update_python_ci_containers
+    feature/ci:
+      - step: *handle_semver
