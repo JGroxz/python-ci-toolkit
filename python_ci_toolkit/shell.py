@@ -101,6 +101,7 @@ def run_shell_command(command: str,
     process = subprocess.Popen(args, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     with process.stdout:
         with process.stderr:
+            # TODO: use threads so that both can print at the same time?
             capture_subprocess_output(process.stdout)
             capture_subprocess_output(process.stderr, stderr=True)
     exitcode = process.wait()
