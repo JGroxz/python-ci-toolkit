@@ -6,6 +6,8 @@ from __future__ import annotations
 import os
 import shlex
 import subprocess
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Tuple
 
@@ -72,6 +74,9 @@ def run_shell_command(command: str,
 
     captured_output = ""
 
+    # lock is required to prints from stdout- and stderr-reading threads from interfering with each other (if 'silence_output' is set to False)
+    lock = threading.Lock()
+
     # helper function for handling the executed shell command's output
     def capture_subprocess_output(pipe, stderr: bool = False):
         for line in iter(pipe.readline, b''):  # b'\n'-separated lines
@@ -83,6 +88,7 @@ def run_shell_command(command: str,
 
             # print to console if not silenced
             if not silence_output:
+                lock.acquire()
                 decoded_line = decoded_line.rstrip(" \n")
                 if raw_output:
                     print(decoded_line)
@@ -94,15 +100,17 @@ def run_shell_command(command: str,
                     grid.add_row(
                         Text(f" > shell: ") + Text(command, style=SHELL_OUTPUT_COMMAND_STYLE), " │ ", (decoded_line if (not stderr) else Text(decoded_line, style=SHELL_OUTPUT_STDERR_STYLE))
                     )
-
                     ci_console.print(grid, end="")
+                lock.release()
 
     # run the shell command and capture its output
     process = subprocess.Popen(args, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    with process.stdout:
-        with process.stderr:
-            capture_subprocess_output(process.stdout)
-            capture_subprocess_output(process.stderr, stderr=True)
+    with process.stdout, process.stderr:
+        # we read stdout and stderr in threads to be able to print live logs from both streams concurrently
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            executor.submit(capture_subprocess_output, process.stdout)
+            executor.submit(capture_subprocess_output, process.stderr, stderr=True)
+            executor.shutdown(wait=True)
     exitcode = process.wait()
 
     if (exitcode != 0) and throw_exception_on_error:
