@@ -75,7 +75,7 @@ def assert_environment_variable_set(variable_name: str, usage_explanation: str =
     message = f"'{variable_name}' environment variable is not set, but is required by CI logic."
     if usage_explanation is not None:
         message = (f"{message}\n"
-                   f"Explanation: {usage_explanation}")
+                   f"    Explanation: {usage_explanation}")
 
     assert os.environ.get(variable_name), message
 
