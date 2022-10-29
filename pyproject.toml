@@ -4,7 +4,11 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "python-ci-toolkit"
+<<<<<<< HEAD
 version = "0.7.2-dev"
+=======
+version = "0.7.0"
+>>>>>>> main
 description = "A collection of tools for building CI Python scripts used by PyCI"
 authors = [ "PyCI <hello@pyci.dev>",]
 
