@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import rich
 import rich.pretty
 from rich.console import Console
@@ -14,10 +16,10 @@ def run():
     aws_domain_owner = "755432789552"
     aws_region = "eu-west-1"
 
-    error, output = run_shell_command(
-        f"aws codeartifact get-authorization-token --domain {aws_domain} --domain-owner {aws_domain_owner} --query authorizationToken --output text")
+    # error, output = run_shell_command(
+    #     f"aws codeartifact get-authorization-token --domain {aws_domain} --domain-owner {aws_domain_owner} --query authorizationToken --output text")
 
-    test_command = "ls -a"
+    test_command = f"bash tests/files/shell/slow_print.sh"
     test_cwd = "../"
 
     def print_run_result(run_result):
