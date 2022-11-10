@@ -1,7 +1,6 @@
 """
 Provides functions to retrieve and run CI actions based on Python scripts.
 """
-import io
 import logging
 import os
 import shutil
@@ -11,7 +10,8 @@ import time
 from pathlib import Path
 from typing import List
 
-from ..environment import assert_environment_variable_set, ci_project_root, assert_multiline_environment_variable_set
+from python_ci_toolkit.git import prepare_git_ssh, reset_git_ssh
+from ..environment import assert_environment_variable_set, ci_project_root, assert_multiline_environment_variable_set, ci_environment_type, CiEnvironmentType, is_environment_variable_set
 from ..python import import_module_from_file
 from ..shell import run_shell_command
 
@@ -64,7 +64,6 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
     """
     # prepare paths
     action_script_name = f"{action_name}.py"
-    ssh_key_file_path = Path(TEMP_CI_DIRECTORY_PATH, "actions_repo_ssh_key")
     cloned_repo_path = Path(TEMP_CI_DIRECTORY_PATH, "actions_repo_clone")
     action_script_cloned_path = Path(cloned_repo_path, "actions", f"{action_name}", f"{action_name}.py")
     action_script_local_path = Path(DOWNLOADED_ACTIONS_DIRECTORY_PATH, action_script_name)
@@ -74,16 +73,7 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
     os.makedirs(TEMP_CI_DIRECTORY_PATH, exist_ok=True)
 
     if ssh_private_key is not None:
-        # save Git SSH key to file
-        with io.open(ssh_key_file_path, "w", newline="\n") as file:
-            file.write(ssh_private_key)
-
-        # adjust SSH key permissions on UNIX-like systems to prevent 'ssh' command from complaining
-        if os.name == "posix":
-            os.chmod(ssh_key_file_path, 0o600)
-
-        # tell Git to use the new SSH key file
-        os.environ["GIT_SSH_COMMAND"] = f"ssh -i \"{ssh_key_file_path}\" -o IdentitiesOnly=yes"
+        prepare_git_ssh(ssh_private_key)
 
     # clone the repo
     if action_version is None:
@@ -133,7 +123,7 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
 
     # clean up
     delete_git_repo(cloned_repo_path)
-    os.remove(ssh_key_file_path)
+    reset_git_ssh()
 
     return action_script_local_path
 
@@ -175,6 +165,8 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
         # Git repo
         start_time = time.perf_counter()
 
+        setup_git_environment_fallbacks_if_local()
+
         actions_git_repo_url = assert_environment_variable_set("PYTHON_CI_ACTIONS_GIT_REPO_URL",
                                                                f"URL address of the Git repository is required to pull the code for action '{action_display_name}'.")
         actions_ssh_private_key = assert_multiline_environment_variable_set("PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY",
@@ -209,6 +201,29 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
                  f"    Version: '{action_version}'\n"
                  f"    Source: {action_source}")
     action_module.cli()
+
+
+def setup_git_environment_fallbacks_if_local():
+    """
+    Applies default values to the environment variables for remote actions Git repo access if running in Unknown/Local CI environment and those variables are not set.
+
+    Notes:
+        This function is used to simplify the process of running remote CI actions in non-cloud CI environments, which are usually developer machines.
+        It allows to fall back to the default actions repo and makes the logic use local SSH keys for the repository access.
+    """
+    if ci_environment_type != CiEnvironmentType.Unknown:
+        return
+
+    # when running in a local environment, set up fallback values for Git actions repo environment variables
+    repo_url_env_var = "PYTHON_CI_ACTIONS_GIT_REPO_URL"
+    if not is_environment_variable_set(repo_url_env_var):
+        default_actions_repository = "git@bitbucket.org:pyci/python-ci-actions.git"
+        logging.warning(f"Environment variable '{repo_url_env_var}' is not set. Falling back to the default actions repository: '{default_actions_repository}'")
+
+    ssh_key_env_var = "PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY"
+    if not is_environment_variable_set(ssh_key_env_var):
+        logging.warning(f"Environment variable '{ssh_key_env_var}' is not set. Falling back to using default SSH configuration on this machine for remote actions Git repo access.")
+        os.environ["PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY"] = ""
 
 
 def cli() -> None:
