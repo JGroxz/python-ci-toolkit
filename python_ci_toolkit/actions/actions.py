@@ -165,12 +165,14 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
         # Git repo
         start_time = time.perf_counter()
 
-        actions_git_repo_url = assert_environment_variable_set("PYTHON_CI_ACTIONS_GIT_REPO_URL",
-                                                               f"URL address of the Git repository is required to pull the code for action '{action_display_name}'.",
-                                                               fallback_value_getter=lambda _: "git@bitbucket.org:pyci/python-ci-actions.git")
-        actions_ssh_private_key = assert_multiline_environment_variable_set("PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY",
-                                                                            "SSH private key is required to pull actions from the private remote Git repositories.",
-                                                                            fallback_value_getter=get_default_ssh_private_key)
+        actions_git_repo_url = assert_environment_variable_set(
+            "PYTHON_CI_ACTIONS_GIT_REPO_URL",
+            f"URL address of the Git repository is required to pull the code for action '{action_display_name}'.",
+            fallback_value_getter=lambda: "git@bitbucket.org:pyci/python-ci-actions.git")
+        actions_ssh_private_key = assert_multiline_environment_variable_set(
+            "PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY",
+            "SSH private key is required to pull actions from the private remote Git repositories.",
+            fallback_value_getter=get_default_ssh_private_key)
 
         action_script_path = retrieve_ci_action_script_from_git(
             git_repo_url=actions_git_repo_url,
