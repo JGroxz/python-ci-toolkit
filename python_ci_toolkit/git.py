@@ -55,8 +55,8 @@ def prepare_git_ssh(ssh_private_key: str = None) -> None:
     if (ssh_private_key is None) or (ssh_private_key == ""):
         # Try to retrieve the default SSH key
         logging.info("Private SSH key string is not provided, trying to locate SSH keys file in the default directory...")
-        ssh_private_key = get_default_ssh_private_key()
         default_path = get_default_ssh_private_key_file_path()
+        ssh_private_key = get_default_ssh_private_key()
 
         if ssh_private_key is None:
             # If the default key is missing, there is nothing we can do here
@@ -64,6 +64,9 @@ def prepare_git_ssh(ssh_private_key: str = None) -> None:
         else:
             # If all is good, print path to the used private key file for info
             logging.info(f"Default private SSH key loaded successfully from '{default_path}'.")
+
+    # Make sure that temporary folder for the key file exists
+    os.makedirs(os.path.dirname(TEMP_PRIVATE_SSH_KEY_FILE_PATH), exist_ok=True)
 
     # Save Git SSH key to file
     with io.open(TEMP_PRIVATE_SSH_KEY_FILE_PATH, "w", newline="\n") as file:
