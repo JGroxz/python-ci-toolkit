@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from python_ci_toolkit.environment import get_project_root_directory_path, assert_environment_variable_set
+from python_ci_toolkit.environment import get_project_root_directory_path, assert_environment_variable_set, assert_multiline_environment_variable_set
 
 
 def test_project_root_directory_path():
@@ -11,8 +11,8 @@ def test_project_root_directory_path():
 
 
 def test_environment_variable_set():
-    TEST_VALUE = "some test value"
     VARIABLE_NAME = "TEST_ENVIRONMENT_VARIABLE"
+    TEST_VALUE = "some test value"
 
     os.environ[VARIABLE_NAME] = TEST_VALUE
 
@@ -36,6 +36,20 @@ def test_environment_variable_fallback():
     assert value == TEST_FALLBACK_VALUE
 
 
+def test_multiline_environment_variable_set():
+    VARIABLE_NAME = "TEST_ENVIRONMENT_VARIABLE"
+    TEST_VALUE = ("ama\n"
+                  "longa\n"
+                  "multilina\n"
+                  "varaiabelle")
+
+    os.environ[VARIABLE_NAME] = TEST_VALUE
+
+    value = assert_multiline_environment_variable_set(VARIABLE_NAME)
+
+    assert value == TEST_VALUE
+
+
 def test_multiline_environment_variable_fallback():
     VARIABLE_NAME = "TEST_ENVIRONMENT_VARIABLE"
     TEST_FALLBACK_VALUE = ("ama\n"
@@ -49,7 +63,7 @@ def test_multiline_environment_variable_fallback():
         print("Running fallback getter...")
         return TEST_FALLBACK_VALUE
 
-    value = assert_environment_variable_set(VARIABLE_NAME, fallback_value_getter=get_fallback_value)
+    value = assert_multiline_environment_variable_set(VARIABLE_NAME, fallback_value_getter=get_fallback_value)
 
     assert value == TEST_FALLBACK_VALUE
 

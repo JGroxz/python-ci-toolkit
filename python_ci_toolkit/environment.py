@@ -94,7 +94,8 @@ def assert_environment_variable_set(variable_name: str, usage_explanation: str =
     """
     # Use fallback value if required and available
     if (not is_environment_variable_set(variable_name)) and (fallback_value_getter is not None):
-        logging.info(f"'{variable_name}' environment variable is not set. Trying to retrieve a fallback value...")
+        logging.info(f"'{variable_name}' environment variable is not set, but fallback getter function is defined.\n"
+                     f"  Trying to retrieve a fallback value...")
 
         os.environ[variable_name] = fallback_value_getter()
 
