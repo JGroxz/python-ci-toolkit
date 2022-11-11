@@ -6,9 +6,14 @@ import logging
 import os
 from pathlib import Path
 
+from git import Repo
+
 from python_ci_toolkit.environment import ci_project_root
 
-PRIVATE_SSH_KEY_FILE_PATH = ci_project_root.joinpath(".ci/temp/ssh_key")
+TEMP_PRIVATE_SSH_KEY_FILE_PATH = ci_project_root.joinpath(".ci/temp/ssh_key")
+
+ci_repo = Repo(ci_project_root)
+"""GitPython reference to the local Git repository of the current CI project."""
 
 
 def get_default_ssh_private_key_file_path() -> Path:
@@ -61,15 +66,15 @@ def prepare_git_ssh(ssh_private_key: str = None) -> None:
             logging.info(f"Default private SSH key loaded successfully from '{default_path}'.")
 
     # Save Git SSH key to file
-    with io.open(PRIVATE_SSH_KEY_FILE_PATH, "w", newline="\n") as file:
+    with io.open(TEMP_PRIVATE_SSH_KEY_FILE_PATH, "w", newline="\n") as file:
         file.write(ssh_private_key)
 
     # Adjust SSH key permissions on UNIX-like systems to prevent 'ssh' command from complaining
     if os.name == "posix":
-        os.chmod(PRIVATE_SSH_KEY_FILE_PATH, 0o600)
+        os.chmod(TEMP_PRIVATE_SSH_KEY_FILE_PATH, 0o600)
 
     # Tell Git to use the new SSH key file
-    os.environ["GIT_SSH_COMMAND"] = f'ssh -i "{PRIVATE_SSH_KEY_FILE_PATH}" -o IdentitiesOnly=yes'
+    os.environ["GIT_SSH_COMMAND"] = f'ssh -i "{TEMP_PRIVATE_SSH_KEY_FILE_PATH}" -o IdentitiesOnly=yes'
 
 
 def reset_git_ssh() -> None:
@@ -80,5 +85,5 @@ def reset_git_ssh() -> None:
     os.environ["GIT_SSH_COMMAND"] = ""
 
     # Clean up the file; this will throw an error if the file cannot be deleted due to permissions etc.
-    if PRIVATE_SSH_KEY_FILE_PATH.exists():
-        os.remove(PRIVATE_SSH_KEY_FILE_PATH)
+    if TEMP_PRIVATE_SSH_KEY_FILE_PATH.exists():
+        os.remove(TEMP_PRIVATE_SSH_KEY_FILE_PATH)
