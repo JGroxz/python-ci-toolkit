@@ -22,7 +22,7 @@ def get_default_ssh_private_key_file_path() -> Path:
     """
     if ci_environment_type == CiEnvironmentType.BitbucketPipelines:
         bitbucket_ssh_key_path = assert_environment_variable_set(
-            "BITBUCKET_SSH_KEY_FILE"
+            "BITBUCKET_SSH_KEY_FILE",
             "This variable is only available for pipelines running on Bitbucket Cloud and the Linux Docker Pipelines runner. "
             "See https://support.atlassian.com/bitbucket-cloud/docs/variables-and-secrets/.")
         return Path(bitbucket_ssh_key_path)
