@@ -8,7 +8,7 @@ from pathlib import Path
 
 from git import Repo
 
-from python_ci_toolkit.environment import ci_project_root
+from python_ci_toolkit.environment import ci_project_root, ci_environment_type, CiEnvironmentType, assert_environment_variable_set
 
 TEMP_PRIVATE_SSH_KEY_FILE_PATH = ci_project_root.joinpath(".ci/temp/ssh_key")
 
@@ -20,6 +20,13 @@ def get_default_ssh_private_key_file_path() -> Path:
     """
     Returns the path to the default location of the private SSH key file on the current system.
     """
+    if ci_environment_type == CiEnvironmentType.BitbucketPipelines:
+        bitbucket_ssh_key_path = assert_environment_variable_set(
+            "BITBUCKET_SSH_KEY_FILE"
+            "This variable is only available for pipelines running on Bitbucket Cloud and the Linux Docker Pipelines runner. "
+            "See https://support.atlassian.com/bitbucket-cloud/docs/variables-and-secrets/.")
+        return Path(bitbucket_ssh_key_path)
+
     # Both in UNIX and in Windows, default SSH private key location is in '~/.ssh/id_rsa'
     return Path(Path.home(), ".ssh/id_rsa")
 
