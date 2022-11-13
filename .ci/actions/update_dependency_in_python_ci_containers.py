@@ -5,6 +5,13 @@ import logging
 from pathlib import Path
 
 from python_ci_toolkit.console import initialize_ci_console
+from python_ci_toolkit.environment import assert_multiline_environment_variable_set
+from python_ci_toolkit.git import get_default_ssh_private_key
+
+PYTHON_CI_PUSH_SSH_PRIVATE_KEY = assert_multiline_environment_variable_set(
+    "PYTHON_CI_PUSH_SSH_PRIVATE_KEY",
+    usage_explanation="An SSH private key with read and write access to the python-ci-containers repository is required to update it.",
+    fallback_value_getter=get_default_ssh_private_key)
 
 
 def clone_python_ci_containers_repo() -> Path:

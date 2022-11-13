@@ -1,7 +1,6 @@
 """
 Provides functions to retrieve and run CI actions based on Python scripts.
 """
-import io
 import logging
 import os
 import shutil
@@ -11,6 +10,7 @@ import time
 from pathlib import Path
 from typing import List
 
+from python_ci_toolkit.git import prepare_git_ssh, reset_git_ssh, get_default_ssh_private_key
 from ..environment import assert_environment_variable_set, ci_project_root, assert_multiline_environment_variable_set
 from ..python import import_module_from_file
 from ..shell import run_shell_command
@@ -64,7 +64,6 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
     """
     # prepare paths
     action_script_name = f"{action_name}.py"
-    ssh_key_file_path = Path(TEMP_CI_DIRECTORY_PATH, "actions_repo_ssh_key")
     cloned_repo_path = Path(TEMP_CI_DIRECTORY_PATH, "actions_repo_clone")
     action_script_cloned_path = Path(cloned_repo_path, "actions", f"{action_name}", f"{action_name}.py")
     action_script_local_path = Path(DOWNLOADED_ACTIONS_DIRECTORY_PATH, action_script_name)
@@ -74,16 +73,7 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
     os.makedirs(TEMP_CI_DIRECTORY_PATH, exist_ok=True)
 
     if ssh_private_key is not None:
-        # save Git SSH key to file
-        with io.open(ssh_key_file_path, "w", newline="\n") as file:
-            file.write(ssh_private_key)
-
-        # adjust SSH key permissions on UNIX-like systems to prevent 'ssh' command from complaining
-        if os.name == "posix":
-            os.chmod(ssh_key_file_path, 0o600)
-
-        # tell Git to use the new SSH key file
-        os.environ["GIT_SSH_COMMAND"] = f"ssh -i \"{ssh_key_file_path}\" -o IdentitiesOnly=yes"
+        prepare_git_ssh(ssh_private_key)
 
     # clone the repo
     if action_version is None:
@@ -133,7 +123,7 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
 
     # clean up
     delete_git_repo(cloned_repo_path)
-    os.remove(ssh_key_file_path)
+    reset_git_ssh()
 
     return action_script_local_path
 
@@ -175,10 +165,14 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
         # Git repo
         start_time = time.perf_counter()
 
-        actions_git_repo_url = assert_environment_variable_set("PYTHON_CI_ACTIONS_GIT_REPO_URL",
-                                                               f"URL address of the Git repository is required to pull the code for action '{action_display_name}'.")
-        actions_ssh_private_key = assert_multiline_environment_variable_set("PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY",
-                                                                            "SSH private key is required to pull actions from the private remote Git repositories.")
+        actions_git_repo_url = assert_environment_variable_set(
+            "PYTHON_CI_ACTIONS_GIT_REPO_URL",
+            f"URL address of the Git repository is required to pull the code for action '{action_display_name}'.",
+            fallback_value_getter=lambda: "git@bitbucket.org:pyci/python-ci-actions.git")
+        actions_ssh_private_key = assert_multiline_environment_variable_set(
+            "PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY",
+            "SSH private key is required to pull actions from the private remote Git repositories.",
+            fallback_value_getter=get_default_ssh_private_key)
 
         action_script_path = retrieve_ci_action_script_from_git(
             git_repo_url=actions_git_repo_url,

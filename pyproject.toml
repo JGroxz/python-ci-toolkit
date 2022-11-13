@@ -4,15 +4,16 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "python-ci-toolkit"
-version = "0.7.2"
+version = "0.9.6"
 description = "A collection of tools for building CI Python scripts used by PyCI"
 authors = [ "PyCI <hello@pyci.dev>",]
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.10"
 rich = ">=1"
 semver = ">=2"
 toml = ">=0.10"
+GitPython = ">=3.1"
 
 [tool.poetry.dev-dependencies]
 

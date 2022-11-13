@@ -5,7 +5,7 @@ import logging
 import os
 from enum import Enum
 from pathlib import Path
-from typing import List
+from typing import List, Callable
 
 
 class CiEnvironmentType(Enum):
@@ -61,28 +61,70 @@ def get_ci_environment_name() -> str:
         return "Unknown/Local"
 
 
-def assert_environment_variable_set(variable_name: str, usage_explanation: str = None) -> str:
+def is_environment_variable_set(variable_name: str) -> bool:
+    """
+    Checks whether the given environment variable is set.
+
+    Notes:
+        Variables defined with empty string as a value are considered unset.
+
+    Args:
+        variable_name: Name of the environment variable to check.
+
+    Returns:
+        True if variable is set, False otherwise.
+    """
+    value = os.environ.get(variable_name)
+    return (value is not None) and (value != "")
+
+
+def assert_environment_variable_set(variable_name: str, usage_explanation: str = None, fallback_value_getter: Callable[[], str | None] = None) -> str:
     """
     Assert that the given environment variable is set and available.
 
     Args:
         variable_name: Name of the environment variable to assert.
         usage_explanation: Optional string with an explanation of why the given environment variable must be set.
+        fallback_value_getter: Optional callable to retrieve the fallback value of this variable in case it is not set.
+            Can be used to provide default values to variables. If this callable returns None, assertion will still fail.
+            If the fallback value exists, it will also be automatically written into the given environment variable.
 
     Returns:
         Value of the given environment variable.
     """
+    # Use fallback value if required and available
+    if (not is_environment_variable_set(variable_name)) and (fallback_value_getter is not None):
+        logging.info(f"'{variable_name}' environment variable is not set, but fallback getter function is defined.\n"
+                     f"  Trying to retrieve a fallback value...")
+
+        # Retrieve fallback value
+        fallback_value = fallback_value_getter()
+
+        if isinstance(fallback_value, str):
+            os.environ[variable_name] = fallback_value_getter()
+        elif fallback_value is not None:
+            raise TypeError(f"Value returned by fallback getter function {fallback_value_getter} is of type {type(fallback_value)}, which is neither a string nor None.\n"
+                            f"  Fallback value functions are only allowed to return strings or None to avoid ambiguity, because environment variables can only have string or no value.\n")
+
+        if is_environment_variable_set(variable_name):
+            logging.info(f"Retrieved fallback value for '{variable_name}' environment variable.")
+            return os.environ[variable_name]
+        else:
+            logging.warning(f"Could not retrieve a fallback value for '{variable_name}' environment variable.")
+
+    # Craft message
     message = f"'{variable_name}' environment variable is not set, but is required by CI logic."
     if usage_explanation is not None:
         message = (f"{message}\n"
                    f"    Explanation: {usage_explanation}")
 
-    assert os.environ.get(variable_name), message
+    assert is_environment_variable_set(variable_name), message
 
     return os.environ[variable_name]
 
 
-def assert_multiline_environment_variable_set(variable_name: str, usage_explanation: str = None, newline_substitution_character: str = "|") -> str:
+def assert_multiline_environment_variable_set(variable_name: str, usage_explanation: str = None, fallback_value_getter: Callable[[], str | None] = None,
+                                              newline_substitution_character: str = "|") -> str:
     """
     A version of assert_environment_variable_set() function which recovers multiline environment variable from its inlined form on platforms which don't support multiline ones.
 
@@ -99,22 +141,35 @@ def assert_multiline_environment_variable_set(variable_name: str, usage_explanat
     Args:
         variable_name: Name of the variable to assert and recover.
         usage_explanation: Optional string with an explanation of why the given environment variable must be set.
+        fallback_value_getter: Optional callable to retrieve the fallback value of this variable in case it is not set.
+            Can be used to provide default values to variables. If this callable returns None, assertion will still fail.
+            If the fallback value exists, it will also be automatically written into the given environment variable.
+
+            NOTE: Fallback is expected to return a value with ACTUAL newline characters.
+            Substitution characters will not be replaced in the fallback value.
+            This is done so that you don't have to care about CI environment type when returning fallback values.
+
         newline_substitution_character: Character used in the environment variable instead of newline.
             The default value is pipe ('|').
 
     Returns:
         Recovered multiline value of the given environment variable.
     """
-    value = assert_environment_variable_set(variable_name, usage_explanation)
+    # we have to be cautious to
+    is_fallback_used = (not is_environment_variable_set(variable_name)) and (fallback_value_getter is not None)
 
-    # list of CI environment types which do not support defining multiline environment variables
-    unsupported_environments: List[CiEnvironmentType] = [
-        CiEnvironmentType.BitbucketPipelines
-    ]
+    # retrieve the value
+    value = assert_environment_variable_set(variable_name, usage_explanation, fallback_value_getter)
 
-    # recover if we are in an unsupported environment
-    if ci_environment_type in unsupported_environments:
-        return value.replace(newline_substitution_character, "\n")
+    if not is_fallback_used:
+        # list of CI environment types which do not support defining multiline environment variables
+        unsupported_environments: List[CiEnvironmentType] = [
+            CiEnvironmentType.BitbucketPipelines
+        ]
+
+        # recover if we are in an unsupported environment
+        if ci_environment_type in unsupported_environments:
+            return value.replace(newline_substitution_character, "\n")
 
     # return original value otherwise
     return value
