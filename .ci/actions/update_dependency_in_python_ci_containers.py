@@ -16,6 +16,7 @@ from python_ci_toolkit.actions.actions import delete_git_repo
 from python_ci_toolkit.console import initialize_ci_console
 from python_ci_toolkit.environment import assert_multiline_environment_variable_set, ci_project_root
 from python_ci_toolkit.git import get_default_ssh_private_key, prepare_git_ssh
+from python_ci_toolkit.shell import run_shell_command
 from python_ci_toolkit.versions import versions
 
 PYTHON_CI_PUSH_SSH_PRIVATE_KEY = assert_multiline_environment_variable_set(
@@ -96,8 +97,8 @@ def cli() -> None:
     containers_repo = clone_python_ci_containers_repo()
     logging.info("Repo cloned.")
 
-    containers_repo.git.config('user.name "PyCI Bot"')
-    containers_repo.git.config('user.email "automation@pyci.dev"')
+    containers_repo.git.config("user.name", "PyCI Bot")
+    containers_repo.git.config("user.email", "automation@pyci.dev")
     logging.info("Set Git config in the containers repo.")
 
     containers_repo.git.checkout("main")
