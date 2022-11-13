@@ -143,7 +143,7 @@ def ensure_remote_is_ssh(repo: Repo) -> None:
 
     # Update remote URL
     repo.remote().set_url(ssh_remote_url)
-    logging.info(f"Updated remote URL: '{ssh_remote_url}'")
+    logging.info(f"Updated remote URL: '{ssh_remote_url}'.")
 
 
 def ensure_remote_is_https(repo: Repo) -> None:
@@ -166,9 +166,10 @@ def ensure_remote_is_https(repo: Repo) -> None:
             logging.info("Remote URL uses HTTP. Switching to HTTPS...")
             https_remote_url = remote_url.replace("http", "https", 1)
             repo.remote().set_url(https_remote_url)
+            logging.info(f"Updated remote URL: '{https_remote_url}'.")
         else:
             # All good
-            logging.info(f"Remote '{remote_url}' is an HTTP(S) address.")
+            logging.info(f"Remote '{remote_url}' is an HTTPS address.")
         return
 
     logging.warning(f"Remote '{remote_url}' is an SSH address.")
@@ -184,4 +185,4 @@ def ensure_remote_is_https(repo: Repo) -> None:
 
     # Update remote URL
     repo.remote().set_url(https_remote_url)
-    logging.info(f"Updated remote URL: '{https_remote_url}'")
+    logging.info(f"Updated remote URL: '{https_remote_url}'.")
