@@ -11,14 +11,11 @@ from pathlib import Path
 from typing import List
 
 from python_ci_toolkit.git import prepare_git_ssh, reset_git_ssh, get_default_ssh_private_key
-from ..environment import assert_environment_variable_set, ci_project_root, assert_multiline_environment_variable_set
+from ..environment import assert_environment_variable_set, ci_project_root, assert_multiline_environment_variable_set, ci_files_directory, ci_temp_files_directory
 from ..python import import_module_from_file
 from ..shell import run_shell_command
 
-CI_SCRIPTS_DIRECTORY_NAME = ".ci"
-CI_SCRIPTS_DIRECTORY_PATH: Path = Path(ci_project_root, CI_SCRIPTS_DIRECTORY_NAME)
-TEMP_CI_DIRECTORY_PATH: Path = Path(CI_SCRIPTS_DIRECTORY_PATH, "temp")
-DOWNLOADED_ACTIONS_DIRECTORY_PATH: Path = Path(TEMP_CI_DIRECTORY_PATH, "downloaded_actions")
+DOWNLOADED_ACTIONS_DIRECTORY_PATH: Path = ci_temp_files_directory.joinpath("downloaded_actions")
 
 
 def delete_git_repo(repo_path: Path) -> None:
@@ -64,13 +61,13 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
     """
     # prepare paths
     action_script_name = f"{action_name}.py"
-    cloned_repo_path = Path(TEMP_CI_DIRECTORY_PATH, "actions_repo_clone")
+    cloned_repo_path = ci_temp_files_directory.joinpath("actions_repo_clone")
     action_script_cloned_path = Path(cloned_repo_path, "actions", f"{action_name}", f"{action_name}.py")
     action_script_local_path = Path(DOWNLOADED_ACTIONS_DIRECTORY_PATH, action_script_name)
 
     # prepare directories
     os.makedirs(DOWNLOADED_ACTIONS_DIRECTORY_PATH, exist_ok=True)
-    os.makedirs(TEMP_CI_DIRECTORY_PATH, exist_ok=True)
+    os.makedirs(ci_temp_files_directory, exist_ok=True)
 
     if ssh_private_key is not None:
         prepare_git_ssh(ssh_private_key)
@@ -138,7 +135,7 @@ def retrieve_ci_action_script_local(action_name: str) -> Path:
     Returns:
         Full path to the given action's Python file.
     """
-    local_ci_actions_folder = Path(ci_project_root, ".ci", "actions")
+    local_ci_actions_folder = ci_files_directory.joinpath("actions")
     action_file_path = Path(local_ci_actions_folder, f"{action_name}.py")
 
     if not action_file_path.exists():
@@ -194,10 +191,12 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
 
     # run CI action using its cli() method with the given arguments
     try:
+        logging.info(f"Importing Python module of the action '{action_name}'...")
         action_module = import_module_from_file(f"{action_name}", f"{action_script_path}")
     except Exception:
         logging.error(f"Error when importing Python module from action script '{action_script_path}' (action '{action_display_name}' from {action_source}).")
         raise
+    logging.info("Import completed.")
 
     logging.info(f"> Running action '{action_name}':\n"
                  f"    Version: '{action_version}'\n"
