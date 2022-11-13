@@ -8,9 +8,9 @@ from pathlib import Path
 
 from git import Repo, GitCommandError
 
-from python_ci_toolkit.environment import ci_project_root, ci_environment_type, CiEnvironmentType, assert_environment_variable_set
+from python_ci_toolkit.environment import ci_project_root, ci_environment_type, CiEnvironmentType, assert_environment_variable_set, ci_temp_files_directory
 
-TEMP_PRIVATE_SSH_KEY_FILE_PATH = ci_project_root.joinpath(".ci/temp/ssh_key")
+TEMP_PRIVATE_SSH_KEY_FILE_PATH = ci_temp_files_directory.joinpath("ssh_key")
 
 ci_repo = Repo(ci_project_root)
 """GitPython reference to the local Git repository of the current CI project."""
