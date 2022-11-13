@@ -94,9 +94,17 @@ def assert_environment_variable_set(variable_name: str, usage_explanation: str =
     """
     # Use fallback value if required and available
     if (not is_environment_variable_set(variable_name)) and (fallback_value_getter is not None):
-        logging.info(f"'{variable_name}' environment variable is not set. Trying to retrieve a fallback value...")
+        logging.info(f"'{variable_name}' environment variable is not set, but fallback getter function is defined.\n"
+                     f"  Trying to retrieve a fallback value...")
 
-        os.environ[variable_name] = fallback_value_getter()
+        # Retrieve fallback value
+        fallback_value = fallback_value_getter()
+
+        if isinstance(fallback_value, str):
+            os.environ[variable_name] = fallback_value
+        elif fallback_value is not None:
+            raise TypeError(f"Value returned by fallback getter function {fallback_value_getter} is of type {type(fallback_value)}, which is neither a string nor None.\n"
+                            f"  Fallback value functions are only allowed to return strings or None to avoid ambiguity, because environment variables can only have string or no value.\n")
 
         if is_environment_variable_set(variable_name):
             logging.info(f"Retrieved fallback value for '{variable_name}' environment variable.")
@@ -115,7 +123,8 @@ def assert_environment_variable_set(variable_name: str, usage_explanation: str =
     return os.environ[variable_name]
 
 
-def assert_multiline_environment_variable_set(variable_name: str, usage_explanation: str = None, fallback_value_getter: Callable[[], str | None] = None, newline_substitution_character: str = "|") -> str:
+def assert_multiline_environment_variable_set(variable_name: str, usage_explanation: str = None, fallback_value_getter: Callable[[], str | None] = None,
+                                              newline_substitution_character: str = "|") -> str:
     """
     A version of assert_environment_variable_set() function which recovers multiline environment variable from its inlined form on platforms which don't support multiline ones.
 

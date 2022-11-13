@@ -44,6 +44,11 @@ def parse_semantic_version(version_string: str) -> VersionInfo:
     if version_string.count(".") == 0:
         version_string += ".0.0"
 
+    # PyPI package versions can use dot '.' instead of a hyphen '-' as the last separator, but VersionInfo doesn't parse that out of the box
+    if version_string.count(".") > 2:
+        split = version_string.split(".")
+        version_string = ".".join(split[:3]) + "-" + ".".join(split[3:])
+
     return VersionInfo.parse(version_string)
 
 
