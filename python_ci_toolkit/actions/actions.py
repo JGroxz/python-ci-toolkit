@@ -194,10 +194,12 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
 
     # run CI action using its cli() method with the given arguments
     try:
+        logging.info(f"Importing Python module of the action '{action_name}'...")
         action_module = import_module_from_file(f"{action_name}", f"{action_script_path}")
     except Exception:
         logging.error(f"Error when importing Python module from action script '{action_script_path}' (action '{action_display_name}' from {action_source}).")
         raise
+    logging.info("Import completed.")
 
     logging.info(f"> Running action '{action_name}':\n"
                  f"    Version: '{action_version}'\n"
