@@ -101,7 +101,7 @@ def assert_environment_variable_set(variable_name: str, usage_explanation: str =
         fallback_value = fallback_value_getter()
 
         if isinstance(fallback_value, str):
-            os.environ[variable_name] = fallback_value_getter()
+            os.environ[variable_name] = fallback_value
         elif fallback_value is not None:
             raise TypeError(f"Value returned by fallback getter function {fallback_value_getter} is of type {type(fallback_value)}, which is neither a string nor None.\n"
                             f"  Fallback value functions are only allowed to return strings or None to avoid ambiguity, because environment variables can only have string or no value.\n")
