@@ -6,8 +6,10 @@ from __future__ import annotations
 import os
 import shlex
 import subprocess
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Tuple, List
+from typing import Tuple
 
 from rich.style import Style
 from rich.table import Table
@@ -27,7 +29,7 @@ def run_shell_command(command: str,
                       silence_output: bool = False,
                       raw_output: bool = False,
                       throw_exception_on_error: bool = True,
-                      use_wsl_on_windows: bool = True) -> Tuple[int, List[str]]:
+                      use_wsl_on_windows: bool = True) -> Tuple[int, str]:
     """
     Executes the given command in a subprocess.
 
@@ -70,7 +72,10 @@ def run_shell_command(command: str,
     # prepare command args
     args = shlex.split(command)
 
-    captured_output: List[str] = []
+    captured_output = ""
+
+    # lock is required to prints from stdout- and stderr-reading threads from interfering with each other (if 'silence_output' is set to False)
+    lock = threading.Lock()
 
     # helper function for handling the executed shell command's output
     def capture_subprocess_output(pipe, stderr: bool = False):
@@ -79,10 +84,11 @@ def run_shell_command(command: str,
 
             # capture output
             nonlocal captured_output
-            captured_output.append(decoded_line)
+            captured_output += decoded_line
 
             # print to console if not silenced
             if not silence_output:
+                lock.acquire()
                 decoded_line = decoded_line.rstrip(" \n")
                 if raw_output:
                     print(decoded_line)
@@ -94,20 +100,24 @@ def run_shell_command(command: str,
                     grid.add_row(
                         Text(f" > shell: ") + Text(command, style=SHELL_OUTPUT_COMMAND_STYLE), " │ ", (decoded_line if (not stderr) else Text(decoded_line, style=SHELL_OUTPUT_STDERR_STYLE))
                     )
-
                     ci_console.print(grid, end="")
+                lock.release()
 
     # run the shell command and capture its output
     process = subprocess.Popen(args, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    with process.stdout:
-        with process.stderr:
-            capture_subprocess_output(process.stdout)
-            capture_subprocess_output(process.stderr, stderr=True)
+    with process.stdout, process.stderr:
+        # we read stdout and stderr in threads to be able to print live logs from both streams concurrently
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            executor.submit(capture_subprocess_output, process.stdout)
+            executor.submit(capture_subprocess_output, process.stderr, stderr=True)
+            executor.shutdown(wait=True)
     exitcode = process.wait()
 
     if (exitcode != 0) and throw_exception_on_error:
         raise RuntimeError(f"Error executing command (exit code {exitcode})\n"
-                           f"    Command: {command}\n"
-                           f"    Output: {captured_output}\n")
+                           f"  Command:\n"
+                           f"    {command}\n"
+                           f"  Output:\n"
+                           f"    {''.join(captured_output)}\n")
 
     return exitcode, captured_output

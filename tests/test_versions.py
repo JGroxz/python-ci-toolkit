@@ -35,6 +35,8 @@ def test_version_parsing():
         "v0.0.1-dev",
         "v0.1.0-dev",
         "v1.0.0-dev.1",
+        "v1.0.0-dev1",
+        "v1.0.0.dev1",
     ]
 
     for version_string in version_strings:
@@ -104,9 +106,9 @@ def test_version_bump():
 if __name__ == '__main__':
     # test_project_version()
     # test_latest()
-    # test_version_parsing()
+    test_version_parsing()
     # test_version_write()
-    test_version_bump()
+    # test_version_bump()
 
     # handler = PyProjectVersionFileHandler()
     # path = Path("../", "pyproject.toml")
