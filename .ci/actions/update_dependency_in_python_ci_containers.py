@@ -96,6 +96,10 @@ def cli() -> None:
     containers_repo = clone_python_ci_containers_repo()
     logging.info("Repo cloned.")
 
+    containers_repo.git.config('user.name "PyCI Bot"')
+    containers_repo.git.config('user.email "automation@pyci.dev"')
+    logging.info("Set Git config in the containers repo.")
+
     containers_repo.git.checkout("main")
     logging.info("Checked out 'main'.")
 
