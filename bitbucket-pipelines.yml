@@ -9,12 +9,18 @@ definitions:
         aws:
           oidc-role: $AWS_OIDC_ROLE_ARN
   steps:
-    - step: &handle_semver
+    - step: &handle_semantic_version_development
         <<: *use_python_ci_runner_image
-        name: Handle semantic version
+        name: Handle semantic version (development)
         script:
-          - python-ci-action generate_semantic_version_from_git
-          - python-ci-action push_committed_changes_and_tags_to_git
+          - python-ci-action generate_semver_development_from_git
+          - python-ci-action push_changes_to_git_through_ssh
+    - step: &handle_semantic_version_release
+        <<: *use_python_ci_runner_image
+        name: Handle semantic version (release)
+        script:
+          - python-ci-action generate_semver_release_from_git
+          - python-ci-action push_changes_to_git_through_ssh
     - step: &release_poetry_package
         <<: *use_python_ci_runner_image
         name: Build and publish Poetry package
@@ -31,9 +37,9 @@ definitions:
 pipelines:
   branches:
     develop:
-      - step: *handle_semver
+      - step: *handle_semantic_version_development
+      - step: *handle_semantic_version_release
     main:
-      - step: *handle_semver
       - step: *update_python_ci_containers
   tags:
     'v*':
