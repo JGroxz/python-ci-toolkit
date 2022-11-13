@@ -13,14 +13,14 @@ definitions:
         <<: *use_python_ci_runner_image
         name: Handle semantic version (development)
         script:
-          - python-ci-action generate_development_semver_from_git:develop
-          - python-ci-action push_committed_changes_and_tags_to_git:develop
+          - python-ci-action generate_semver_development_from_git
+          - python-ci-action push_changes_to_git_through_ssh
     - step: &handle_semantic_version_release
         <<: *use_python_ci_runner_image
         name: Handle semantic version (release)
         script:
-          - python-ci-action generate_release_semver_from_git:develop
-          - python-ci-action push_committed_changes_and_tags_to_git:develop
+          - python-ci-action generate_semver_release_from_git
+          - python-ci-action push_changes_to_git_through_ssh
     - step: &release_poetry_package
         <<: *use_python_ci_runner_image
         name: Build and publish Poetry package
@@ -38,8 +38,8 @@ pipelines:
   branches:
     develop:
       - step: *handle_semantic_version_development
-    main:
       - step: *handle_semantic_version_release
+    main:
       - step: *update_python_ci_containers
   tags:
     'v*':
