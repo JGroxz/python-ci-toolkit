@@ -25,7 +25,7 @@ PYTHON_CI_PUSH_SSH_PRIVATE_KEY = assert_multiline_environment_variable_set(
     fallback_value_getter=get_default_ssh_private_key)
 
 PYTHON_CI_CONTAINERS_REPO_URL = "git@bitbucket.org:pyci/python-ci-containers.git"
-TEMP_REPO_CLONE_PATH = ci_project_root.joinpath(".ci", "temp", "python-ci-containers-clone")
+TEMP_REPO_CLONE_PATH = ci_temp_files_directory.joinpath("python-ci-containers-clone")
 TOOLKIT_VERSION_DEFINITION_REGEX = re.compile('(python-ci-toolkit==".*")', flags=re.UNICODE)
 
 
