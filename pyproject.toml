@@ -19,3 +19,4 @@ GitPython = ">=3.1"
 
 [tool.poetry.scripts]
 python-ci-action = "python_ci_toolkit.actions:cli"
+pyci = "python_ci_toolkit.actions:cli"
