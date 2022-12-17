@@ -1,7 +1,7 @@
 import os
 import sys
 
-from python_ci_toolkit import actions, python
+from python_ci_toolkit import actions
 
 
 def test_run_action_git() -> None:
