@@ -5,6 +5,7 @@ import io
 import logging
 import os
 from pathlib import Path
+from typing import Union
 
 from git import Repo, GitCommandError, InvalidGitRepositoryError
 
@@ -35,7 +36,7 @@ def get_default_ssh_private_key_file_path() -> Path:
     return Path(Path.home(), ".ssh/id_rsa")
 
 
-def get_default_ssh_private_key() -> str | None:
+def get_default_ssh_private_key() -> Union[str, None]:
     """
     Returns private SSH key from the default system location, or None if such key is not present.
     """

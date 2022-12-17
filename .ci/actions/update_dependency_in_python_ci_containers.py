@@ -14,9 +14,9 @@ from git import Repo
 
 from python_ci_toolkit.actions.actions import delete_git_repo
 from python_ci_toolkit.console import initialize_ci_console
-from python_ci_toolkit.environment import assert_multiline_environment_variable_set, ci_project_root, ci_temp_files_directory
+from python_ci_toolkit.environment import assert_multiline_environment_variable_set, ci_project_root, \
+    ci_temp_files_directory
 from python_ci_toolkit.git import get_default_ssh_private_key, prepare_git_ssh
-from python_ci_toolkit.shell import run_shell_command
 from python_ci_toolkit.versions import versions
 
 PYTHON_CI_PUSH_SSH_PRIVATE_KEY = assert_multiline_environment_variable_set(
