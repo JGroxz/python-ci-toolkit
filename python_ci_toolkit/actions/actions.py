@@ -18,6 +18,8 @@ from ..shell import run_shell_command
 
 DOWNLOADED_ACTIONS_DIRECTORY_PATH: Path = ci_temp_files_directory.joinpath("downloaded_actions")
 
+_ACTION_VERSION_SEPARATOR = "@"
+
 
 def delete_git_repo(repo_path: Path) -> None:
     """
@@ -225,7 +227,7 @@ def cli() -> None:
     """
 
     def cli_print_usage() -> None:
-        message = ("Usage: python-ci-action action_name[:action_version] [action_args]\n"
+        message = ("Usage: python-ci-action action_name[@action_version] [action_args]\n"
                    "\n"
                    "Notes:\n"
                    "  - Action name must correspond to the name of action's Python file without a '.py' extension.\n"
@@ -235,9 +237,9 @@ def cli() -> None:
                    "\n"
                    "Examples:\n"
                    "  python-ci-action build_dockers          # Runs 'build_dockers' action from Git branch 'main'\n"
-                   "  python-ci-action build_dockers:develop  # Runs 'build_dockers' action from Git branch 'develop'\n"
-                   "  python-ci-action build_dockers:v1.0.0   # Runs 'build_dockers' action from Git tag 'v1.0.0'\n"
-                   "  python-ci-action build_dockers:local    # Runs 'build_dockers' located at '.ci/actions/build_dockers.py' at your CI project's root folder\n")
+                   "  python-ci-action build_dockers@develop  # Runs 'build_dockers' action from Git branch 'develop'\n"
+                   "  python-ci-action build_dockers@v1.0.0   # Runs 'build_dockers' action from Git tag 'v1.0.0'\n"
+                   "  python-ci-action build_dockers@local    # Runs 'build_dockers' located at '.ci/actions/build_dockers.py' at your CI project's root folder\n")
         print(message)
 
     def cli_error_and_exit(error_code: int, error_text: str) -> None:
@@ -257,8 +259,8 @@ def cli() -> None:
     first_arg = sys.argv[1]
 
     # version can be included in the first argument, separated from the action name by a semicolon
-    if ":" in first_arg:
-        split_by_first_colon = first_arg.split(":", 1)
+    if _ACTION_VERSION_SEPARATOR in first_arg:
+        split_by_first_colon = first_arg.split(_ACTION_VERSION_SEPARATOR, 1)
         action_name = split_by_first_colon[0]
         action_version = split_by_first_colon[1]
     else:
