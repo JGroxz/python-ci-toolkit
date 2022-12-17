@@ -5,7 +5,9 @@ import logging
 import os
 from enum import Enum
 from pathlib import Path
-from typing import List, Callable
+from typing import List, Callable, Union
+
+from python_ci_toolkit.shell import run_shell_command
 
 
 class CiEnvironmentType(Enum):
@@ -78,7 +80,8 @@ def is_environment_variable_set(variable_name: str) -> bool:
     return (value is not None) and (value != "")
 
 
-def assert_environment_variable_set(variable_name: str, usage_explanation: str = None, fallback_value_getter: Callable[[], str | None] = None) -> str:
+def assert_environment_variable_set(variable_name: str, usage_explanation: str = None,
+                                    fallback_value_getter: Callable[[], Union[str, None]] = None) -> str:
     """
     Assert that the given environment variable is set and available.
 
@@ -103,8 +106,9 @@ def assert_environment_variable_set(variable_name: str, usage_explanation: str =
         if isinstance(fallback_value, str):
             os.environ[variable_name] = fallback_value
         elif fallback_value is not None:
-            raise TypeError(f"Value returned by fallback getter function {fallback_value_getter} is of type {type(fallback_value)}, which is neither a string nor None.\n"
-                            f"  Fallback value functions are only allowed to return strings or None to avoid ambiguity, because environment variables can only have string or no value.\n")
+            raise TypeError(
+                f"Value returned by fallback getter function {fallback_value_getter} is of type {type(fallback_value)}, which is neither a string nor None.\n"
+                f"  Fallback value functions are only allowed to return strings or None to avoid ambiguity, because environment variables can only have string or no value.\n")
 
         if is_environment_variable_set(variable_name):
             logging.info(f"Retrieved fallback value for '{variable_name}' environment variable.")
@@ -123,7 +127,8 @@ def assert_environment_variable_set(variable_name: str, usage_explanation: str =
     return os.environ[variable_name]
 
 
-def assert_multiline_environment_variable_set(variable_name: str, usage_explanation: str = None, fallback_value_getter: Callable[[], str | None] = None,
+def assert_multiline_environment_variable_set(variable_name: str, usage_explanation: str = None,
+                                              fallback_value_getter: Callable[[], Union[str, None]] = None,
                                               newline_substitution_character: str = "|") -> str:
     """
     A version of assert_environment_variable_set() function which recovers multiline environment variable from its inlined form on platforms which don't support multiline ones.
@@ -190,31 +195,19 @@ def get_project_root_directory_path() -> Path:
     if ci_environment_type == CiEnvironmentType.BitbucketPipelines:
         return Path(os.environ["BITBUCKET_CLONE_DIR"])
     elif ci_environment_type == CiEnvironmentType.Unknown:
-        # we are dealing with an unknown environment, so we assume we are running on a local developer machine,
-        # where this code should be installed as a package inside venv directory located in the project directory
-        script_parent_directory = Path(__file__).parent
+        # general case: find the root of the enclosing Git repository
+        return_code, git_repo_root = run_shell_command("git rev-parse --show-toplevel", use_wsl_on_windows=False,
+                                                       throw_exception_on_error=False, silence_output=True,
+                                                       cwd=os.getcwd())
+        if return_code == 0:
+            return Path(git_repo_root.strip())
 
-        # special case: the project is a dev version of python-ci-toolkit itself
-        if (script_parent_directory.name == "python_ci_toolkit"
-                and Path(script_parent_directory.parent, "pyproject.toml").exists()):
-            return script_parent_directory.parent
-
-        # normal case: the package is installed inside a venv
-        parent_directory = script_parent_directory
-        while parent_directory.name != "venv":
-            if parent_directory == parent_directory.parent:
-                # we have reached the root of the file system; this means that the package inside the venv;
-                # the best we can do in this case is treat current working directory as the project directory and print a warning
-                logging.warning(f"Could not determine project's root directory (CI environment is '{get_ci_environment_name()}' and python-ci-toolkit is not installed inside a venv).\n"
-                                f"Assuming current working directory as the current CI project's root.")
-                project_root_path = Path(os.getcwd())
-                return project_root_path
-
-            parent_directory = parent_directory.parent
-
-        # we found the venv, project directory must be the parent of it
-        project_root_path = parent_directory.parent
-        return project_root_path
+        # other case: we are not inside a Git repo, so the root cannot be reliably determined
+        logging.warning(f"Could not determine project's root directory: not a Git repo.\n"
+                        f"  CI environment: '{get_ci_environment_name()}'\n"
+                        f"  CWD: '{os.getcwd()}'\n"
+                        f"Assuming current working directory as the current CI project's root.")
+        return Path(os.getcwd())
 
 
 ci_project_root: Path = get_project_root_directory_path()
@@ -227,7 +220,15 @@ Notes:
     otherwise, current working directory will be assumed to be project's root.
 """
 
-ci_files_directory: Path = ci_project_root.joinpath(".ci")
+ci_files_directory_relative: Path = Path(".ci")
+"""
+Relative path to the CI directory of the current project (relative to the project's root).
+
+Notes:
+    This directory can be used to store scripts and configuration files related to the given project's CI workflows.
+"""
+
+ci_files_directory: Path = ci_project_root.joinpath(ci_files_directory_relative)
 """
 Absolute path to the CI directory of the current project.
 
@@ -235,7 +236,19 @@ Notes:
     This directory can be used to store scripts and configuration files related to the given project's CI workflows.
 """
 
-ci_temp_files_directory: Path = ci_files_directory.joinpath("temp")
+ci_temp_files_directory_relative: Path = ci_files_directory_relative.joinpath("temp")
+"""
+Relative path to the location for temporary files generated by the CI logic (relative to the project's root).
+
+Notes:
+    This directory can and should be used for storing any temporary files generated by CI logic.
+    
+    Note that this directory is not added to .gitignore automatically, but it it recommended to do so in order to prevent accidentally committing temporary files to your repository's history. 
+    Before using this directory in CI scripts, add the following line to your project's .gitignore:
+        temp/
+"""
+
+ci_temp_files_directory: Path = ci_project_root.joinpath(ci_temp_files_directory_relative)
 """
 Absolute path to the location for temporary files generated by the CI logic.
 

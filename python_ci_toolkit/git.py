@@ -5,15 +5,20 @@ import io
 import logging
 import os
 from pathlib import Path
+from typing import Union
 
-from git import Repo, GitCommandError
+from git import Repo, GitCommandError, InvalidGitRepositoryError
 
 from python_ci_toolkit.environment import ci_project_root, ci_environment_type, CiEnvironmentType, assert_environment_variable_set, ci_temp_files_directory
 
 TEMP_PRIVATE_SSH_KEY_FILE_PATH = ci_temp_files_directory.joinpath("ssh_key")
 
-ci_repo = Repo(ci_project_root)
-"""GitPython reference to the local Git repository of the current CI project."""
+try:
+    ci_repo = Repo(ci_project_root)
+    """GitPython reference to the local Git repository of the current CI project."""
+except InvalidGitRepositoryError as e:
+    ci_repo = None
+    logging.error(f"Current project path ('{ci_project_root}') is not a Git repository. Module 'python_ci_toolkit.git' module cannot be used.")
 
 
 def get_default_ssh_private_key_file_path() -> Path:
@@ -31,7 +36,7 @@ def get_default_ssh_private_key_file_path() -> Path:
     return Path(Path.home(), ".ssh/id_rsa")
 
 
-def get_default_ssh_private_key() -> str | None:
+def get_default_ssh_private_key() -> Union[str, None]:
     """
     Returns private SSH key from the default system location, or None if such key is not present.
     """
