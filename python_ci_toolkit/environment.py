@@ -3,12 +3,9 @@ Utility functions for inspecting and interacting with current CI environment.
 """
 import logging
 import os
-import sys
 from enum import Enum
 from pathlib import Path
-from typing import List, Callable
-
-from git import Repo
+from typing import List, Callable, Union
 
 from python_ci_toolkit.shell import run_shell_command
 
@@ -83,7 +80,8 @@ def is_environment_variable_set(variable_name: str) -> bool:
     return (value is not None) and (value != "")
 
 
-def assert_environment_variable_set(variable_name: str, usage_explanation: str = None, fallback_value_getter: Callable[[], str | None] = None) -> str:
+def assert_environment_variable_set(variable_name: str, usage_explanation: str = None,
+                                    fallback_value_getter: Callable[[], Union[str, None]] = None) -> str:
     """
     Assert that the given environment variable is set and available.
 
@@ -108,8 +106,9 @@ def assert_environment_variable_set(variable_name: str, usage_explanation: str =
         if isinstance(fallback_value, str):
             os.environ[variable_name] = fallback_value
         elif fallback_value is not None:
-            raise TypeError(f"Value returned by fallback getter function {fallback_value_getter} is of type {type(fallback_value)}, which is neither a string nor None.\n"
-                            f"  Fallback value functions are only allowed to return strings or None to avoid ambiguity, because environment variables can only have string or no value.\n")
+            raise TypeError(
+                f"Value returned by fallback getter function {fallback_value_getter} is of type {type(fallback_value)}, which is neither a string nor None.\n"
+                f"  Fallback value functions are only allowed to return strings or None to avoid ambiguity, because environment variables can only have string or no value.\n")
 
         if is_environment_variable_set(variable_name):
             logging.info(f"Retrieved fallback value for '{variable_name}' environment variable.")
@@ -128,7 +127,8 @@ def assert_environment_variable_set(variable_name: str, usage_explanation: str =
     return os.environ[variable_name]
 
 
-def assert_multiline_environment_variable_set(variable_name: str, usage_explanation: str = None, fallback_value_getter: Callable[[], str | None] = None,
+def assert_multiline_environment_variable_set(variable_name: str, usage_explanation: str = None,
+                                              fallback_value_getter: Callable[[], Union[str, None]] = None,
                                               newline_substitution_character: str = "|") -> str:
     """
     A version of assert_environment_variable_set() function which recovers multiline environment variable from its inlined form on platforms which don't support multiline ones.
@@ -196,7 +196,9 @@ def get_project_root_directory_path() -> Path:
         return Path(os.environ["BITBUCKET_CLONE_DIR"])
     elif ci_environment_type == CiEnvironmentType.Unknown:
         # general case: find the root of the enclosing Git repository
-        return_code, git_repo_root = run_shell_command("git rev-parse --show-toplevel", use_wsl_on_windows=False, throw_exception_on_error=False, silence_output=True, cwd=os.getcwd())
+        return_code, git_repo_root = run_shell_command("git rev-parse --show-toplevel", use_wsl_on_windows=False,
+                                                       throw_exception_on_error=False, silence_output=True,
+                                                       cwd=os.getcwd())
         if return_code == 0:
             return Path(git_repo_root.strip())
 

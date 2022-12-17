@@ -51,7 +51,8 @@ class PyProjectVersionFileHandler(VersionFileHandler):
         self._set_nested_dict_key(project_config, ["tool", "poetry", "version"], version_string)
         return toml.dumps(project_config)
 
-    def _set_nested_dict_key(self, dictionary, keys, value):
+    @staticmethod
+    def _set_nested_dict_key(dictionary, keys, value):
         for key in keys[:-1]:
             dictionary = dictionary.setdefault(key, {})
         dictionary[keys[-1]] = value
