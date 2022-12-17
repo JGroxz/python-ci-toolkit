@@ -1,6 +1,8 @@
 """
 Utility functions for inspecting and interacting with current CI environment.
 """
+from __future__ import annotations
+
 import logging
 import os
 from enum import Enum
@@ -81,7 +83,7 @@ def is_environment_variable_set(variable_name: str) -> bool:
 
 
 def assert_environment_variable_set(variable_name: str, usage_explanation: str = None,
-                                    fallback_value_getter: Callable[[], Union[str, None]] = None) -> str:
+                                    fallback_value_getter: Callable[[], str | None] = None) -> str:
     """
     Assert that the given environment variable is set and available.
 
@@ -128,7 +130,7 @@ def assert_environment_variable_set(variable_name: str, usage_explanation: str =
 
 
 def assert_multiline_environment_variable_set(variable_name: str, usage_explanation: str = None,
-                                              fallback_value_getter: Callable[[], Union[str, None]] = None,
+                                              fallback_value_getter: Callable[[], str | None] = None,
                                               newline_substitution_character: str = "|") -> str:
     """
     A version of assert_environment_variable_set() function which recovers multiline environment variable from its inlined form on platforms which don't support multiline ones.
