@@ -156,7 +156,7 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
     """
     Executes CI action by the given action name.
     """
-    action_display_name = action_name if (action_version is None) else f"{action_name}:{action_version}"
+    action_display_name = action_name if (action_version is None) else f"{action_name}{_ACTION_VERSION_SEPARATOR}{action_version}"
     logging.info(f"Locating action '{action_display_name}'...")
 
     # locate action script
