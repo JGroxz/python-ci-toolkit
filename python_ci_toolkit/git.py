@@ -71,7 +71,7 @@ def git_ssh_credentials(ssh_private_key: str = None) -> None:
     temp_private_ssh_key_file_path = ci_temp_files_directory.joinpath("ssh", f"{uuid.uuid4()}")
 
     # Save current GIT_SSH_COMMAND
-    original_git_ssh_command = os.environ.get("GIT_SSH_COMMAND", default=None)
+    original_git_ssh_command = os.environ.get("GIT_SSH_COMMAND", default="")
 
     # In case SSH key is not provided, try retrieving a default one
     if (ssh_private_key is None) or (ssh_private_key == ""):
