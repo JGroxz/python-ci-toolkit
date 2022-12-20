@@ -35,8 +35,7 @@ def clone_python_ci_containers_repo() -> Repo:
         delete_git_repo(TEMP_REPO_CLONE_PATH)
     os.makedirs(TEMP_REPO_CLONE_PATH, exist_ok=True)
 
-    with git_ssh_credentials(PYTHON_CI_PUSH_SSH_PRIVATE_KEY):
-        repo = Repo.clone_from(PYTHON_CI_CONTAINERS_REPO_URL, TEMP_REPO_CLONE_PATH)
+    repo = Repo.clone_from(PYTHON_CI_CONTAINERS_REPO_URL, TEMP_REPO_CLONE_PATH)
 
     return repo
 
@@ -91,25 +90,26 @@ def update_self_dependency_version_in_dockerfile(containers_repo: Repo) -> None:
 def cli() -> None:
     initialize_ci_console()
 
-    logging.info("Cloning containers repo...")
-    containers_repo = clone_python_ci_containers_repo()
-    logging.info("Repo cloned.")
+    with git_ssh_credentials(PYTHON_CI_PUSH_SSH_PRIVATE_KEY):
+        logging.info("Cloning containers repo...")
+        containers_repo = clone_python_ci_containers_repo()
+        logging.info("Repo cloned.")
 
-    containers_repo.git.config("user.name", "PyCI Bot")
-    containers_repo.git.config("user.email", "automation@pyci.dev")
-    logging.info("Set Git config in the containers repo.")
+        containers_repo.git.config("user.name", "PyCI Bot")
+        containers_repo.git.config("user.email", "automation@pyci.dev")
+        logging.info("Set Git config in the containers repo.")
 
-    containers_repo.git.checkout("main")
-    logging.info("Checked out 'main'.")
+        containers_repo.git.checkout("main")
+        logging.info("Checked out 'main'.")
 
-    logging.info("Updating self-dependency in the repo's Dockerfile...")
-    update_self_dependency_version_in_dockerfile(containers_repo)
-    logging.info("Self-dependency updated.")
+        logging.info("Updating self-dependency in the repo's Dockerfile...")
+        update_self_dependency_version_in_dockerfile(containers_repo)
+        logging.info("Self-dependency updated.")
 
-    logging.info("Pushing commits and tags...")
-    containers_repo.git.push()
-    containers_repo.git.push(tags=True)
-    logging.info("Done.")
+        logging.info("Pushing commits and tags...")
+        containers_repo.git.push()
+        containers_repo.git.push(tags=True)
+        logging.info("Done.")
 
 
 if __name__ == '__main__':
