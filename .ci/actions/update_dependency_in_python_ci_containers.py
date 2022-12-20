@@ -16,7 +16,7 @@ from python_ci_toolkit.actions.actions import delete_git_repo
 from python_ci_toolkit.console import initialize_ci_console
 from python_ci_toolkit.environment import assert_multiline_environment_variable_set, ci_project_root, \
     ci_temp_files_directory
-from python_ci_toolkit.git import get_default_ssh_private_key, git_ssh_credentials
+from python_ci_toolkit.git import get_default_ssh_private_key, prepare_git_ssh
 from python_ci_toolkit.versions import versions
 
 PYTHON_CI_PUSH_SSH_PRIVATE_KEY = assert_multiline_environment_variable_set(
@@ -30,14 +30,15 @@ TOOLKIT_VERSION_DEFINITION_REGEX = re.compile('(python-ci-toolkit==".*")', flags
 
 
 def clone_python_ci_containers_repo() -> Repo:
-    with git_ssh_credentials(PYTHON_CI_PUSH_SSH_PRIVATE_KEY):
-        # Recreate the temporary directory
-        if TEMP_REPO_CLONE_PATH.exists():
-            delete_git_repo(TEMP_REPO_CLONE_PATH)
-        os.makedirs(TEMP_REPO_CLONE_PATH, exist_ok=True)
+    prepare_git_ssh(PYTHON_CI_PUSH_SSH_PRIVATE_KEY)
 
-        # Clone
-        repo = Repo.clone_from(PYTHON_CI_CONTAINERS_REPO_URL, TEMP_REPO_CLONE_PATH)
+    # Recreate the temporary directory
+    if TEMP_REPO_CLONE_PATH.exists():
+        delete_git_repo(TEMP_REPO_CLONE_PATH)
+    os.makedirs(TEMP_REPO_CLONE_PATH, exist_ok=True)
+
+    # Clone
+    repo = Repo.clone_from(PYTHON_CI_CONTAINERS_REPO_URL, TEMP_REPO_CLONE_PATH)
 
     return repo
 
