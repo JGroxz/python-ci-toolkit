@@ -3,24 +3,25 @@ Utility functions for interacting with remote Git repositories.
 """
 from __future__ import annotations
 
+import contextlib
 import io
 import logging
 import os
+import uuid
 from pathlib import Path
-from typing import Union
 
 from git import Repo, GitCommandError, InvalidGitRepositoryError
 
-from python_ci_toolkit.environment import ci_project_root, ci_environment_type, CiEnvironmentType, assert_environment_variable_set, ci_temp_files_directory
+from python_ci_toolkit.environment import ci_project_root, ci_environment_type, CiEnvironmentType, \
+    assert_environment_variable_set, ci_temp_files_directory
 
-TEMP_PRIVATE_SSH_KEY_FILE_PATH = ci_temp_files_directory.joinpath("ssh_key")
 
 try:
     ci_repo = Repo(ci_project_root)
     """GitPython reference to the local Git repository of the current CI project."""
 except InvalidGitRepositoryError as e:
+    logging.warning(f"Current project path ('{ci_project_root}') is not a Git repository. Setting 'ci_repo' variable to None.")
     ci_repo = None
-    logging.error(f"Current project path ('{ci_project_root}') is not a Git repository. Module 'python_ci_toolkit.git' module cannot be used.")
 
 
 def get_default_ssh_private_key_file_path() -> Path:
@@ -54,18 +55,25 @@ def get_default_ssh_private_key() -> str | None:
     return default_ssh_key
 
 
-def prepare_git_ssh(ssh_private_key: str = None) -> None:
+@contextlib.contextmanager
+def git_ssh_credentials(ssh_private_key: str = None) -> None:
     """
-    Configures Git to use the provided private SSH key when interacting with remote repositories
+    Context manager that configures Git to use the provided private SSH key when interacting with remote repositories
     by setting 'GIT_SSH_COMMAND' variable.
 
     Notes:
         This generates a temporary key file at '.ci/temp/ssh_key' at the current CI project root.
-        To clean up this file after you are done, call 'reset_git_ssh()'.
+        This file is automatically deleted when this context manager exits.
 
     Args:
         ssh_private_key: Private SSH key to use with Git.
     """
+    temp_private_ssh_key_file_path = ci_temp_files_directory.joinpath("ssh", f"{uuid.uuid4()}")
+
+    # Save current GIT_SSH_COMMAND
+    original_git_ssh_command = os.environ.get("GIT_SSH_COMMAND", default=None)
+
+    # In case SSH key is not provided, try retrieving a default one
     if (ssh_private_key is None) or (ssh_private_key == ""):
         # Try to retrieve the default SSH key
         logging.info("Private SSH key string is not provided, trying to locate SSH keys file in the default directory...")
@@ -80,30 +88,27 @@ def prepare_git_ssh(ssh_private_key: str = None) -> None:
             logging.info(f"Default private SSH key loaded successfully from '{default_path}'.")
 
     # Make sure that temporary folder for the key file exists
-    os.makedirs(os.path.dirname(TEMP_PRIVATE_SSH_KEY_FILE_PATH), exist_ok=True)
+    os.makedirs(os.path.dirname(temp_private_ssh_key_file_path), exist_ok=True)
 
     # Save Git SSH key to file
-    with io.open(TEMP_PRIVATE_SSH_KEY_FILE_PATH, "w", newline="\n") as file:
+    with io.open(temp_private_ssh_key_file_path, "w", newline="\n") as file:
         file.write(ssh_private_key)
 
     # Adjust SSH key permissions on UNIX-like systems to prevent 'ssh' command from complaining
     if os.name == "posix":
-        os.chmod(TEMP_PRIVATE_SSH_KEY_FILE_PATH, 0o600)
+        os.chmod(temp_private_ssh_key_file_path, 0o600)
 
     # Tell Git to use the new SSH key file
-    os.environ["GIT_SSH_COMMAND"] = f'ssh -i "{TEMP_PRIVATE_SSH_KEY_FILE_PATH}" -o IdentitiesOnly=yes'
+    os.environ["GIT_SSH_COMMAND"] = f'ssh -i "{temp_private_ssh_key_file_path}" -o IdentitiesOnly=yes'
 
+    yield  # <- with this context, clone repos, push changes etc.
 
-def reset_git_ssh() -> None:
-    """
-    Removes temporary private SSH key file created by 'prepare_git_ssh()' command and resets 'GIT_SSH_COMMAND' environment variable.
-    """
-    # Reset environment variable
-    os.environ["GIT_SSH_COMMAND"] = ""
+    # Restore original GIT_SSH_COMMAND
+    os.environ["GIT_SSH_COMMAND"] = original_git_ssh_command
 
-    # Clean up the file; this will throw an error if the file cannot be deleted due to permissions etc.
-    if TEMP_PRIVATE_SSH_KEY_FILE_PATH.exists():
-        os.remove(TEMP_PRIVATE_SSH_KEY_FILE_PATH)
+    # Clean up the temporary key file; this will throw an error if the file cannot be deleted due to permissions etc.
+    if temp_private_ssh_key_file_path.exists():
+        os.remove(temp_private_ssh_key_file_path)
 
 
 def ensure_remote_is_ssh(repo: Repo) -> None:
