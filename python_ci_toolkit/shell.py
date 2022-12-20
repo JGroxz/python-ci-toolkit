@@ -118,6 +118,8 @@ def run_shell_command(command: str,
                            f"  Command:\n"
                            f"    {command}\n"
                            f"  Output:\n"
-                           f"    {''.join(captured_output)}\n")
+                           f"↓ ↓ ↓ Command output start ↓ ↓ ↓\n"
+                           f"{''.join(captured_output)}\n"
+                           f"↑ ↑ ↑  Command output end  ↑ ↑ ↑\n\n")
 
     return exitcode, captured_output
