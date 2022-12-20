@@ -2,9 +2,8 @@ from pathlib import Path
 
 from semver import VersionInfo
 
-from python_ci_toolkit import versions
 from python_ci_toolkit.versions import read_project_version, get_latest_pypi_package_version, parse_semantic_version
-from python_ci_toolkit.versions.version_file_handlers import VERSION_FILE_HANDLERS, VersionFileHandler, PyProjectVersionFileHandler
+from python_ci_toolkit.versions.version_file_handlers import VERSION_FILE_HANDLERS, VersionFileHandler
 
 TEST_VERSION_FILES_FOLDER = Path("./test_version_files")
 

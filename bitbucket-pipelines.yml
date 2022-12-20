@@ -13,26 +13,26 @@ definitions:
         <<: *use_python_ci_runner_image
         name: Handle semantic version (development)
         script:
-          - python-ci-action generate_semver_development_from_git
-          - python-ci-action push_changes_to_git_through_ssh
+          - pyci generate_semver_development_from_git
+          - pyci push_changes_to_git_through_ssh
     - step: &handle_semantic_version_release
         <<: *use_python_ci_runner_image
         name: Handle semantic version (release)
         script:
-          - python-ci-action generate_semver_release_from_git
-          - python-ci-action push_changes_to_git_through_ssh
+          - pyci generate_semver_release_from_git
+          - pyci push_changes_to_git_through_ssh
     - step: &release_poetry_package
         <<: *use_python_ci_runner_image
         name: Build and publish Poetry package
         script:
-          - python-ci-action setup_aws_cli
-          - python-ci-action build_poetry_package
-          - python-ci-action publish_poetry_package
+          - pyci setup_aws_cli
+          - pyci build_poetry_package
+          - pyci publish_poetry_package
     - step: &update_python_ci_containers
         <<: *use_python_ci_runner_image
         name: Update self dependency in python-ci-containers
         script:
-          - python-ci-action update_dependency_in_python_ci_containers:local
+          - pyci update_dependency_in_python_ci_containers@local
 
 pipelines:
   branches:
