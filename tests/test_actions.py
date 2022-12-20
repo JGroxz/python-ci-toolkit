@@ -1,13 +1,10 @@
 import os
 import sys
 
-from python_ci_toolkit import actions, python
+from python_ci_toolkit import actions
 
 
 def test_run_action_git() -> None:
-    os.environ["PYTHON_CI_ACTIONS_GIT_REPO_URL"] = "git@bitbucket.org:pyci/python-ci-actions.git"  # TODO: remove
-    os.environ["PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY"] = """***REMOVED PRIVATE KEY***
-"""
     os.environ["SECRETS_FILE_NAME"] = "secrets"
 
     print(sys.argv)

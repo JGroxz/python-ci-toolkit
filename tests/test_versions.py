@@ -2,9 +2,8 @@ from pathlib import Path
 
 from semver import VersionInfo
 
-from python_ci_toolkit import versions
 from python_ci_toolkit.versions import read_project_version, get_latest_pypi_package_version, parse_semantic_version
-from python_ci_toolkit.versions.version_file_handlers import VERSION_FILE_HANDLERS, VersionFileHandler, PyProjectVersionFileHandler
+from python_ci_toolkit.versions.version_file_handlers import VERSION_FILE_HANDLERS, VersionFileHandler
 
 TEST_VERSION_FILES_FOLDER = Path("./test_version_files")
 
@@ -35,6 +34,8 @@ def test_version_parsing():
         "v0.0.1-dev",
         "v0.1.0-dev",
         "v1.0.0-dev.1",
+        "v1.0.0-dev1",
+        "v1.0.0.dev1",
     ]
 
     for version_string in version_strings:
@@ -104,9 +105,9 @@ def test_version_bump():
 if __name__ == '__main__':
     # test_project_version()
     # test_latest()
-    # test_version_parsing()
+    test_version_parsing()
     # test_version_write()
-    test_version_bump()
+    # test_version_bump()
 
     # handler = PyProjectVersionFileHandler()
     # path = Path("../", "pyproject.toml")
