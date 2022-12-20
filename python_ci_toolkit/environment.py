@@ -98,7 +98,8 @@ def assert_environment_variable_set(variable_name: str, usage_explanation: str =
         Value of the given environment variable.
     """
     # Use fallback value if required and available
-    if (not is_environment_variable_set(variable_name)) and (fallback_value_getter is not None):
+    is_fallback_provided = (fallback_value_getter is not None)
+    if (not is_environment_variable_set(variable_name)) and is_fallback_provided:
         logging.info(f"'{variable_name}' environment variable is not set, but fallback getter function is defined.\n"
                      f"  Trying to retrieve a fallback value...")
 
@@ -120,9 +121,12 @@ def assert_environment_variable_set(variable_name: str, usage_explanation: str =
 
     # Craft message
     message = f"'{variable_name}' environment variable is not set, but is required by CI logic."
+    if is_fallback_provided:
+        message = (f"{message}\n"
+                   f"  Fallback value could not be retrieved either. Please see previous log messages for details (before the stack trace).")
     if usage_explanation is not None:
         message = (f"{message}\n"
-                   f"    Explanation: {usage_explanation}")
+                   f"  Explanation: {usage_explanation}")
 
     assert is_environment_variable_set(variable_name), message
 
