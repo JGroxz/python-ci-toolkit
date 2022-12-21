@@ -99,7 +99,9 @@ def git_ssh_credentials(ssh_private_key: str = None) -> None:
         os.chmod(temp_private_ssh_key_file_path, 0o600)
 
     # Tell Git to use the new SSH key file
-    os.environ["GIT_SSH_COMMAND"] = f'ssh -i "{temp_private_ssh_key_file_path}" -o IdentitiesOnly=yes'
+    os.environ["GIT_SSH_COMMAND"] = f'ssh -i "{temp_private_ssh_key_file_path}" ' \
+                                    f'-o IdentitiesOnly=yes ' \
+                                    f'-o StrictHostKeyChecking=accept-new'
 
     yield  # <- with this context, clone repos, push changes etc.
 
