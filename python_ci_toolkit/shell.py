@@ -66,7 +66,8 @@ def run_shell_command(command: str,
 
     # print header if using pretty output
     if (not silence_output) and (not raw_output):
-        header = Text("Running shell command:", style=SHELL_OUTPUT_PREFIX_STYLE) + " " + Text(f"{command}", style=SHELL_OUTPUT_COMMAND_STYLE)
+        header = Text("Running shell command:", style=SHELL_OUTPUT_PREFIX_STYLE) + " " + Text(f"{command}",
+                                                                                              style=SHELL_OUTPUT_COMMAND_STYLE)
         ci_console.print(header)
 
     # prepare command args
@@ -74,7 +75,8 @@ def run_shell_command(command: str,
 
     captured_output = ""
 
-    # lock is required to prints from stdout- and stderr-reading threads from interfering with each other (if 'silence_output' is set to False)
+    # lock is required to prints from stdout- and stderr-reading threads from interfering with each other
+    # (if 'silence_output' is set to False)
     lock = threading.Lock()
 
     # helper function for handling the executed shell command's output
@@ -94,12 +96,15 @@ def run_shell_command(command: str,
                     print(decoded_line)
                 else:
                     grid = Table.grid()
-                    grid.add_column(style=SHELL_OUTPUT_PREFIX_STYLE, min_width=SHELL_OUTPUT_PREFIX_WIDTH_MIN, max_width=SHELL_OUTPUT_PREFIX_WIDTH_MAX, overflow="ellipsis", no_wrap=True)
+                    grid.add_column(style=SHELL_OUTPUT_PREFIX_STYLE, min_width=SHELL_OUTPUT_PREFIX_WIDTH_MIN,
+                                    max_width=SHELL_OUTPUT_PREFIX_WIDTH_MAX, overflow="ellipsis", no_wrap=True)
                     grid.add_column(style=SHELL_OUTPUT_PREFIX_STYLE)
                     grid.add_column(overflow="fold")
                     grid.add_row(
-                        Text(f" > shell: ") + Text(command, style=SHELL_OUTPUT_COMMAND_STYLE), " │ ", (decoded_line if (not stderr) else Text(decoded_line, style=SHELL_OUTPUT_STDERR_STYLE))
+                        Text(f" > shell: ") + Text(command, style=SHELL_OUTPUT_COMMAND_STYLE), " │ ",
+                        (decoded_line if (not stderr) else Text(decoded_line, style=SHELL_OUTPUT_STDERR_STYLE))
                     )
+                    # noinspection PyUnresolvedReferences
                     ci_console.print(grid, end="")
                 lock.release()
 
@@ -114,12 +119,17 @@ def run_shell_command(command: str,
     exitcode = process.wait()
 
     if (exitcode != 0) and throw_exception_on_error:
+        if silence_output:
+            output_string = (f"  Output:\n"
+                             f"    ↓ ↓ ↓ Command output start ↓ ↓ ↓\n"
+                             f"{''.join(captured_output)}\n"
+                             f"    ↑ ↑ ↑  Command output end  ↑ ↑ ↑\n")
+        else:
+            output_string = "  Output of the command can be seen before the stacktrace above."
+
         raise RuntimeError(f"Error executing command (exit code {exitcode})\n"
                            f"  Command:\n"
                            f"    {command}\n"
-                           f"  Output:\n"
-                           f"↓ ↓ ↓ Command output start ↓ ↓ ↓\n"
-                           f"{''.join(captured_output)}\n"
-                           f"↑ ↑ ↑  Command output end  ↑ ↑ ↑\n\n")
+                           f"{output_string}")
 
     return exitcode, captured_output
