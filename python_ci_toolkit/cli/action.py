@@ -86,7 +86,7 @@ def _complete_action_identifier(ctx: Context, param: Argument, incomplete: str):
 def action(action_identifier: str, action_args: List[str]) -> None:
     """
     Execute CI action based on the given ACTION_IDENTIFIER.\n
-    Arbitrary arguments can be passed to the action in place of ACTION_ARGS.
+    Arbitrary arguments can be passed to the action in place of ACTION_ARGS.\n
     \n
     Notes:\n
      - Action name must correspond to the name of action's Python file without a '.py' extension.\n

@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "python-ci-toolkit"
-version = "0.16.0"
+version = "0.16.1"
 description = "A collection of tools for building CI Python scripts used by PyCI"
 authors = [ "PyCI <hello@pyci.dev>",]
 
@@ -20,4 +20,4 @@ rich-click = "^1.6.0"
 
 [tool.poetry.scripts]
 python-ci = "python_ci_toolkit.cli:cli"
-pyci = "python_ci_toolkit.cli:cli"
+pyci = "python_ci_toolkit.cli.action:action"
