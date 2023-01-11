@@ -1,10 +1,9 @@
-import logging
-
 import click as vanilla_click
 import rich_click as click
-from rich.logging import RichHandler
+from click import UsageError
 from rich.traceback import install
 
+from .action import action
 from .autocompletion import autocompletion
 
 # configuring rich-click
@@ -15,27 +14,27 @@ CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 
 @click.group(context_settings=CONTEXT_SETTINGS)
 @click.version_option()
-def cli() -> None:
-    # initialize logging
+@click.option("--debug",
+              is_flag=True,
+              help="Enable debug logging.")
+def cli(debug: bool = False) -> None:
+    """
+    Tool to streamline the use of Python scripts in CI/CD automation.
+    """
+    from python_ci_toolkit.console import initialize_ci_console
 
+    # initialize logging
+    initialize_ci_console()
     install(show_locals=False, suppress=[click, vanilla_click])
 
-    logs_format = "%(message)s"
-    logging.basicConfig(
-        level="INFO",
-        format=logs_format,
-        handlers=[
-            RichHandler(
-                show_path=False,
-                tracebacks_show_locals=False,
-                markup=False
-            )
-        ]
-    )
+    if debug:
+        # TODO: set log level to DEBUG
+        raise NotImplementedError("WIP")
 
 
 # Register CLI commands
 cli.add_command(autocompletion)
+cli.add_command(action)
 
 if __name__ == '__main__':
     cli()
