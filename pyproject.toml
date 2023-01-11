@@ -20,4 +20,4 @@ rich-click = "^1.6.0"
 
 [tool.poetry.scripts]
 python-ci = "python_ci_toolkit.cli:cli"
-pyci = "python_ci_toolkit.cli:cli"
+pyci = "python_ci_toolkit.cli.action:action"
