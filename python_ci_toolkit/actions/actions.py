@@ -10,15 +10,20 @@ import time
 from pathlib import Path
 from typing import List
 
+from rich import print
+from rich.text import Text
+
 from python_ci_toolkit import pip
-from python_ci_toolkit.git import git_ssh_credentials, get_default_ssh_private_key
-from ..environment import assert_environment_variable_set, assert_multiline_environment_variable_set, ci_files_directory, ci_temp_files_directory
+from ..console import initialize_ci_console
+from ..git import git_ssh_credentials, get_default_ssh_private_key
+from ..environment import assert_environment_variable_set, assert_multiline_environment_variable_set, \
+    ci_files_directory, ci_temp_files_directory, get_ci_environment_name, ci_project_root
 from ..python import import_module_from_file
 from ..shell import run_shell_command
 
+# Constants
+ACTION_VERSION_SEPARATOR = "@"
 DOWNLOADED_ACTIONS_DIRECTORY_PATH: Path = ci_temp_files_directory.joinpath("downloaded_actions")
-
-_ACTION_VERSION_SEPARATOR = "@"
 
 
 def delete_git_repo(repo_path: Path) -> None:
@@ -41,7 +46,8 @@ def delete_git_repo(repo_path: Path) -> None:
     shutil.rmtree(repo_path, onerror=on_rm_error)
 
 
-def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, action_version: str = None, ssh_private_key: str = None) -> Path:
+def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, action_version: str = None,
+                                       ssh_private_key: str = None) -> Path:
     """
     Retrieves Python CI script file with the given name from Git repository specified in 'PYTHON_CI_ACTIONS_GIT_REPO_URL' environment variable.
     If the repository is private, a private SSH key can be supplied in 'PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY' environment variable.
@@ -62,6 +68,8 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
     Returns:
         Local path to the downloaded action file.
     """
+    action_display_name = f"{action_name}{ACTION_VERSION_SEPARATOR}{action_version}"
+
     # prepare paths
     action_script_name = f"{action_name}.py"
     cloned_repo_path = ci_temp_files_directory.joinpath("actions_repo_clone")
@@ -78,10 +86,12 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
         # clone the repo
         if action_version is None:
             # if no version specified, just clone the main branch
-            run_shell_command(f'git clone --depth 1 "{git_repo_url}" "{cloned_repo_path}"', silence_output=True, use_wsl_on_windows=False)
+            run_shell_command(f'git clone --depth 1 "{git_repo_url}" "{cloned_repo_path}"', silence_output=True,
+                              use_wsl_on_windows=False)
         else:
             # find branches or tags matching the given version
-            _, output = run_shell_command(f'git ls-remote "{git_repo_url}"', silence_output=True, use_wsl_on_windows=False)
+            _, output = run_shell_command(f'git ls-remote "{git_repo_url}"', silence_output=True,
+                                          use_wsl_on_windows=False)
             output_lines = output.split("\n")
             branch_exists = False
             tag_exists = False
@@ -93,14 +103,15 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
 
             # if both a branch and a tag exist with the same name, do not pull to avoid ambiguity
             if tag_exists and branch_exists:
-                logging.error(f"Both a branch and a tag named '{action_version}' exist in remote repository '{git_repo_url}'.\n"
-                              f"The action '{action_name}:{action_version}' wil not be pulled to avoid ambiguity.\n"
-                              f"Please remove the redundant branch or tag ('{action_version}') from the repo before pulling this version again.")
+                logging.error(
+                    f"Both a branch and a tag named '{action_version}' exist in remote repository '{git_repo_url}'.\n"
+                    f"The action '{action_display_name}' wil not be pulled to avoid ambiguity.\n"
+                    f"Please remove the redundant branch or tag ('{action_version}') from the repo before pulling this version again.")
                 sys.exit(2)
 
             # if nothing matches the version, there is nothing we can do
             if (not tag_exists) and (not branch_exists):
-                logging.error(f"Cannot pull action '{action_name}:{action_version}' from Git: "
+                logging.error(f"Cannot pull action '{action_display_name}' from Git: "
                               f"remote repository '{git_repo_url}' has neither a branch nor a tag named '{action_version}'.\n"
                               f"Please make sure that the corresponding branch or tag ('{action_version}') exists before pulling this version again.")
                 sys.exit(3)
@@ -110,12 +121,14 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
                 delete_git_repo(cloned_repo_path)
 
             # pull whatever is available
-            run_shell_command(f'git clone --depth 1 --branch "{action_version}" "{git_repo_url}" "{cloned_repo_path}"', silence_output=True, use_wsl_on_windows=False)
+            run_shell_command(f'git clone --depth 1 --branch "{action_version}" "{git_repo_url}" "{cloned_repo_path}"',
+                              silence_output=True, use_wsl_on_windows=False)
 
         # check if the repo had the requested action script
         if not action_script_cloned_path.exists():
-            logging.error(f"Cloned repository '{git_repo_url}' does include action '{action_name}' (expected script path is '{action_script_cloned_path}').\n"
-                          f"Please make sure that the remote repository has the required action script.")
+            logging.error(
+                f"Cloned repository '{git_repo_url}' does include action '{action_name}' (expected script path is '{action_script_cloned_path}').\n"
+                f"Please make sure that the remote repository has the required action script.")
             sys.exit(4)
 
         # copy the action script over to the downloaded actions directory
@@ -146,25 +159,50 @@ def retrieve_ci_action_script_local(action_name: str) -> Path:
     action_file_path = Path(local_ci_actions_folder, f"{action_name}.py")
 
     if not action_file_path.exists():
-        raise FileNotFoundError(f"Cannot run action '{action_name}' from local file '{action_file_path}': file does not exist.\n"
-                                f"When you run actions in local mode, make sure that the corresponding action file exists in '.ci/actions' folder in your CI project's root.")
+        raise FileNotFoundError(
+            f"Cannot run action '{action_name}' from local file '{action_file_path}': file does not exist.\n"
+            f"When you run actions in local mode, make sure that the corresponding action file exists in '.ci/actions' folder in your CI project's root.")
 
     return action_file_path
+
+
+def _print_action_header(action_name: str, action_version: str, action_source: str) -> None:
+    ci_environment_name = get_ci_environment_name()
+
+    # noinspection PyBroadException
+    try:
+        import pkg_resources
+        version = pkg_resources.get_distribution('python-ci-toolkit').version
+    except Exception:
+        from ..versions import read_project_version
+        version = read_project_version(ci_project_root)
+
+    action_display_name = f"{action_name}{ACTION_VERSION_SEPARATOR}{action_version}";
+    initialized_notification = Text.from_markup(
+        f"[green]>_[/][rgb(146,202,85)] Running CI action '{action_display_name}'[/]...\n"
+        f"     CI toolkit version: [blue]{version}[/]\n"
+        f"     CI environment: [blue]{ci_environment_name}[/]\n"
+        f"     Action version: [blue]{action_version}[/]\n"
+        f"     Action source: {action_source}"
+    )
+    logging.info(initialized_notification)
 
 
 def run_ci_action(action_name: str, action_version: str = None, argv: List[str] = None) -> None:
     """
     Executes CI action by the given action name.
     """
-    action_display_name = action_name if (action_version is None) else f"{action_name}{_ACTION_VERSION_SEPARATOR}{action_version}"
-    logging.info(f"Locating action '{action_display_name}'...")
+    action_display_name = (action_name
+                           if (action_version is None)
+                           else f"{action_name}{ACTION_VERSION_SEPARATOR}{action_version}")
 
     # locate action script
+    logging.debug(f"Locating action '{action_display_name}'...")
     if action_version == "local":
         # local folder
         action_script_path = retrieve_ci_action_script_local(action_name)
         action_source = f"'{action_script_path}'"
-        logging.info(f"Retrieved local action '{action_name}'. Running...")
+        logging.debug(f"Retrieved local action '{action_name}'. Running...")
     else:
         # Git repo
         start_time = time.perf_counter()
@@ -194,9 +232,9 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
     # install action's requirements if present
     action_requirements_path = action_script_path.parent.joinpath("requirements.txt")
     if action_requirements_path.exists():
-        logging.info(f"Action '{action_name}' has requirements file supplied with it. Installing requirements...")
+        logging.debug(f"Action '{action_name}' has requirements file supplied with it. Installing requirements...")
         pip.ensure_requirements_installed(action_requirements_path)
-        logging.info("Requirements installation complete.")
+        logging.debug("Requirements installation complete.")
 
     # prepare action's CLI arguments
     sys.argv = sys.argv[:1]
@@ -205,67 +243,14 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
 
     # run CI action using its cli() method with the given arguments
     try:
-        logging.info(f"Importing Python module of the action '{action_name}'...")
+        logging.debug(f"Importing Python module of the action '{action_name}'...")
         action_module = import_module_from_file(f"{action_name}", f"{action_script_path}")
+        logging.debug("Import completed.")
     except Exception:
-        logging.error(f"Error when importing Python module from action script '{action_script_path}' (action '{action_display_name}' from {action_source}).")
+        logging.error(
+            f"Error when importing Python module from action script '{action_script_path}' (action '{action_display_name}' from {action_source}).")
         raise
-    logging.info("Import completed.")
 
-    logging.info(f"> Running action '{action_name}':\n"
-                 f"    Version: '{action_version}'\n"
-                 f"    Source: {action_source}")
+    _print_action_header(action_name, action_version, action_source)
+
     action_module.cli()
-
-
-def cli() -> None:
-    """
-    Executes CI action.
-    """
-
-    def cli_print_usage() -> None:
-        message = ("Usage: python-ci-action action_name[@action_version] [action_args]\n"
-                   "\n"
-                   "Notes:\n"
-                   "  - Action name must correspond to the name of action's Python file without a '.py' extension.\n"
-                   "  - Action version can be either a Git branch name or a Git tag. The corresponding branch/tag will be pulled from the action repository.\n"
-                   "  - If action version is set to 'local', utility will look for the action file in '.ci/actions' folder inside your CI project's root directory.\n"
-                   "  - Any arguments passed after the action name/tag will be passed to the executed action script.\n"
-                   "\n"
-                   "Examples:\n"
-                   "  python-ci-action build_dockers          # Runs 'build_dockers' action from Git branch 'main'\n"
-                   "  python-ci-action build_dockers@develop  # Runs 'build_dockers' action from Git branch 'develop'\n"
-                   "  python-ci-action build_dockers@v1.0.0   # Runs 'build_dockers' action from Git tag 'v1.0.0'\n"
-                   "  python-ci-action build_dockers@local    # Runs 'build_dockers' located at '.ci/actions/build_dockers.py' at your CI project's root folder\n")
-        print(message)
-
-    def cli_error_and_exit(error_code: int, error_text: str) -> None:
-        print(f"Error: {error_text}\n")
-        cli_print_usage()
-        sys.exit(error_code)
-
-    # sanity checks
-    if len(sys.argv) <= 1:
-        cli_error_and_exit(1, "No CI action name given.")
-
-    # initialize CI console for formatted output
-    from ..console import initialize_ci_console
-    initialize_ci_console()
-
-    # parse action name/version from the first argument
-    first_arg = sys.argv[1]
-
-    # version can be included in the first argument, separated from the action name by a semicolon
-    if _ACTION_VERSION_SEPARATOR in first_arg:
-        split_by_first_colon = first_arg.split(_ACTION_VERSION_SEPARATOR, 1)
-        action_name = split_by_first_colon[0]
-        action_version = split_by_first_colon[1]
-    else:
-        action_name = first_arg
-        action_version = None
-
-    run_ci_action(action_name, action_version, sys.argv[2:])
-
-
-if __name__ == '__main__':
-    cli()

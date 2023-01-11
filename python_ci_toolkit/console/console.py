@@ -3,13 +3,10 @@ Functions for setting up a CI console.
 """
 
 import logging
-import os
-from pathlib import Path
 
 from rich.console import Console
-from rich.text import Text
 
-from ..environment import is_running_in_bitbucket_ci, get_ci_environment_name
+from ..environment import is_running_in_bitbucket_ci
 
 _INITIALIZED = False
 """Whether the console was initialized. Used to make initialize_ci_console() logic run only once."""
@@ -80,24 +77,6 @@ def initialize_ci_console() -> Console:
         return ci_console
 
     setup_ci_logging()
-
-    ci_environment_name = get_ci_environment_name()
-
-    try:
-        import pkg_resources
-        version = pkg_resources.get_distribution('python-ci-toolkit').version
-    except Exception:
-        from ..versions import read_project_version
-        version = read_project_version(Path(os.path.dirname(__file__), "../../"))
-
-
-    initialized_notification = f"[green]>_[/][rgb(146,202,85)] Python CI console initialized[/]\n"
-    initialized_notification += f"     CI toolkit version: [blue]{version}[/]\n"
-    initialized_notification += f"     CI environment: [blue]{ci_environment_name}[/]\n" \
-                                f"     [bright_black](from [i]python_ci_utilities.console[/])[/]"
-    initialized_notification = Text.from_markup(initialized_notification)
-
-    logging.info(initialized_notification)
 
     _INITIALIZED = True
 
