@@ -14,9 +14,10 @@ rich = ">=1"
 semver = ">=2"
 toml = ">=0.10"
 GitPython = ">=3.1"
+rich-click = "^1.6.0"
 
 [tool.poetry.dev-dependencies]
 
 [tool.poetry.scripts]
-python-ci-action = "python_ci_toolkit.actions:cli"
-pyci = "python_ci_toolkit.actions:cli"
+python-ci = "python_ci_toolkit.cli:cli"
+pyci = "python_ci_toolkit.cli:cli"
