@@ -179,7 +179,7 @@ def _print_action_header(action_name: str, action_version: str, action_source: s
                  f"     CI toolkit version: [blue]{version}[/]\n"
                  f"     CI environment: [blue]{ci_environment_name}[/]\n"
                  f"     Action version: [blue]{action_version}[/]\n"
-                 f"     Action source: {action_source}", extra={"markup": True})
+                 f"     Action source: {action_source}", extra={"markup": True, "highlighter": None})
 
 
 def run_ci_action(action_name: str, action_version: str = None, argv: List[str] = None) -> None:
