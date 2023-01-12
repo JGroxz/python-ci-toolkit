@@ -10,14 +10,10 @@ import time
 from pathlib import Path
 from typing import List
 
-from rich import print
-from rich.text import Text
-
 from python_ci_toolkit import pip
-from ..console import initialize_ci_console
-from ..git import git_ssh_credentials, get_default_ssh_private_key
 from ..environment import assert_environment_variable_set, assert_multiline_environment_variable_set, \
     ci_files_directory, ci_temp_files_directory, get_ci_environment_name, ci_project_root
+from ..git import git_ssh_credentials, get_default_ssh_private_key
 from ..python import import_module_from_file
 from ..shell import run_shell_command
 
@@ -178,14 +174,12 @@ def _print_action_header(action_name: str, action_version: str, action_source: s
         version = read_project_version(ci_project_root)
 
     action_display_name = f"{action_name}{ACTION_VERSION_SEPARATOR}{action_version}";
-    initialized_notification = Text.from_markup(
-        f"[green]>_[/][rgb(146,202,85)] Running CI action '{action_display_name}'[/]...\n"
-        f"     CI toolkit version: [blue]{version}[/]\n"
-        f"     CI environment: [blue]{ci_environment_name}[/]\n"
-        f"     Action version: [blue]{action_version}[/]\n"
-        f"     Action source: {action_source}"
-    )
-    logging.info(initialized_notification)
+
+    logging.info(f"[green]>_[/][rgb(146,202,85)] Running CI action '{action_display_name}'[/]...\n"
+                 f"     CI toolkit version: [blue]{version}[/]\n"
+                 f"     CI environment: [blue]{ci_environment_name}[/]\n"
+                 f"     Action version: [blue]{action_version}[/]\n"
+                 f"     Action source: {action_source}", extra={"markup": True})
 
 
 def run_ci_action(action_name: str, action_version: str = None, argv: List[str] = None) -> None:
