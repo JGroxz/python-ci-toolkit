@@ -50,7 +50,7 @@ def setup_ci_logging() -> None:
                 show_path=False,
                 tracebacks_show_locals=False,
                 # disable Rich markup by default to avoid character clashes when printing logs;
-                # markup can still be processed on demand by explicitly using Text.from_markup(...) on strings before logging them
+                # markup can still be processed on demand by explicitly adding 'extra={"markup": True}' to the log call
                 markup=False
             )
         ]
