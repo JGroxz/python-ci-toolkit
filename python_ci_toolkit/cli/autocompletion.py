@@ -13,7 +13,7 @@ import sys
 
 AUTOCOMPLETION_COMMAND_BASE_NAME = "pyci-annotation-utilities"
 
-CURRENT_SHELL_PATH = Path(os.environ.get("SHELL"))
+CURRENT_SHELL_PATH = Path(os.environ.get("SHELL", ""))
 CURRENT_SHELL_NAME = CURRENT_SHELL_PATH.name.lower()
 
 
