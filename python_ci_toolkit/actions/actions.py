@@ -1,6 +1,7 @@
 """
 Provides functions to retrieve and run CI actions based on Python scripts.
 """
+import hashlib
 import logging
 import os
 import shutil
@@ -66,9 +67,13 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
     """
     action_display_name = f"{action_name}{ACTION_VERSION_SEPARATOR}{action_version}"
 
-    # prepare paths
+    # generate local repo path based on remote
+    action_repos_directory = ci_temp_files_directory.joinpath("downloaded_action_repos")
+    git_repo_hash = hashlib.md5(git_repo_url.encode()).hexdigest()
+    cloned_repo_path = action_repos_directory.joinpath(git_repo_hash)
+
+    # prepare other paths
     action_script_name = f"{action_name}.py"
-    cloned_repo_path = ci_temp_files_directory.joinpath("actions_repo_clone")
     action_script_cloned_path = Path(cloned_repo_path, "actions", f"{action_name}", f"{action_name}.py")
     action_local_directory = DOWNLOADED_ACTIONS_DIRECTORY_PATH.joinpath(action_name)
     action_script_local_path = action_local_directory.joinpath(action_script_name)
@@ -78,16 +83,39 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
     os.makedirs(action_local_directory, exist_ok=True)
     os.makedirs(ci_temp_files_directory, exist_ok=True)
 
+    # TODO: rework cloning logic to enable caching
+    #       - if not cloned, clone the full repo
+    #       - if cloned, fetch all
+    #       - checkout branch/tag from origin
+
+    if cloned_repo_path.exists():
+        logging.warning("REPO ALREADY CLONED")
+        run_shell_command(f'git status',
+                          cwd=cloned_repo_path, silence_output=False, use_wsl_on_windows=False)
+
+        start = time.perf_counter()
+        run_shell_command("git fetch --all --tags")
+        print(f"{time.perf_counter() - start}")
+
+        if action_version:
+            run_shell_command(f'git checkout "origin/tags/{action_version}"',
+                              cwd=cloned_repo_path, silence_output=False, use_wsl_on_windows=False)
+
+        run_shell_command(f'git status',
+                          cwd=cloned_repo_path, silence_output=False, use_wsl_on_windows=False)
+
+        raise NotImplementedError("WIP")
+
     with git_ssh_credentials(ssh_private_key):
         # clone the repo
         if action_version is None:
             # if no version specified, just clone the main branch
-            run_shell_command(f'git clone --depth 1 "{git_repo_url}" "{cloned_repo_path}"', silence_output=True,
-                              use_wsl_on_windows=False)
+            run_shell_command(f'git clone --depth 1 "{git_repo_url}" "{cloned_repo_path}"',
+                              silence_output=True, use_wsl_on_windows=False)
         else:
             # find branches or tags matching the given version
-            _, output = run_shell_command(f'git ls-remote "{git_repo_url}"', silence_output=True,
-                                          use_wsl_on_windows=False)
+            _, output = run_shell_command(f'git ls-remote "{git_repo_url}"',
+                                          silence_output=True, use_wsl_on_windows=False)
             output_lines = output.split("\n")
             branch_exists = False
             tag_exists = False
@@ -117,26 +145,26 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
                 delete_git_repo(cloned_repo_path)
 
             # pull whatever is available
-            run_shell_command(f'git clone --depth 1 --branch "{action_version}" "{git_repo_url}" "{cloned_repo_path}"',
+            run_shell_command(f'git clone --branch "{action_version}" "{git_repo_url}" "{cloned_repo_path}"',
                               silence_output=True, use_wsl_on_windows=False)
 
-        # check if the repo had the requested action script
-        if not action_script_cloned_path.exists():
-            logging.error(
-                f"Cloned repository '{git_repo_url}' does include action '{action_name}' (expected script path is '{action_script_cloned_path}').\n"
-                f"Please make sure that the remote repository has the required action script.")
-            sys.exit(4)
+    # check if the repo had the requested action script
+    if not action_script_cloned_path.exists():
+        logging.error(
+            f"Cloned repository '{git_repo_url}' does include action '{action_name}' (expected script path is '{action_script_cloned_path}').\n"
+            f"Please make sure that the remote repository has the required action script.")
+        sys.exit(4)
 
-        # copy the action script over to the downloaded actions directory
-        shutil.copyfile(action_script_cloned_path, action_script_local_path)
+    # copy the action script over to the downloaded actions directory
+    shutil.copyfile(action_script_cloned_path, action_script_local_path)
 
-        # copy requirements if those are present
-        action_requirements_cloned_path = action_script_cloned_path.parent.joinpath("requirements.txt")
-        if action_requirements_cloned_path.exists():
-            shutil.copyfile(action_requirements_cloned_path, action_requirements_local_path)
+    # copy requirements if those are present
+    action_requirements_cloned_path = action_script_cloned_path.parent.joinpath("requirements.txt")
+    if action_requirements_cloned_path.exists():
+        shutil.copyfile(action_requirements_cloned_path, action_requirements_local_path)
 
-        # clean up
-        delete_git_repo(cloned_repo_path)
+    # # clean up
+    # delete_git_repo(cloned_repo_path)
 
     return action_script_local_path
 
