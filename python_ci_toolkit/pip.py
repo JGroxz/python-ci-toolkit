@@ -9,6 +9,22 @@ import pkg_resources
 from .shell import run_shell_command
 
 
+def install_package(package_name: str, silence_pip_stdout: bool = False) -> None:
+    """
+    Installs the given requirement in the current Python environment using PIP.
+
+    Args:
+        package_name: Name of the package to install.
+        silence_pip_stdout: If set to True, PIP installation logs will not be sent to stdout.
+
+    Raises:
+        RuntimeError if package installation fails.
+    """
+    error, _ = run_shell_command(f"pip install {package_name}", silence_output=silence_pip_stdout, use_wsl_on_windows=False)
+    if error:
+        raise RuntimeError(f"Failed to install PIP package '{package_name}'.")
+
+
 def check_package_installed(package_name: str) -> bool:
     """
     Checks if the given PIP package is installed in the current Python environment.
@@ -26,22 +42,6 @@ def check_package_installed(package_name: str) -> bool:
         return False
 
     return True
-
-
-def install_package(package_name: str, silence_pip_stdout: bool = False) -> None:
-    """
-    Installs the given requirement in the current Python environment using PIP.
-
-    Args:
-        package_name: Name of the package to install.
-        silence_pip_stdout: If set to True, PIP installation logs will not be sent to stdout.
-
-    Raises:
-        RuntimeError if package installation fails.
-    """
-    error, _ = run_shell_command(f"pip install {package_name}", silence_output=silence_pip_stdout, use_wsl_on_windows=False)
-    if error:
-        raise RuntimeError(f"Failed to install PIP package '{package_name}'.")
 
 
 def ensure_package_installed(package_name: str, silence_pip_stdout: bool = False) -> None:
@@ -74,7 +74,7 @@ def ensure_requirements_installed(requirements_file_path: Path, silence_pip_stdo
     if not requirements_file_path.exists():
         raise FileNotFoundError(f"Cannot install requirements from file '{requirements_file_path}' because the file does not exist.")
 
-    with io.open(requirements_file_path, "r") as file:
+    with requirements_file_path.open("r") as file:
         lines = file.readlines()
 
     for line in lines:
