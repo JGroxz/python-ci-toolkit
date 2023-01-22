@@ -21,7 +21,7 @@ SHELL_OUTPUT_PREFIX_STYLE = Style(color="blue")
 SHELL_OUTPUT_COMMAND_STYLE = Style(color="deep_sky_blue4", italic=True)
 SHELL_OUTPUT_STDERR_STYLE = Style(color="red")
 
-ci_console = None
+_output_console = None
 
 
 def run_shell_command(command: str,
@@ -41,7 +41,7 @@ def run_shell_command(command: str,
         cwd: Working directory to execute the command in. Defaults to current working directory.
         silence_output: If set to True, command output will be suppressed.
         raw_output: If set to True, the output from the executed command will be printed as is.
-            If set to False, the output will be printed with pretty Rich formatting through ci_console.
+            If set to False, the output will be printed with pretty Rich formatting through ci_output_console.
             Has effect only with 'silence_output' set to False.
         throw_exception_on_error: If set to True (default), an exception will be thrown if the executed command exits with a non-zero exit code.
         use_wsl_on_windows: If set to True (default) and running on Windows, the provided command will be run in WSL.
@@ -55,10 +55,10 @@ def run_shell_command(command: str,
     """
 
     # lazy-initialize CI console if using pretty output
-    global ci_console
-    if (not silence_output) and (not raw_output) and (ci_console is None):
-        from .console import ci_console as c
-        ci_console = c
+    global _output_console
+    if (not silence_output) and (_output_console is None):
+        from .logging import ci_output_console
+        _output_console = ci_output_console
 
     # use WSL if required on Windows
     if os.name == "nt" and use_wsl_on_windows:
@@ -68,7 +68,7 @@ def run_shell_command(command: str,
     if (not silence_output) and (not raw_output):
         header = Text("Running shell command:", style=SHELL_OUTPUT_PREFIX_STYLE) + " " + Text(f"{command}",
                                                                                               style=SHELL_OUTPUT_COMMAND_STYLE)
-        ci_console.print(header)
+        _output_console.print(header)
 
     # prepare command args
     args = shlex.split(command)
@@ -93,7 +93,7 @@ def run_shell_command(command: str,
                 lock.acquire()
                 decoded_line = decoded_line.rstrip(" \n")
                 if raw_output:
-                    print(decoded_line)
+                    _output_console.print(decoded_line)
                 else:
                     grid = Table.grid()
                     grid.add_column(style=SHELL_OUTPUT_PREFIX_STYLE, min_width=SHELL_OUTPUT_PREFIX_WIDTH_MIN,
@@ -105,7 +105,7 @@ def run_shell_command(command: str,
                         (decoded_line if (not stderr) else Text(decoded_line, style=SHELL_OUTPUT_STDERR_STYLE))
                     )
                     # noinspection PyUnresolvedReferences
-                    ci_console.print(grid, end="")
+                    _output_console.print(grid, end="")
                 lock.release()
 
     # run the shell command and capture its output
