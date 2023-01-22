@@ -3,11 +3,12 @@ Utility functions for interacting with remote Git repositories.
 """
 from __future__ import annotations
 
-import contextlib
 import io
 import logging
 import os
+import shutil
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
 
 from git import Repo, GitCommandError, InvalidGitRepositoryError
@@ -15,12 +16,10 @@ from git import Repo, GitCommandError, InvalidGitRepositoryError
 from python_ci_toolkit.environment import ci_project_root, ci_environment_type, CiEnvironmentType, \
     assert_environment_variable_set, ci_temp_files_directory
 
-
 try:
     ci_repo = Repo(ci_project_root)
     """GitPython reference to the local Git repository of the current CI project."""
 except InvalidGitRepositoryError as e:
-    logging.warning(f"Current project path ('{ci_project_root}') is not a Git repository. Setting 'ci_repo' variable to None.")
     ci_repo = None
 
 
@@ -55,7 +54,7 @@ def get_default_ssh_private_key() -> str | None:
     return default_ssh_key
 
 
-@contextlib.contextmanager
+@contextmanager
 def git_ssh_credentials(ssh_private_key: str = None) -> None:
     """
     Context manager that configures Git to use the provided private SSH key when interacting with remote repositories
@@ -99,9 +98,11 @@ def git_ssh_credentials(ssh_private_key: str = None) -> None:
         os.chmod(temp_private_ssh_key_file_path, 0o600)
 
     # Tell Git to use the new SSH key file
-    os.environ["GIT_SSH_COMMAND"] = f'ssh -i "{temp_private_ssh_key_file_path}" -o IdentitiesOnly=yes'
+    os.environ["GIT_SSH_COMMAND"] = f'ssh -i "{temp_private_ssh_key_file_path}" ' \
+                                    f'-o IdentitiesOnly=yes ' \
+                                    f'-o StrictHostKeyChecking=accept-new'
 
-    yield  # <- with this context, clone repos, push changes etc.
+    yield  # <- within this context, clone repos, push changes etc.
 
     # Restore original GIT_SSH_COMMAND
     os.environ["GIT_SSH_COMMAND"] = original_git_ssh_command
@@ -198,3 +199,23 @@ def ensure_remote_is_https(repo: Repo) -> None:
     # Update remote URL
     repo.remote().set_url(https_remote_url)
     logging.info(f"Updated remote URL: '{https_remote_url}'.")
+
+
+def delete_git_repo(repo_path: Path) -> None:
+    """
+    Deletes Git repository in the given folder.
+
+    Notes:
+        Deleting Git directory requires special treatment, because a normal shutil.rmtree() call can fail
+        because of certain files in .git folder which get marked as read-only when cloning.
+
+    Args:
+        repo_path: Path to the Git repository's folder.
+    """
+
+    def on_rm_error(func, path, exc_info):
+        # from: https://stackoverflow.com/a/4829285
+        os.chmod(path, os.stat.S_IWRITE)
+        os.unlink(path)
+
+    shutil.rmtree(repo_path, onerror=on_rm_error)
