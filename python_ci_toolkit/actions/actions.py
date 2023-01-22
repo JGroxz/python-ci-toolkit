@@ -4,16 +4,18 @@ Provides functions to retrieve and run CI actions based on Python scripts.
 import hashlib
 import logging
 import os
-import shutil
 import sys
 import time
+from contextlib import contextmanager
 from pathlib import Path
 from typing import List
+
+from rich.progress import Progress
 
 from python_ci_toolkit import pip
 from ..environment import assert_environment_variable_set, assert_multiline_environment_variable_set, \
     ci_files_directory, ci_temp_files_directory, get_ci_environment_name, ci_project_root
-from ..git import git_ssh_credentials, get_default_ssh_private_key, delete_git_repo
+from ..git import git_ssh_credentials, get_default_ssh_private_key
 from ..python import import_module_from_file
 from ..shell import run_shell_command
 
@@ -99,10 +101,6 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
     action_display_name = f"{action_name}{ACTION_VERSION_SEPARATOR}{action_version}"
     action_script_directory = action_repo_directory / "actions" / f"{action_name}"
     action_script_path = action_script_directory / f"{action_name}.py"
-    action_requirements_path = action_script_directory / "requirements.txt"
-
-    # TODO: checkout required branch/tag
-    # TODO: update
 
     with git_ssh_credentials(ssh_private_key):
         # clone the repo
@@ -154,7 +152,7 @@ def retrieve_ci_action_script_local(action_name: str) -> Path:
     Returns:
         Full path to the given action's Python file.
     """
-    local_ci_actions_folder = ci_files_directory.joinpath("actions")
+    local_ci_actions_folder = ci_files_directory / "actions"
     action_file_path = Path(local_ci_actions_folder, f"{action_name}.py")
 
     if not action_file_path.exists():
@@ -185,6 +183,21 @@ def _print_action_header(action_name: str, action_version: str, action_source: s
                 f"     Action source: {action_source}", extra={"markup": True, "highlighter": None})
 
 
+@contextmanager
+def loading_animation(description: str) -> None:
+    """
+    Context manager that displays a loading animation in the console.
+    To be displayed to the user while doing prolonged tasks like cloning action Git repo.
+
+    Args:
+        description: Info message describing what's happening. Will be displayed next to the animation.
+    """
+    with Progress(transient=True, refresh_per_second=60) as progress:
+        progress.add_task(f"[blue]{description}...", total=None)
+
+        yield  # <- within this context, clone repos, install requirements etc.
+
+
 def run_ci_action(action_name: str, action_version: str = None, argv: List[str] = None) -> None:
     """
     Executes CI action by the given action name.
@@ -201,36 +214,40 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
         action_source = f"'{action_script_path}'"
         logger.debug(f"Retrieved local action '{action_name}'. Running...")
     else:
-        # Git repo
-        start_time = time.perf_counter()
+        with loading_animation(f"Retrieving action from Git"):
+            start_time = time.perf_counter()
 
-        actions_git_repo_url = assert_environment_variable_set(
-            "PYTHON_CI_ACTIONS_GIT_REPO_URL",
-            f"URL address of the Git repository is required to pull the code for action '{action_display_name}'.",
-            fallback_value_getter=lambda: DEFAULT_ACTION_REPO_URL)
-        actions_ssh_private_key = assert_multiline_environment_variable_set(
-            "PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY",
-            "SSH private key is required to pull actions from the private remote Git repositories.",
-            fallback_value_getter=get_default_ssh_private_key)
+            # Git repo
+            actions_git_repo_url = assert_environment_variable_set(
+                "PYTHON_CI_ACTIONS_GIT_REPO_URL",
+                f"URL address of the Git repository is required to pull the code for action '{action_display_name}'.",
+                fallback_value_getter=lambda: DEFAULT_ACTION_REPO_URL)
+            actions_ssh_private_key = assert_multiline_environment_variable_set(
+                "PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY",
+                "SSH private key is required to pull actions from the private remote Git repositories.",
+                fallback_value_getter=get_default_ssh_private_key)
 
-        action_script_path = retrieve_ci_action_script_from_git(
-            git_repo_url=actions_git_repo_url,
-            action_name=action_name,
-            action_version=action_version,
-            ssh_private_key=actions_ssh_private_key
-        )
+            action_script_path = retrieve_ci_action_script_from_git(
+                git_repo_url=actions_git_repo_url,
+                action_name=action_name,
+                action_version=action_version,
+                ssh_private_key=actions_ssh_private_key
+            )
 
-        branch_or_tag_name = "main" if (action_version is None) else action_version
-        action_source = f"'{branch_or_tag_name}' at '{actions_git_repo_url}'"
+            branch_or_tag_name = "main" if (action_version is None) else action_version
+            action_source = f"'{branch_or_tag_name}' at '{actions_git_repo_url}'"
 
-        duration = time.perf_counter() - start_time
+            duration = time.perf_counter() - start_time
         logger.info(f"Retrieved action '{action_display_name}' from Git in {duration:.3f} seconds.")
 
     # install action's requirements if present
-    action_requirements_path = action_script_path.parent.joinpath("requirements.txt")
+    action_requirements_path = action_script_path.parent / "requirements.txt"
     if action_requirements_path.exists():
         logger.debug(f"Action '{action_name}' has requirements file supplied with it. Installing requirements...")
-        pip.ensure_requirements_installed(action_requirements_path)
+
+        with loading_animation("Installing action's dependencies"):
+            pip.ensure_requirements_installed(action_requirements_path)
+
         logger.debug("Requirements installation complete.")
 
     # prepare action's CLI arguments
@@ -239,14 +256,14 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
         sys.argv.extend(argv)
 
     # run CI action using its cli() method with the given arguments
+    logger.debug(f"Importing Python module of the action '{action_name}'...")
     try:
-        logger.debug(f"Importing Python module of the action '{action_name}'...")
         action_module = import_module_from_file(f"{action_name}", f"{action_script_path}")
-        logger.debug("Import completed.")
     except Exception:
         logger.error(
             f"Error when importing Python module from action script '{action_script_path}' (action '{action_display_name}' from {action_source}).")
         raise
+    logger.debug("Import completed.")
 
     _print_action_header(action_name, action_version, action_source)
 

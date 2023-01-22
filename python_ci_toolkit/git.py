@@ -3,12 +3,12 @@ Utility functions for interacting with remote Git repositories.
 """
 from __future__ import annotations
 
-import contextlib
 import io
 import logging
 import os
 import shutil
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
 
 from git import Repo, GitCommandError, InvalidGitRepositoryError
@@ -16,12 +16,10 @@ from git import Repo, GitCommandError, InvalidGitRepositoryError
 from python_ci_toolkit.environment import ci_project_root, ci_environment_type, CiEnvironmentType, \
     assert_environment_variable_set, ci_temp_files_directory
 
-
 try:
     ci_repo = Repo(ci_project_root)
     """GitPython reference to the local Git repository of the current CI project."""
 except InvalidGitRepositoryError as e:
-    logging.warning(f"Current project path ('{ci_project_root}') is not a Git repository. Setting 'ci_repo' variable to None.")
     ci_repo = None
 
 
@@ -56,7 +54,7 @@ def get_default_ssh_private_key() -> str | None:
     return default_ssh_key
 
 
-@contextlib.contextmanager
+@contextmanager
 def git_ssh_credentials(ssh_private_key: str = None) -> None:
     """
     Context manager that configures Git to use the provided private SSH key when interacting with remote repositories
@@ -104,7 +102,7 @@ def git_ssh_credentials(ssh_private_key: str = None) -> None:
                                     f'-o IdentitiesOnly=yes ' \
                                     f'-o StrictHostKeyChecking=accept-new'
 
-    yield  # <- with this context, clone repos, push changes etc.
+    yield  # <- within this context, clone repos, push changes etc.
 
     # Restore original GIT_SSH_COMMAND
     os.environ["GIT_SSH_COMMAND"] = original_git_ssh_command
