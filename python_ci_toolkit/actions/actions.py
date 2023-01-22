@@ -341,5 +341,5 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
 
     _print_action_header(action_name, action_version, action_source)
 
-    with loading_animation(f"[rgb(146,202,85)]Running CI action '{action_display_name}'..."):
+    with loading_animation(f"[rgb(146,202,85)]Running CI action '{action_display_name}'"):
         action_module.cli()
