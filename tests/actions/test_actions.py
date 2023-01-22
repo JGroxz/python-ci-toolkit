@@ -46,3 +46,4 @@ if __name__ == '__main__':
     initialize_ci_console()
     test_retrieve_action_repo()
     test_retrieve_ci_action_script_from_git()
+    
