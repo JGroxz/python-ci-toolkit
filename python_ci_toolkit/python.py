@@ -1,5 +1,5 @@
 """
-Utility functions for working with python modules.
+Utility functions for working with Python modules.
 """
 import importlib.util
 import sys
