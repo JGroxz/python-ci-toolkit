@@ -281,7 +281,7 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
         logger.debug(f"Action '{action_name}' has requirements file supplied with it. Installing requirements...")
 
         with loading_animation("Installing action's dependencies"):
-            pip.ensure_requirements_installed(action_requirements_path)
+            pip.ensure_requirements_installed(action_requirements_path, silence_pip_stdout=True)
 
         logger.debug("Requirements installation complete.")
 
