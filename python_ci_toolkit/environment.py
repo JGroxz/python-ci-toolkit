@@ -162,17 +162,21 @@ def ensure_ci_temp_files_directory_exists() -> None:
     if not ci_temp_files_directory.exists():
         os.makedirs(ci_temp_files_directory, exist_ok=True)
 
-    # add the directory to .gitignore (if not yet there)
-    gitignore = ci_project_root / ".gitignore"
-    if not gitignore.exists():
-        gitignore.touch()
-    with gitignore.open("r+") as file:
-        content = file.read()
-        entry = f"{ci_temp_files_directory_relative.as_posix()}\n"
-        if entry not in content:
-            file.write("\n"
-                       "# Python CI Toolkit's temporary files directory\n"
-                       f"{entry}")
+    # if in local environment, add the directory to .gitignore (if not yet there)
+    # we limit this to local environments because it allows the developers to check and commit the changed .gitignore manually;
+    # modifying .gitignore like this in an unsupervised cloud environment could result in some CI workflows breaking
+    # because of the merge conflicts (i.e. when pulling updates to the project repo)
+    if ci_environment_type == CiEnvironmentType.Unknown:
+        gitignore = ci_project_root / ".gitignore"
+        if not gitignore.exists():
+            gitignore.touch()
+        with gitignore.open("r+") as file:
+            content = file.read()
+            entry = f"{ci_temp_files_directory_relative.as_posix()}\n"
+            if entry not in content:
+                file.write("\n"
+                           "# Python CI Toolkit's temporary files directory\n"
+                           f"{entry}")
 
 
 ensure_ci_temp_files_directory_exists()
