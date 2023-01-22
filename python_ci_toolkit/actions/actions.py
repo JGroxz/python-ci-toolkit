@@ -1,6 +1,7 @@
 """
 Provides functions to retrieve and run CI actions based on Python scripts.
 """
+import glob
 import hashlib
 import logging
 import os
@@ -21,11 +22,39 @@ from ..shell import run_shell_command
 
 # Constants
 ACTION_VERSION_SEPARATOR = "@"
-# DOWNLOADED_ACTIONS_DIRECTORY_PATH = ci_temp_files_directory / "downloaded_actions"
 DEFAULT_ACTION_REPO_URL = "git@bitbucket.org:pyci/python-ci-actions.git"
 DOWNLOADED_ACTION_REPOS_DIRECTORY = ci_temp_files_directory / "downloaded_action_repos"
+LOCAL_ACTIONS_DIRECTORY = ci_files_directory / "actions"
 
 logger = logging.getLogger(__name__)
+
+
+def list_actions_in_directory(directory: Path) -> List[Path]:
+    """
+    Lists all action scripts available in the given directory.
+
+    Notes:
+        TODO docs
+
+    Args:
+        directory: Directory to search for actions in.
+
+    Returns:
+        List of absolute paths of the located action scripts.
+    """
+    # find all 'simple' action scripts; these are scripts that are individual Python files
+    simple_actions = [Path(p) for p in glob.glob(str(directory / "*.py"))]
+
+    # find all 'complex' action scripts; these are Python scripts nested in the directories with the matching name
+    complex_actions: List[Path] = []
+    child_directories = [Path(x[0]) for x in os.walk(directory) if Path(x[0]) != directory]
+    for child in child_directories:
+        nested_action_script_path = child / f"{child.name}.py"
+        if nested_action_script_path.exists():
+            complex_actions.append(nested_action_script_path)
+
+    return simple_actions + complex_actions
+
 
 
 def retrieve_action_repo(git_repo_url: str, ssh_private_key: str = None) -> Path:
@@ -33,14 +62,15 @@ def retrieve_action_repo(git_repo_url: str, ssh_private_key: str = None) -> Path
     Retrieves the given Git repository into the standard actions cache location.
 
     Notes:
-        This action will return the existing local repo if it was cloned before, but will fetch all available updates regardless before that.
+        This action will return the existing local repo if it was cloned before.
+        The repo is guaranteed to have all updates fetched and the main branch checked out.
 
     Args:
         git_repo_url: URL of the Git repository to pull.
         ssh_private_key: Private SSH key to be used when accessing the specified Git repository (string value).
 
     Returns:
-        Path to the cloned repository.
+        Path to the directory in the cloned repository that contains actions.
     """
 
     # prepare downloads directory
@@ -68,7 +98,13 @@ def retrieve_action_repo(git_repo_url: str, ssh_private_key: str = None) -> Path
         run_shell_command("git checkout main",
                           cwd=cloned_repo_path, silence_output=True, use_wsl_on_windows=False)
 
-    return cloned_repo_path
+    # check if actions directory is present before returning it
+    actions_directory = cloned_repo_path / "actions"
+    if not actions_directory.exists():
+        logger.error(f"Repository '{git_repo_url}' does not have 'actions' directory in it.")
+        sys.exit(1)
+
+    return actions_directory
 
 
 def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, action_version: str = None,
@@ -95,11 +131,11 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
     """
 
     # retrieve repo
-    action_repo_directory = retrieve_action_repo(git_repo_url, ssh_private_key)
+    cloned_actions_directory = retrieve_action_repo(git_repo_url, ssh_private_key)
 
     # prepare paths
     action_display_name = f"{action_name}{ACTION_VERSION_SEPARATOR}{action_version}"
-    action_script_directory = action_repo_directory / "actions" / f"{action_name}"
+    action_script_directory = cloned_actions_directory / f"{action_name}"
     action_script_path = action_script_directory / f"{action_name}.py"
 
     with git_ssh_credentials(ssh_private_key):
@@ -107,11 +143,11 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
         if action_version is None:
             # if no version specified, use the main branch
             run_shell_command(f'git checkout main',
-                              cwd=action_repo_directory, silence_output=True, use_wsl_on_windows=False)
+                              cwd=cloned_actions_directory, silence_output=True, use_wsl_on_windows=False)
         else:
             # find branches or tags matching the given version
             _, output = run_shell_command(f'git show-ref',
-                                          cwd=action_repo_directory, silence_output=True, use_wsl_on_windows=False)
+                                          cwd=cloned_actions_directory, silence_output=True, use_wsl_on_windows=False)
             branch_exists = (f"refs/heads/{action_version}" in output) or (f"refs/remotes/origin/{action_version}" in output)
             tag_exists = (f"refs/tags/{action_version}" in output)
 
@@ -131,7 +167,7 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
 
             # pull whatever is available
             run_shell_command(f'git checkout "{action_version}"',
-                              cwd=action_repo_directory, silence_output=True, use_wsl_on_windows=False)
+                              cwd=cloned_actions_directory, silence_output=True, use_wsl_on_windows=False)
 
     # check if the repo had the requested action script
     if not action_script_path.exists():
@@ -152,8 +188,7 @@ def retrieve_ci_action_script_local(action_name: str) -> Path:
     Returns:
         Full path to the given action's Python file.
     """
-    local_ci_actions_folder = ci_files_directory / "actions"
-    action_file_path = Path(local_ci_actions_folder, f"{action_name}.py")
+    action_file_path = Path(LOCAL_ACTIONS_DIRECTORY, f"{action_name}.py")
 
     if not action_file_path.exists():
         raise FileNotFoundError(
@@ -174,7 +209,7 @@ def _print_action_header(action_name: str, action_version: str, action_source: s
         from ..versions import read_project_version
         version = read_project_version(ci_project_root)
 
-    action_display_name = f"{action_name}{ACTION_VERSION_SEPARATOR}{action_version}";
+    action_display_name = f"{action_name}{ACTION_VERSION_SEPARATOR}{action_version}"
 
     logger.info(f"[green]>_[/][rgb(146,202,85)] Running CI action '{action_display_name}'[/]...\n"
                 f"     CI toolkit version: [blue]{version}[/]\n"
