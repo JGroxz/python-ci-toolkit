@@ -1,5 +1,5 @@
 """
-Custom CI action that automatically bumps python-ci-toolkit's version dependency in python-ci-containers repository.
+Automatically bumps python-ci-toolkit's version dependency in python-ci-containers repository.
 
 https://bitbucket.org/pyci/python-ci-containers/src/main/
 """

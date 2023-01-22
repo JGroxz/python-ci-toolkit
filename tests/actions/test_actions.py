@@ -1,0 +1,49 @@
+import time
+
+from python_ci_toolkit.console import initialize_ci_console
+from python_ci_toolkit.git import git_ssh_credentials
+from python_ci_toolkit.shell import run_shell_command
+
+
+def test_retrieve_action_repo():
+    from python_ci_toolkit.actions.actions import retrieve_action_repo, DEFAULT_ACTION_REPO_URL
+    from python_ci_toolkit.git import get_default_ssh_private_key
+
+    start = time.perf_counter()
+
+    ssh_private_key = get_default_ssh_private_key()
+    repo_directory = retrieve_action_repo(git_repo_url=DEFAULT_ACTION_REPO_URL, ssh_private_key=ssh_private_key)
+
+    print(f"Retrieved action repo in {(time.perf_counter() - start) * 1000} ms")
+
+    assert (repo_directory / ".git").exists(), "There is no '.git' file in the action repo directory. It means the repo was not cloned."
+
+
+def test_retrieve_ci_action_script_from_git():
+    from python_ci_toolkit.actions.actions import retrieve_ci_action_script_from_git, DEFAULT_ACTION_REPO_URL
+    from python_ci_toolkit.git import get_default_ssh_private_key
+
+    ssh_private_key = get_default_ssh_private_key()
+    action_name = "build_dockers"
+    action_version = "main"
+
+    action_script_path = retrieve_ci_action_script_from_git(
+        git_repo_url=DEFAULT_ACTION_REPO_URL,
+        action_name=action_name,
+        action_version=action_version,
+        ssh_private_key=ssh_private_key
+    )
+
+    action_script_directory = action_script_path.parent
+
+    with git_ssh_credentials(ssh_private_key):
+        _, output = run_shell_command(f'git status',
+                                      cwd=action_script_directory, silence_output=True, use_wsl_on_windows=False)
+        assert action_version in output, f"Action repo must be checked out at branch/tag '{action_version}', but it's not:\n{output}"
+
+
+if __name__ == '__main__':
+    initialize_ci_console()
+    test_retrieve_action_repo()
+    test_retrieve_ci_action_script_from_git()
+    

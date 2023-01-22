@@ -35,7 +35,7 @@ def _get_action_description_from_file(file_path: Path) -> str:
     return description
 
 
-ACTION_IDENTIFIER_REGEX = re.compile(r'^\w+(?:@[\w\.]+)?', re.UNICODE)
+ACTION_IDENTIFIER_REGEX = re.compile(r'^\w+(?:@[\w\.\/]+)?', re.UNICODE)
 
 
 def _validate_action_identifier(ctx: Context, param: Argument, value: str) -> str:

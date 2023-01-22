@@ -100,8 +100,8 @@ def assert_environment_variable_set(variable_name: str, usage_explanation: str =
     # Use fallback value if required and available
     is_fallback_provided = (fallback_value_getter is not None)
     if (not is_environment_variable_set(variable_name)) and is_fallback_provided:
-        logging.info(f"'{variable_name}' environment variable is not set, but fallback getter function is defined.\n"
-                     f"  Trying to retrieve a fallback value...")
+        logging.debug(f"'{variable_name}' environment variable is not set, but fallback getter function is defined.\n"
+                      f"  Trying to retrieve a fallback value...")
 
         # Retrieve fallback value
         fallback_value = fallback_value_getter()
@@ -114,7 +114,7 @@ def assert_environment_variable_set(variable_name: str, usage_explanation: str =
                 f"  Fallback value functions are only allowed to return strings or None to avoid ambiguity, because environment variables can only have string or no value.\n")
 
         if is_environment_variable_set(variable_name):
-            logging.info(f"Retrieved fallback value for '{variable_name}' environment variable.")
+            logging.debug(f"Retrieved fallback value for '{variable_name}' environment variable.")
             return os.environ[variable_name]
         else:
             logging.warning(f"Could not retrieve a fallback value for '{variable_name}' environment variable.")
