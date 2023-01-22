@@ -49,7 +49,7 @@ def _validate_action_identifier(ctx: Context, param: Argument, value: str) -> st
 
         raise click.BadParameter(
             f"'{value}'\n\n"
-            f"Action identifier must be in format ACTION_NAME[{ACTION_VERSION_SEPARATOR}ACTION_VERSION], where:\n"
+            f"Action identifier must be in the format ACTION_NAME[{ACTION_VERSION_SEPARATOR}ACTION_VERSION], where:\n"
             f" - ACTION_NAME can only contain alphanumeric characters and underscores.\n"
             f" - ACTION_VERSION can be either:\n"
             f"     - 'local' (for local actions)\n"
@@ -103,17 +103,15 @@ def action(action_identifier: str, action_args: List[str]) -> None:
     Execute CI action based on the given ACTION_IDENTIFIER.\n
     Arbitrary arguments can be passed to the action in place of ACTION_ARGS.\n
     \n
+    ACTION_IDENTIFIER must be in the format ACTION_NAME[@ACTION_VERSION], where:\n
+     - ACTION_NAME can only contain alphanumeric characters and underscores.\n
+     - ACTION_VERSION can be either:\n
+         - 'local' (for local actions)\n
+         - any valid Git tag or branch name (for remote actions)\n
+    \n
     Notes:\n
-     - Action name must correspond to the name of action's Python file without a '.py' extension.\n
-     - Action version can be either a Git branch name or a Git tag. The corresponding branch/tag will be pulled from the action repository.\n
      - If action version is set to 'local', utility will look for the action file in '.ci/actions' folder inside your CI project's root directory.\n
      - Any arguments passed after the action name/tag will be passed to the executed action script.\n
-    \n
-    Examples:\n
-    > python-ci-action build_dockers          # Runs 'build_dockers' action from Git branch 'main'\n
-    > python-ci-action build_dockers@develop  # Runs 'build_dockers' action from Git branch 'develop'\n
-    > python-ci-action build_dockers@v1.0.0   # Runs 'build_dockers' action from Git tag 'v1.0.0'\n
-    > python-ci-action build_dockers@local    # Runs 'build_dockers' located at '.ci/actions/build_dockers.py' at your CI project's root folder\n
     """
     from python_ci_toolkit.actions import run_ci_action
     from python_ci_toolkit.actions.actions import ACTION_VERSION_SEPARATOR
