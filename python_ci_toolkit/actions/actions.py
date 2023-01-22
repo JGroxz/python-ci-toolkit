@@ -14,6 +14,7 @@ from typing import List
 
 from rich.progress import Progress
 
+from .. import environment
 from ..environment import assert_environment_variable_set, assert_multiline_environment_variable_set, \
     ci_files_directory, ci_temp_files_directory, get_ci_environment_name, ci_project_root
 from ..git import git_ssh_credentials, get_default_ssh_private_key
@@ -252,13 +253,22 @@ def loading_animation(description: str) -> None:
     Context manager that displays a loading animation in the console.
     To be displayed to the user while doing prolonged tasks like cloning action Git repo.
 
+    Notes:
+        Animation is disabled in cloud CI environments, as their consoles normally don't support this level of rendering.
+
     Args:
         description: Info message describing what's happening. Will be displayed next to the animation.
     """
-    with Progress(console=ci_output_console, transient=True, refresh_per_second=60) as progress:
-        progress.add_task(f"[blue]{description}...", total=None)
+    if environment.ci_environment_type == environment.CiEnvironmentType.Unknown:
+        # in a local environment, display animated progress bar for visual feedback
+        with Progress(console=ci_output_console, transient=True, refresh_per_second=60) as progress:
+            progress.add_task(f"[blue]{description}...", total=None)
 
-        yield  # <- within this context, clone repos, install requirements etc.
+            yield  # <- within this context, clone repos, install requirements etc.
+    else:
+        # cloud environments normally don't support erasing terminal output,
+        # so progres bars get messed up; in this case we don't display them
+        yield
 
 
 def run_ci_action(action_name: str, action_version: str = None, argv: List[str] = None) -> None:
