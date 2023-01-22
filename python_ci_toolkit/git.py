@@ -7,6 +7,7 @@ import contextlib
 import io
 import logging
 import os
+import shutil
 import uuid
 from pathlib import Path
 
@@ -200,3 +201,23 @@ def ensure_remote_is_https(repo: Repo) -> None:
     # Update remote URL
     repo.remote().set_url(https_remote_url)
     logging.info(f"Updated remote URL: '{https_remote_url}'.")
+
+
+def delete_git_repo(repo_path: Path) -> None:
+    """
+    Deletes Git repository in the given folder.
+
+    Notes:
+        Deleting Git directory requires special treatment, because a normal shutil.rmtree() call can fail
+        because of certain files in .git folder which get marked as read-only when cloning.
+
+    Args:
+        repo_path: Path to the Git repository's folder.
+    """
+
+    def on_rm_error(func, path, exc_info):
+        # from: https://stackoverflow.com/a/4829285
+        os.chmod(path, os.stat.S_IWRITE)
+        os.unlink(path)
+
+    shutil.rmtree(repo_path, onerror=on_rm_error)
