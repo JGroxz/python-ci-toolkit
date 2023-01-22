@@ -17,7 +17,7 @@ from rich.progress import Progress
 from .. import environment
 from ..environment import assert_environment_variable_set, assert_multiline_environment_variable_set, \
     ci_files_directory, ci_temp_files_directory, get_ci_environment_name, ci_project_root
-from ..git import git_ssh_credentials, get_default_ssh_private_key
+from ..git import git_ssh_credentials, get_default_ssh_private_key, ci_repo
 from ..logging import get_logger, ci_output_console
 from ..pip import ensure_requirements_installed
 from ..python import import_module_from_file
@@ -275,6 +275,15 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
     """
     Executes CI action by the given action name.
     """
+    # sanity checks
+    if ci_repo is None:
+        logger.critical(f"Current CI project root [red]is not a Git repository[/] ('{ci_project_root}').\n"
+                        "Actions are only allowed to run inside Git repositories to avoid accidentally cluttering random places with temporary files.\n"
+                        "Exiting.",
+                        extra={"markup": True})
+        sys.exit(1)
+
+    # craft action name for logs
     action_display_name = (action_name
                            if (action_version is None)
                            else f"{action_name}{ACTION_VERSION_SEPARATOR}{action_version}")
