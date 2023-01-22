@@ -1,7 +1,6 @@
 import time
 
 from python_ci_toolkit.console import initialize_ci_console
-from python_ci_toolkit.git import git_ssh_credentials
 from python_ci_toolkit.shell import run_shell_command
 
 
@@ -21,7 +20,7 @@ def test_retrieve_action_repo():
 
 def test_retrieve_ci_action_script_from_git():
     from python_ci_toolkit.actions.actions import retrieve_ci_action_script_from_git, DEFAULT_ACTION_REPO_URL
-    from python_ci_toolkit.git import get_default_ssh_private_key
+    from python_ci_toolkit.git import get_default_ssh_private_key, git_ssh_credentials
 
     ssh_private_key = get_default_ssh_private_key()
     action_name = "build_dockers"
@@ -42,8 +41,20 @@ def test_retrieve_ci_action_script_from_git():
         assert action_version in output, f"Action repo must be checked out at branch/tag '{action_version}', but it's not:\n{output}"
 
 
+def test_list_actions_in_directory():
+    from python_ci_toolkit.actions.actions import list_actions_in_directory, LOCAL_ACTIONS_DIRECTORY, DOWNLOADED_ACTION_REPOS_DIRECTORY
+    from python_ci_toolkit.environment import ci_temp_files_directory
+
+    # local_actions = list_actions_in_directory(LOCAL_ACTIONS_DIRECTORY)
+    # print(local_actions)
+
+    downloaded_actions = list_actions_in_directory(DOWNLOADED_ACTION_REPOS_DIRECTORY / "4388b54d60d7fececf2a578d7963a098" / "actions")
+    print([x.stem for x in downloaded_actions])
+
+
+
 if __name__ == '__main__':
     initialize_ci_console()
-    test_retrieve_action_repo()
-    test_retrieve_ci_action_script_from_git()
-    
+    # test_retrieve_action_repo()
+    # test_retrieve_ci_action_script_from_git()
+    test_list_actions_in_directory()

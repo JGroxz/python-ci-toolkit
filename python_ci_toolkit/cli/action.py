@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import glob
 import re
 from pathlib import Path
 from typing import List
@@ -9,9 +8,7 @@ import rich_click as click
 from click import Context, Argument
 from click.shell_completion import CompletionItem
 
-import python_ci_toolkit.actions
-from python_ci_toolkit.actions import run_ci_action
-from python_ci_toolkit.actions.actions import ACTION_VERSION_SEPARATOR
+from python_ci_toolkit.actions.actions import list_actions_in_directory
 
 _FIRST_COMMENT_REGEX = re.compile(r'"""(?:\n)(.*?)"""', re.MULTILINE | re.UNICODE | re.DOTALL)
 
@@ -39,6 +36,8 @@ ACTION_IDENTIFIER_REGEX = re.compile(r'^\w+(?:@[\w\.\/]+)?', re.UNICODE)
 
 
 def _validate_action_identifier(ctx: Context, param: Argument, value: str) -> str:
+    from python_ci_toolkit.actions.actions import ACTION_VERSION_SEPARATOR
+
     action_identifier = str(value)
 
     if not ACTION_IDENTIFIER_REGEX.fullmatch(value):
@@ -50,7 +49,7 @@ def _validate_action_identifier(ctx: Context, param: Argument, value: str) -> st
 
         raise click.BadParameter(
             f"'{value}'\n\n"
-            f"Action identifier must be in format ACTION_NAME[{ACTION_VERSION_SEPARATOR}ACTION_VERSON], where:\n"
+            f"Action identifier must be in format ACTION_NAME[{ACTION_VERSION_SEPARATOR}ACTION_VERSION], where:\n"
             f" - ACTION_NAME can only contain alphanumeric characters and underscores.\n"
             f" - ACTION_VERSION can be either:\n"
             f"     - 'local' (for local actions)\n"
@@ -62,16 +61,26 @@ def _validate_action_identifier(ctx: Context, param: Argument, value: str) -> st
 
 def _complete_action_identifier(ctx: Context, param: Argument, incomplete: str):
     # search for local actions
-    local_actions_directory = python_ci_toolkit.environment.ci_files_directory / "actions"
-    local_action_script_paths = [Path(p) for p in glob.glob(str(local_actions_directory / "*.py"))]
+    from python_ci_toolkit.actions.actions import LOCAL_ACTIONS_DIRECTORY
+    local_action_script_paths = list_actions_in_directory(LOCAL_ACTIONS_DIRECTORY)
+    local_action_names = [f"{p.stem}@local" for p in local_action_script_paths]
+    local_action_descriptions = [f"[local]  {_get_action_description_from_file(p)}" for p in local_action_script_paths]
+    local_actions_metadata = sorted(list(zip(local_action_names, local_action_descriptions)))
 
-    action_names = [f"{p.stem}@local" for p in local_action_script_paths]
-    action_descriptions = [f"[local] {_get_action_description_from_file(p)}" for p in local_action_script_paths]
-
-    # TODO: search for actions in the default repo
+    # search for actions in the default Git repo
+    from python_ci_toolkit.actions.actions import retrieve_action_repo, DEFAULT_ACTION_REPO_URL
+    from python_ci_toolkit.git import get_default_ssh_private_key
+    cloned_actions_directory = retrieve_action_repo(
+        git_repo_url=DEFAULT_ACTION_REPO_URL,
+        ssh_private_key=get_default_ssh_private_key()
+    )
+    remote_action_script_paths = list_actions_in_directory(cloned_actions_directory)
+    remote_action_names = [f"{p.stem}" for p in remote_action_script_paths]
+    remote_action_descriptions = [f"[remote] {_get_action_description_from_file(p)}" for p in remote_action_script_paths]
+    remote_actions_metadata = sorted(list(zip(remote_action_names, remote_action_descriptions)))
 
     return [CompletionItem(x[0], help=x[1])
-            for x in list(zip(action_names, action_descriptions))]
+            for x in (local_actions_metadata + remote_actions_metadata)]
 
 
 @click.command(context_settings=dict(
@@ -104,6 +113,9 @@ def action(action_identifier: str, action_args: List[str]) -> None:
 
     # initialize CI console for formatted output
     initialize_ci_console()
+
+    from python_ci_toolkit.actions import run_ci_action
+    from python_ci_toolkit.actions.actions import ACTION_VERSION_SEPARATOR
 
     # version can be included in the first argument, separated from the action name by a semicolon
     if ACTION_VERSION_SEPARATOR in action_identifier:
