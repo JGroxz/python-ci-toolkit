@@ -3,6 +3,7 @@ Provides functions to retrieve and run CI actions based on Python scripts.
 """
 import glob
 import hashlib
+import logging
 import os
 import sys
 import time
@@ -150,16 +151,21 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
     action_script_directory = cloned_actions_directory / f"{action_name}"
     action_script_path = action_script_directory / f"{action_name}.py"
 
+    # settings for running CLI commands
+    run_shell_command_kwargs = {
+        "cwd": cloned_actions_directory,
+        "silence_output": (logger.getEffectiveLevel() > logging.DEBUG),
+        "use_wsl_on_windows": False
+    }
+
     with git_ssh_credentials(ssh_private_key):
         # clone the repo
         if action_version is None:
-            # if no version specified, use the main branch
-            run_shell_command(f'git checkout main',
-                              cwd=cloned_actions_directory, silence_output=True, use_wsl_on_windows=False)
+            # if no version specified, use the main branch (it's checked out by default)
+            run_shell_command(f'git pull', **run_shell_command_kwargs)
         else:
             # find branches or tags matching the given version
-            _, output = run_shell_command(f'git show-ref',
-                                          cwd=cloned_actions_directory, silence_output=True, use_wsl_on_windows=False)
+            _, output = run_shell_command(f'git show-ref', **run_shell_command_kwargs)
             branch_exists = (f"refs/heads/{action_version}" in output) or (f"refs/remotes/origin/{action_version}" in output)
             tag_exists = (f"refs/tags/{action_version}" in output)
 
@@ -182,11 +188,14 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
                              f"  Please make sure that the corresponding branch or tag ('{action_version}') exists before pulling this version again.")
                 sys.exit(3)
 
-            # pull whatever is available
-            run_shell_command(f'git pull origin "{action_version}"',
-                              cwd=cloned_actions_directory, silence_output=True, use_wsl_on_windows=False)
-            run_shell_command(f'git checkout "{action_version}"',
-                              cwd=cloned_actions_directory, silence_output=True, use_wsl_on_windows=False)
+            # checkout required branch/tag
+            run_shell_command(f'git checkout "{action_version}"', **run_shell_command_kwargs)
+
+            # if on a branch, pull updates
+            _, output = run_shell_command(f'git status', **run_shell_command_kwargs)
+            is_on_a_branch = ("On branch" in output)
+            if is_on_a_branch:
+                run_shell_command(f'git pull', **run_shell_command_kwargs)
 
     # check if the repo had the requested action script
     if not action_script_path.exists():
