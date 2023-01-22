@@ -3,20 +3,21 @@ Provides functions to retrieve and run CI actions based on Python scripts.
 """
 import glob
 import hashlib
-import logging
 import os
 import sys
 import time
 from contextlib import contextmanager
+from logging import Logger
 from pathlib import Path
 from typing import List
 
 from rich.progress import Progress
 
-from python_ci_toolkit import pip
 from ..environment import assert_environment_variable_set, assert_multiline_environment_variable_set, \
     ci_files_directory, ci_temp_files_directory, get_ci_environment_name, ci_project_root
 from ..git import git_ssh_credentials, get_default_ssh_private_key
+from ..logging import get_logger, ci_output_console
+from ..pip import ensure_requirements_installed
 from ..python import import_module_from_file
 from ..shell import run_shell_command
 
@@ -26,15 +27,27 @@ DEFAULT_ACTION_REPO_URL = "git@bitbucket.org:pyci/python-ci-actions.git"
 DOWNLOADED_ACTION_REPOS_DIRECTORY = ci_temp_files_directory / "downloaded_action_repos"
 LOCAL_ACTIONS_DIRECTORY = ci_files_directory / "actions"
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
+
+
+def get_action_logger(name: str = None) -> Logger:
+    """
+    Returns a logger for use in CI actions.
+    Automatically adds handlers to log into the console of the current CI environment.
+
+    Args:
+        name: Name of the CI action this logger is intended for.
+    """
+    if name is None:
+        name = "default"
+
+    # the naming ensures that the returned action logger inherits logging settings from the CI toolkit
+    return get_logger(f"python_ci_toolkit.actions.external.{name}")
 
 
 def list_actions_in_directory(directory: Path) -> List[Path]:
     """
     Lists all action scripts available in the given directory.
-
-    Notes:
-        TODO docs
 
     Args:
         directory: Directory to search for actions in.
@@ -54,7 +67,6 @@ def list_actions_in_directory(directory: Path) -> List[Path]:
             complex_actions.append(nested_action_script_path)
 
     return simple_actions + complex_actions
-
 
 
 def retrieve_action_repo(git_repo_url: str, ssh_private_key: str = None) -> Path:
@@ -151,6 +163,11 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
             branch_exists = (f"refs/heads/{action_version}" in output) or (f"refs/remotes/origin/{action_version}" in output)
             tag_exists = (f"refs/tags/{action_version}" in output)
 
+            if branch_exists:
+                logger.debug(f"'{action_version}' is a branch.")
+            if tag_exists:
+                logger.debug(f"'{action_version}' is a tag.")
+
             # if both a branch and a tag exist with the same name, do not pull to avoid ambiguity
             if tag_exists and branch_exists:
                 logger.error(f"Both a branch and a tag named '{action_version}' exist in remote repository '{git_repo_url}'.\n"
@@ -160,12 +177,14 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
 
             # if nothing matches the version, there is nothing we can do
             if (not tag_exists) and (not branch_exists):
-                logger.error(f"Cannot pull action '{action_display_name}' from Git: "
-                             f"Repository '{git_repo_url}' has neither a branch nor a tag named '{action_version}'.\n"
-                             f"Please make sure that the corresponding branch or tag ('{action_version}') exists before pulling this version again.")
+                logger.error(f"Cannot pull action '{action_display_name}' from Git:\n"
+                             f"  Repository '{git_repo_url}' has neither a branch nor a tag named '{action_version}'.\n"
+                             f"  Please make sure that the corresponding branch or tag ('{action_version}') exists before pulling this version again.")
                 sys.exit(3)
 
             # pull whatever is available
+            run_shell_command(f'git pull origin "{action_version}"',
+                              cwd=cloned_actions_directory, silence_output=True, use_wsl_on_windows=False)
             run_shell_command(f'git checkout "{action_version}"',
                               cwd=cloned_actions_directory, silence_output=True, use_wsl_on_windows=False)
 
@@ -227,7 +246,7 @@ def loading_animation(description: str) -> None:
     Args:
         description: Info message describing what's happening. Will be displayed next to the animation.
     """
-    with Progress(transient=True, refresh_per_second=60) as progress:
+    with Progress(console=ci_output_console, transient=True, refresh_per_second=60) as progress:
         progress.add_task(f"[blue]{description}...", total=None)
 
         yield  # <- within this context, clone repos, install requirements etc.
@@ -281,7 +300,7 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
         logger.debug(f"Action '{action_name}' has requirements file supplied with it. Installing requirements...")
 
         with loading_animation("Installing action's dependencies"):
-            pip.ensure_requirements_installed(action_requirements_path, silence_pip_stdout=True)
+            ensure_requirements_installed(action_requirements_path, silence_pip_stdout=False)
 
         logger.debug("Requirements installation complete.")
 
@@ -292,14 +311,16 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
 
     # run CI action using its cli() method with the given arguments
     logger.debug(f"Importing Python module of the action '{action_name}'...")
-    try:
-        action_module = import_module_from_file(f"{action_name}", f"{action_script_path}")
-    except Exception:
-        logger.error(
-            f"Error when importing Python module from action script '{action_script_path}' (action '{action_display_name}' from {action_source}).")
-        raise
+    with loading_animation("Importing action's Python module..."):
+        try:
+            action_module = import_module_from_file(f"{action_name}", f"{action_script_path}")
+        except Exception:
+            logger.error(
+                f"Error when importing Python module from action script '{action_script_path}' (action '{action_display_name}' from {action_source}).")
+            raise
     logger.debug("Import completed.")
 
     _print_action_header(action_name, action_version, action_source)
 
-    action_module.cli()
+    with loading_animation(f"[rgb(146,202,85)]Running CI action '{action_display_name}'..."):
+        action_module.cli()
