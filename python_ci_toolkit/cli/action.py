@@ -32,7 +32,7 @@ def _get_action_description_from_file(file_path: Path) -> str:
     return description
 
 
-ACTION_IDENTIFIER_REGEX = re.compile(r'^\w+(?:@[\w\.\/]+)?', re.UNICODE)
+ACTION_IDENTIFIER_REGEX = re.compile(r'^\w+(?:@[\w\.\/\-\+]+)?', re.UNICODE)
 
 
 def _validate_action_identifier(ctx: Context, param: Argument, value: str) -> str:
@@ -109,11 +109,6 @@ def action(action_identifier: str, action_args: List[str]) -> None:
     > python-ci-action build_dockers@v1.0.0   # Runs 'build_dockers' action from Git tag 'v1.0.0'\n
     > python-ci-action build_dockers@local    # Runs 'build_dockers' located at '.ci/actions/build_dockers.py' at your CI project's root folder\n
     """
-    from python_ci_toolkit.console import initialize_ci_console
-
-    # initialize CI console for formatted output
-    initialize_ci_console()
-
     from python_ci_toolkit.actions import run_ci_action
     from python_ci_toolkit.actions.actions import ACTION_VERSION_SEPARATOR
 
