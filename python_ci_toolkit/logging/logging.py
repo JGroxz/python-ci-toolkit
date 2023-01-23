@@ -5,6 +5,9 @@ from __future__ import annotations
 
 import logging
 
+import click
+import rich
+import rich_click
 from rich.console import Console
 from rich.logging import RichHandler
 from rich.traceback import install
@@ -42,7 +45,9 @@ def configure_ci_logging(level: str | int = logging.INFO) -> None:
         level: Level to set the root logger to.
     """
 
-    install(console=ci_output_console, show_locals=False)
+    install(console=ci_output_console,
+            show_locals=False,
+            suppress=[click, rich_click, rich])
 
     # basicConfig in case logging has not been set up yet
     FORMAT = "%(message)s"
@@ -50,14 +55,12 @@ def configure_ci_logging(level: str | int = logging.INFO) -> None:
         level=level,
         format=FORMAT,
         handlers=[
-            RichHandler(
-                console=ci_output_console,
-                show_path=False,
-                tracebacks_show_locals=False,
-                # disable Rich markup by default to avoid character clashes when printing logs;
-                # markup can still be processed on demand by explicitly adding 'extra={"markup": True}' to the log call
-                markup=False
-            )
+            RichHandler(console=ci_output_console,
+                        show_path=False,
+                        tracebacks_show_locals=False,
+                        # disable Rich markup by default to avoid character clashes when printing logs;
+                        # markup can still be processed on demand by explicitly adding 'extra={"markup": True}' to the log call
+                        markup=False)
         ],
     )
 
