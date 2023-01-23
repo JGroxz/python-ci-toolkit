@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from pathlib import Path
 from typing import List
@@ -60,6 +61,10 @@ def _validate_action_identifier(ctx: Context, param: Argument, value: str) -> st
 
 
 def _complete_action_identifier(ctx: Context, param: Argument, incomplete: str):
+    # disable logging (to avoid messages in the console during autocompletion)
+    original_root_logger_level = logging.root.level
+    logging.root.setLevel(10000)
+
     # search for local actions
     from python_ci_toolkit.actions.actions import LOCAL_ACTIONS_DIRECTORY
     local_action_script_paths = list_actions_in_directory(LOCAL_ACTIONS_DIRECTORY)
@@ -84,6 +89,9 @@ def _complete_action_identifier(ctx: Context, param: Argument, incomplete: str):
         remote_action_names = [f"{p.stem}" for p in remote_action_script_paths]
         remote_action_descriptions = [f"[remote] {_get_action_description_from_file(p)}" for p in remote_action_script_paths]
         remote_actions_metadata = sorted(list(zip(remote_action_names, remote_action_descriptions)))
+
+    # enable logging again
+    logging.root.setLevel(original_root_logger_level)
 
     return [CompletionItem(x[0], help=x[1])
             for x in (local_actions_metadata + remote_actions_metadata)]
