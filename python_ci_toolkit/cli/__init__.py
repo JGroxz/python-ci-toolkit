@@ -1,8 +1,4 @@
-import logging
-
-import click as vanilla_click
 import rich_click as click
-from rich.traceback import install
 
 from .action import action
 from .autocompletion import autocompletion
