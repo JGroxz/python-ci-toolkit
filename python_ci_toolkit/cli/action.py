@@ -9,8 +9,6 @@ import rich_click as click
 from click import Context, Argument
 from click.shell_completion import CompletionItem
 
-from python_ci_toolkit.actions.actions import list_actions_in_directory
-
 _FIRST_COMMENT_REGEX = re.compile(r'"""(?:\n)(.*?)"""', re.MULTILINE | re.UNICODE | re.DOTALL)
 
 
@@ -66,7 +64,7 @@ def _complete_action_identifier(ctx: Context, param: Argument, incomplete: str):
     logging.root.setLevel(10000)
 
     # search for local actions
-    from python_ci_toolkit.actions.actions import LOCAL_ACTIONS_DIRECTORY
+    from python_ci_toolkit.actions.actions import list_actions_in_directory,  LOCAL_ACTIONS_DIRECTORY
     local_action_script_paths = list_actions_in_directory(LOCAL_ACTIONS_DIRECTORY)
     local_action_names = [f"{p.stem}@local" for p in local_action_script_paths]
     local_action_descriptions = [f"[local]  {_get_action_description_from_file(p)}" for p in local_action_script_paths]
