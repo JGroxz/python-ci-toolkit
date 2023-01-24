@@ -264,6 +264,8 @@ def loading_animation(description: str) -> None:
         with Progress(console=ci_output_console, transient=True, refresh_per_second=60) as progress:
             progress.add_task(f"[blue]{description}...", total=None)
 
+            # TODO: add thread which will update description of the task with a timer if it takes longer than 10 s
+
             yield  # <- within this context, clone repos, install requirements etc.
     else:
         # cloud environments normally don't support erasing terminal output,
@@ -336,7 +338,7 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
     logger.debug(f"Importing Python module of the action '{action_name}'...")
     with loading_animation("Importing action's Python module..."):
         try:
-            action_module = import_module_from_file(f"{action_name}", f"{action_script_path}")
+            action_module = import_module_from_file(f"{action_name}", action_script_path)
         except Exception:
             logger.error(
                 f"Error when importing Python module from action script '{action_script_path}' (action '{action_display_name}' from {action_source}).")
