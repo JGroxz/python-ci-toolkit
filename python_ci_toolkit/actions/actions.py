@@ -16,8 +16,8 @@ from rich.progress import Progress
 
 from .. import environment
 from ..environment import assert_environment_variable_set, assert_multiline_environment_variable_set, \
-    ci_files_directory, ci_temp_files_directory, get_ci_environment_name, ci_project_root
-from ..git import git_ssh_credentials, get_default_ssh_private_key, ci_repo
+    ci_files_directory, ci_temp_files_directory, get_ci_environment_name, ci_project_root, ci_repo
+from ..git import git_ssh_credentials, get_default_ssh_private_key
 from ..logging import get_logger, ci_output_console
 from ..pip import ensure_requirements_installed
 from ..python import import_module_from_file
