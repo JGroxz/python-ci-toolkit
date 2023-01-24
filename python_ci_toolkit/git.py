@@ -11,16 +11,9 @@ import uuid
 from contextlib import contextmanager
 from pathlib import Path
 
-from git import Repo, GitCommandError, InvalidGitRepositoryError
+from git import Repo, GitCommandError
 
-from python_ci_toolkit.environment import ci_project_root, ci_environment_type, CiEnvironmentType, \
-    assert_environment_variable_set, ci_temp_files_directory
-
-try:
-    ci_repo = Repo(ci_project_root)
-    """GitPython reference to the local Git repository of the current CI project."""
-except InvalidGitRepositoryError as e:
-    ci_repo = None
+from python_ci_toolkit.environment import ci_environment_type, CiEnvironmentType, assert_environment_variable_set, ci_temp_files_directory
 
 
 def get_default_ssh_private_key_file_path() -> Path:
