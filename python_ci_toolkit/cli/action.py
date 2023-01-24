@@ -70,22 +70,16 @@ def _complete_action_identifier(ctx: Context, param: Argument, incomplete: str):
     local_actions_metadata = sorted(list(zip(local_action_names, local_action_descriptions)))
 
     # remote actions
-    from python_ci_toolkit.environment import ci_repo
-    if ci_repo is None:
-        # do not pull remote actions repo if local project's directory is not a Git repo
-        remote_actions_metadata = []
-    else:
-        # search for actions in the default Git repo
-        from python_ci_toolkit.actions.actions import retrieve_action_repo, DEFAULT_ACTION_REPO_URL
-        from python_ci_toolkit.git import get_default_ssh_private_key
-        cloned_actions_directory = retrieve_action_repo(
-            git_repo_url=DEFAULT_ACTION_REPO_URL,
-            ssh_private_key=get_default_ssh_private_key()
-        )
-        remote_action_script_paths = list_actions_in_directory(cloned_actions_directory)
-        remote_action_names = [f"{p.stem}" for p in remote_action_script_paths]
-        remote_action_descriptions = [f"[remote] {_get_action_description_from_file(p)}" for p in remote_action_script_paths]
-        remote_actions_metadata = sorted(list(zip(remote_action_names, remote_action_descriptions)))
+    from python_ci_toolkit.actions.actions import retrieve_action_repo, DEFAULT_ACTION_REPO_URL
+    from python_ci_toolkit.git import get_default_ssh_private_key
+    cloned_actions_directory = retrieve_action_repo(
+        git_repo_url=DEFAULT_ACTION_REPO_URL,
+        ssh_private_key=get_default_ssh_private_key()
+    )
+    remote_action_script_paths = list_actions_in_directory(cloned_actions_directory)
+    remote_action_names = [f"{p.stem}" for p in remote_action_script_paths]
+    remote_action_descriptions = [f"[remote] {_get_action_description_from_file(p)}" for p in remote_action_script_paths]
+    remote_actions_metadata = sorted(list(zip(remote_action_names, remote_action_descriptions)))
 
     # enable logging again
     logging.root.disabled = False
