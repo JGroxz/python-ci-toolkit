@@ -126,7 +126,7 @@ Notes:
 
 ci_files_directory: Path = ci_project_root / ci_files_directory_relative
 """
-Absolute path to the CI directory of the current project.
+Absolute path to the CI directory in the current project.
 
 Notes:
     This directory can be used to store scripts and configuration files related to the given project's CI workflows.

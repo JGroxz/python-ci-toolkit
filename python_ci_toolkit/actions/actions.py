@@ -16,7 +16,7 @@ from rich.progress import Progress
 
 from .. import environment
 from ..environment import assert_environment_variable_set, assert_multiline_environment_variable_set, \
-    ci_files_directory, ci_temp_files_directory, get_ci_environment_name, ci_project_root, ci_repo
+    ci_files_directory, get_ci_environment_name, ci_project_root, ci_repo, _ci_temp_files_shared_directory
 from ..git import git_ssh_credentials, get_default_ssh_private_key
 from ..logging import get_logger, ci_output_console
 from ..pip import ensure_requirements_installed
@@ -26,7 +26,7 @@ from ..shell import run_shell_command
 # Constants
 ACTION_VERSION_SEPARATOR = "@"
 DEFAULT_ACTION_REPO_URL = "git@bitbucket.org:pyci/python-ci-actions.git"
-DOWNLOADED_ACTION_REPOS_DIRECTORY = ci_temp_files_directory / "downloaded_action_repos"
+DOWNLOADED_ACTION_REPOS_DIRECTORY = _ci_temp_files_shared_directory / "downloaded_action_repos"
 LOCAL_ACTIONS_DIRECTORY = ci_files_directory / "actions"
 
 logger = get_logger(__name__)
