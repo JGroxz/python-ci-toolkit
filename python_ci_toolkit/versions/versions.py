@@ -179,6 +179,7 @@ def get_all_available_pypi_package_versions(package_name: str) -> List[VersionIn
     Returns:
         List of package versions in semantic VersionInfo format.
     """
+    # TODO: gracefully handle situations when the package does not exist in the remote repository
     _, output = run_shell_command(f"pip index versions {package_name}", use_wsl_on_windows=False)
 
     versions_anchor_string = "Available versions: "

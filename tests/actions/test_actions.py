@@ -1,6 +1,6 @@
 import time
 
-from python_ci_toolkit.console import initialize_ci_console
+from python_ci_toolkit.logging import configure_ci_logging
 from python_ci_toolkit.shell import run_shell_command
 
 
@@ -42,8 +42,7 @@ def test_retrieve_ci_action_script_from_git():
 
 
 def test_list_actions_in_directory():
-    from python_ci_toolkit.actions.actions import list_actions_in_directory, LOCAL_ACTIONS_DIRECTORY, DOWNLOADED_ACTION_REPOS_DIRECTORY
-    from python_ci_toolkit.environment import ci_temp_files_directory
+    from python_ci_toolkit.actions.actions import list_actions_in_directory, DOWNLOADED_ACTION_REPOS_DIRECTORY
 
     # local_actions = list_actions_in_directory(LOCAL_ACTIONS_DIRECTORY)
     # print(local_actions)
@@ -52,9 +51,8 @@ def test_list_actions_in_directory():
     print([x.stem for x in downloaded_actions])
 
 
-
 if __name__ == '__main__':
-    initialize_ci_console()
+    configure_ci_logging("DEBUG")
     # test_retrieve_action_repo()
     # test_retrieve_ci_action_script_from_git()
     test_list_actions_in_directory()
