@@ -275,14 +275,9 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
     """
     Executes CI action by the given action name.
     """
-    # sanity checks
-    if ci_repo is None:
-        logger.critical(f"Current CI project root [red]is not a Git repository[/] ('{ci_project_root}').\n"
-                        "Actions are only allowed to run inside Git repositories to avoid accidentally cluttering random places with temporary files.\n"
-                        "Exiting.",
-                        extra={"markup": True})
-        sys.exit(1)
-
+    """
+    Executes CI action by the given action name.
+    """
     # craft action name for logs
     action_display_name = (action_name
                            if (action_version is None)
