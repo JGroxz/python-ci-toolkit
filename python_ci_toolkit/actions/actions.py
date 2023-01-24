@@ -16,8 +16,8 @@ from rich.progress import Progress
 
 from .. import environment
 from ..environment import assert_environment_variable_set, assert_multiline_environment_variable_set, \
-    ci_files_directory, ci_temp_files_directory, get_ci_environment_name, ci_project_root
-from ..git import git_ssh_credentials, get_default_ssh_private_key, ci_repo
+    ci_files_directory, get_ci_environment_name, ci_project_root, ci_repo, _ci_temp_files_shared_directory
+from ..git import git_ssh_credentials, get_default_ssh_private_key
 from ..logging import get_logger, ci_output_console
 from ..pip import ensure_requirements_installed
 from ..python import import_module_from_file
@@ -26,7 +26,7 @@ from ..shell import run_shell_command
 # Constants
 ACTION_VERSION_SEPARATOR = "@"
 DEFAULT_ACTION_REPO_URL = "git@bitbucket.org:pyci/python-ci-actions.git"
-DOWNLOADED_ACTION_REPOS_DIRECTORY = ci_temp_files_directory / "downloaded_action_repos"
+DOWNLOADED_ACTION_REPOS_DIRECTORY = _ci_temp_files_shared_directory / "downloaded_action_repos"
 LOCAL_ACTIONS_DIRECTORY = ci_files_directory / "actions"
 
 logger = get_logger(__name__)
@@ -264,6 +264,8 @@ def loading_animation(description: str) -> None:
         with Progress(console=ci_output_console, transient=True, refresh_per_second=60) as progress:
             progress.add_task(f"[blue]{description}...", total=None)
 
+            # TODO: add thread which will update description of the task with a timer if it takes longer than 10 s
+
             yield  # <- within this context, clone repos, install requirements etc.
     else:
         # cloud environments normally don't support erasing terminal output,
@@ -275,14 +277,9 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
     """
     Executes CI action by the given action name.
     """
-    # sanity checks
-    if ci_repo is None:
-        logger.critical(f"Current CI project root [red]is not a Git repository[/] ('{ci_project_root}').\n"
-                        "Actions are only allowed to run inside Git repositories to avoid accidentally cluttering random places with temporary files.\n"
-                        "Exiting.",
-                        extra={"markup": True})
-        sys.exit(1)
-
+    """
+    Executes CI action by the given action name.
+    """
     # craft action name for logs
     action_display_name = (action_name
                            if (action_version is None)
@@ -341,7 +338,7 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
     logger.debug(f"Importing Python module of the action '{action_name}'...")
     with loading_animation("Importing action's Python module..."):
         try:
-            action_module = import_module_from_file(f"{action_name}", f"{action_script_path}")
+            action_module = import_module_from_file(f"{action_name}", action_script_path)
         except Exception:
             logger.error(
                 f"Error when importing Python module from action script '{action_script_path}' (action '{action_display_name}' from {action_source}).")

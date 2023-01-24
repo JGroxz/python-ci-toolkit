@@ -60,18 +60,17 @@ def _validate_action_identifier(ctx: Context, param: Argument, value: str) -> st
 
 def _complete_action_identifier(ctx: Context, param: Argument, incomplete: str):
     # disable logging (to avoid messages in the console during autocompletion)
-    original_root_logger_level = logging.root.level
-    logging.root.setLevel(10000)
+    logging.root.disabled = True
 
     # search for local actions
-    from python_ci_toolkit.actions.actions import list_actions_in_directory,  LOCAL_ACTIONS_DIRECTORY
+    from python_ci_toolkit.actions.actions import list_actions_in_directory, LOCAL_ACTIONS_DIRECTORY
     local_action_script_paths = list_actions_in_directory(LOCAL_ACTIONS_DIRECTORY)
     local_action_names = [f"{p.stem}@local" for p in local_action_script_paths]
     local_action_descriptions = [f"[local]  {_get_action_description_from_file(p)}" for p in local_action_script_paths]
     local_actions_metadata = sorted(list(zip(local_action_names, local_action_descriptions)))
 
     # remote actions
-    from python_ci_toolkit.git import ci_repo
+    from python_ci_toolkit.environment import ci_repo
     if ci_repo is None:
         # do not pull remote actions repo if local project's directory is not a Git repo
         remote_actions_metadata = []
@@ -89,7 +88,7 @@ def _complete_action_identifier(ctx: Context, param: Argument, incomplete: str):
         remote_actions_metadata = sorted(list(zip(remote_action_names, remote_action_descriptions)))
 
     # enable logging again
-    logging.root.setLevel(original_root_logger_level)
+    logging.root.disabled = False
 
     return [CompletionItem(x[0], help=x[1])
             for x in (local_actions_metadata + remote_actions_metadata)]
@@ -119,6 +118,7 @@ def action(action_identifier: str, action_args: List[str]) -> None:
      - If action version is set to 'local', utility will look for the action file in '.ci/actions' folder inside your CI project's root directory.\n
      - Any arguments passed after the action name/tag will be passed to the executed action script.\n
     """
+
     from python_ci_toolkit.actions import run_ci_action
     from python_ci_toolkit.actions.actions import ACTION_VERSION_SEPARATOR
 
