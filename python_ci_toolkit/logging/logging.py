@@ -7,10 +7,10 @@ import logging
 
 import click
 import rich
+import rich.traceback
 import rich_click
 from rich.console import Console
 from rich.logging import RichHandler
-from rich.traceback import install
 
 from ..environment import ci_environment_type, CiEnvironmentType
 
@@ -31,7 +31,7 @@ Rich console used by the CI toolkit's loggers.
 """
 
 
-def configure_ci_logging(level: str | int = logging.INFO) -> None:
+def configure_ci_logging(level: str | int = None) -> None:
     """
     Configures the root logger with Rich handler using the CI console.
 
@@ -44,10 +44,14 @@ def configure_ci_logging(level: str | int = logging.INFO) -> None:
     Args:
         level: Level to set the root logger to.
     """
+    # if no level provided, preserve root logger's level
+    if level is None:
+        level = logging.root.getEffectiveLevel()
 
-    install(console=ci_output_console,
-            show_locals=False,
-            suppress=[click, rich_click, rich])
+    # configure tracebacks
+    rich.traceback.install(console=ci_output_console,
+                           show_locals=False,
+                           suppress=[click, rich_click, rich])
 
     # basicConfig in case logging has not been set up yet
     FORMAT = "%(message)s"
