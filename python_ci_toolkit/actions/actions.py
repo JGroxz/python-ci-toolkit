@@ -80,10 +80,25 @@ def _timeit(func):
         result = func(*args, **kwargs)
 
         duration = time.perf_counter() - start
-        logger.debug(f"Function '{func.__name__}()' took {duration*1000:.0f} ms to execute.")
+        logger.debug(f"Function '{func.__name__}()' took {duration * 1000:.0f} ms to execute.")
         return result
 
     return wrapped
+
+
+def get_clone_directory_from_action_repo_url(git_repo_url: str) -> Path:
+    """
+    Generates a deterministic local path to clone the given Git repository based on its URL.
+
+    Args:
+        git_repo_url: URL of the Git repository to generate path for.
+
+    Returns:
+        Local path generated based on the provided Git repo URL.
+    """
+    git_repo_hash = hashlib.md5(git_repo_url.encode()).hexdigest()
+    cloned_repo_path = DOWNLOADED_ACTION_REPOS_DIRECTORY / git_repo_hash
+    return cloned_repo_path
 
 
 @_timeit
@@ -107,18 +122,17 @@ def retrieve_action_repo(git_repo_url: str, ssh_private_key: str = None) -> Path
     os.makedirs(DOWNLOADED_ACTION_REPOS_DIRECTORY, exist_ok=True)
 
     # generate local repo path based on remote
-    git_repo_hash = hashlib.md5(git_repo_url.encode()).hexdigest()
-    cloned_repo_path = DOWNLOADED_ACTION_REPOS_DIRECTORY / git_repo_hash
+    cloned_repo_path = get_clone_directory_from_action_repo_url(git_repo_url)
 
     with git_ssh_credentials(ssh_private_key):
         if not cloned_repo_path.exists():
-            logger.debug(f"Cloning action repo from '{git_repo_url}' (md5: {git_repo_hash}) to '{cloned_repo_path}'.")
+            logger.debug(f"Cloning action repo from '{git_repo_url}' to '{cloned_repo_path}'.")
 
             # execute a fresh pull
             run_shell_command(f'git clone "{git_repo_url}" "{cloned_repo_path}"',
                               silence_output=True, use_wsl_on_windows=False)
         else:
-            logger.debug(f"Using cached action repo of '{git_repo_url}' (md5: {git_repo_hash}) from '{cloned_repo_path}'.")
+            logger.debug(f"Using cached action repo of '{git_repo_url}' from '{cloned_repo_path}'.")
 
         # fetch all available remote branches and tags
         run_shell_command("git fetch --tags",
