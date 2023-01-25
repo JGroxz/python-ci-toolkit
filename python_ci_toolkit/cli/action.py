@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
+import time
 from pathlib import Path
 from typing import List
 
 import rich_click as click
 from click import Context, Argument
 from click.shell_completion import CompletionItem
+
+from python_ci_toolkit.actions.actions import get_clone_directory_from_action_repo_url
 
 _FIRST_COMMENT_REGEX = re.compile(r'"""(?:\n)(.*?)"""', re.MULTILINE | re.UNICODE | re.DOTALL)
 
@@ -32,6 +36,7 @@ def _get_action_description_from_file(file_path: Path) -> str:
 
 
 ACTION_IDENTIFIER_REGEX = re.compile(r'^\w+(?:@[\w\.\/\-\+]+)?', re.UNICODE)
+_ACTION_AUTOCOMPLETE_REMOTE_CLONE_DELAY_TIME_WINDOW = 30
 
 
 def _validate_action_identifier(ctx: Context, param: Argument, value: str) -> str:
@@ -62,6 +67,17 @@ def _complete_action_identifier(ctx: Context, param: Argument, incomplete: str):
     # disable logging (to avoid messages in the console during autocompletion)
     logging.root.disabled = True
 
+    # determine how much time passed since the last call to this autocompletion function;
+    # this is done to avoid cloning the remote action repo on every consecutive call within a specific time window
+    from python_ci_toolkit.environment import _ci_temp_files_shared_directory
+    timestamp_file_path = _ci_temp_files_shared_directory / "cli_actions_last_autocomplete_timestamp"
+    if timestamp_file_path.exists():
+        last_call_timestamp = os.path.getctime(timestamp_file_path)
+        time_since_last_call = time.time() - last_call_timestamp
+    else:
+        timestamp_file_path.touch()
+        time_since_last_call = float("inf")
+
     # search for local actions
     from python_ci_toolkit.actions.actions import list_actions_in_directory, LOCAL_ACTIONS_DIRECTORY
     local_action_script_paths = list_actions_in_directory(LOCAL_ACTIONS_DIRECTORY)
@@ -72,14 +88,20 @@ def _complete_action_identifier(ctx: Context, param: Argument, incomplete: str):
     # remote actions
     from python_ci_toolkit.actions.actions import retrieve_action_repo, DEFAULT_ACTION_REPO_URL
     from python_ci_toolkit.git import get_default_ssh_private_key
-    cloned_actions_directory = retrieve_action_repo(
-        git_repo_url=DEFAULT_ACTION_REPO_URL,
-        ssh_private_key=get_default_ssh_private_key()
-    )
+    cloned_actions_directory = get_clone_directory_from_action_repo_url(DEFAULT_ACTION_REPO_URL)
+    if time_since_last_call >= _ACTION_AUTOCOMPLETE_REMOTE_CLONE_DELAY_TIME_WINDOW:
+        cloned_actions_directory = retrieve_action_repo(
+            git_repo_url=DEFAULT_ACTION_REPO_URL,
+            ssh_private_key=get_default_ssh_private_key()
+        )
     remote_action_script_paths = list_actions_in_directory(cloned_actions_directory)
     remote_action_names = [f"{p.stem}" for p in remote_action_script_paths]
     remote_action_descriptions = [f"[remote] {_get_action_description_from_file(p)}" for p in remote_action_script_paths]
     remote_actions_metadata = sorted(list(zip(remote_action_names, remote_action_descriptions)))
+
+    # recreate the timestamp file
+    os.remove(timestamp_file_path)
+    timestamp_file_path.touch()
 
     # enable logging again
     logging.root.disabled = False
