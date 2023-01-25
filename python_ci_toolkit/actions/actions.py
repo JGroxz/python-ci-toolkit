@@ -16,7 +16,7 @@ from rich.progress import Progress
 
 from .. import environment
 from ..environment import assert_environment_variable_set, assert_multiline_environment_variable_set, \
-    ci_files_directory, get_ci_environment_name, ci_project_root, ci_repo, _ci_temp_files_shared_directory
+    ci_files_directory, get_ci_environment_name, ci_project_root, _ci_temp_files_shared_directory
 from ..git import git_ssh_credentials, get_default_ssh_private_key
 from ..logging import get_logger, ci_output_console
 from ..pip import ensure_requirements_installed
@@ -71,6 +71,22 @@ def list_actions_in_directory(directory: Path) -> List[Path]:
     return simple_actions + complex_actions
 
 
+def _timeit(func):
+    """Utility decorator to time the execution of functions."""
+
+    def wrapped(*args, **kwargs):
+        start = time.perf_counter()
+
+        result = func(*args, **kwargs)
+
+        duration = time.perf_counter() - start
+        logger.debug(f"Function '{func.__name__}()' took {duration*1000:.0f} ms to execute.")
+        return result
+
+    return wrapped
+
+
+@_timeit
 def retrieve_action_repo(git_repo_url: str, ssh_private_key: str = None) -> Path:
     """
     Retrieves the given Git repository into the standard actions cache location.
@@ -96,16 +112,16 @@ def retrieve_action_repo(git_repo_url: str, ssh_private_key: str = None) -> Path
 
     with git_ssh_credentials(ssh_private_key):
         if not cloned_repo_path.exists():
-            logger.debug(f"Cloning action repo from '{git_repo_url}' (md5: {git_repo_hash}).")
+            logger.debug(f"Cloning action repo from '{git_repo_url}' (md5: {git_repo_hash}) to '{cloned_repo_path}'.")
 
             # execute a fresh pull
             run_shell_command(f'git clone "{git_repo_url}" "{cloned_repo_path}"',
                               silence_output=True, use_wsl_on_windows=False)
         else:
-            logger.debug(f"Using cached action repo of '{git_repo_url}' (md5: {git_repo_hash}).")
+            logger.debug(f"Using cached action repo of '{git_repo_url}' (md5: {git_repo_hash}) from '{cloned_repo_path}'.")
 
         # fetch all available remote branches and tags
-        run_shell_command("git fetch --all --tags",
+        run_shell_command("git fetch --tags",
                           cwd=cloned_repo_path, silence_output=True, use_wsl_on_windows=False)
 
         # switch existing clone to main branch
@@ -121,6 +137,7 @@ def retrieve_action_repo(git_repo_url: str, ssh_private_key: str = None) -> Path
     return actions_directory
 
 
+@_timeit
 def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, action_version: str = None,
                                        ssh_private_key: str = None) -> Path:
     """
@@ -163,7 +180,7 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
         # clone the repo
         if action_version is None:
             # if no version specified, use the main branch (it's checked out by default)
-            run_shell_command(f'git pull', **run_shell_command_kwargs)
+            run_shell_command("git merge origin/main", **run_shell_command_kwargs)
         else:
             # find branches or tags matching the given version
             _, output = run_shell_command(f'git show-ref', **run_shell_command_kwargs)
@@ -171,9 +188,9 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
             tag_exists = (f"refs/tags/{action_version}" in output)
 
             if branch_exists:
-                logger.debug(f"'{action_version}' is a branch.")
+                logger.debug(f"'{action_version}' is a branch in '{git_repo_url}'.")
             if tag_exists:
-                logger.debug(f"'{action_version}' is a tag.")
+                logger.debug(f"'{action_version}' is a tag in '{git_repo_url}'.")
 
             # if both a branch and a tag exist with the same name, do not pull to avoid ambiguity
             if tag_exists and branch_exists:
@@ -196,7 +213,7 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
             _, output = run_shell_command(f'git status', **run_shell_command_kwargs)
             is_on_a_branch = ("On branch" in output)
             if is_on_a_branch:
-                run_shell_command(f'git pull', **run_shell_command_kwargs)
+                run_shell_command(f'git merge "origin/{action_version}"', **run_shell_command_kwargs)
 
     # check if the repo had the requested action script
     if not action_script_path.exists():
