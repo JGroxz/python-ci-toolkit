@@ -80,7 +80,8 @@ def test_version_write():
         if (reset_version == original_version):  # TODO: assert
             print(f"Reset version matches the original ({reset_version} == {original_version}). Handler '{version_file_handler_name}' works correctly.")
         else:
-            raise RuntimeError(f"Reset version does not match the original ({reset_version} != {original_version}). Handler '{version_file_handler_name}' must be fixed.")
+            raise RuntimeError(
+                f"Reset version does not match the original ({reset_version} != {original_version}). Handler '{version_file_handler_name}' must be fixed.")
 
 
 def test_version_bump():
@@ -90,17 +91,23 @@ def test_version_bump():
     # Test patch bump
     new_version = original_version.bump_patch()
     print(f"Patch bump: {original_version} -> {new_version}")
-    assert f"{new_version}" == "1.1.2"
+    expected_version = "1.1.2"
+    assert f"{new_version}" == expected_version, \
+        f"Patch bump failed: {original_version} -> {new_version} (expected {expected_version})"
 
     # Test minor bump
     new_version = original_version.bump_minor()
     print(f"Minor bump: {original_version} -> {new_version}")
-    assert f"{new_version}" == "1.2.0"
+    expected_version = "1.2.0"
+    assert f"{new_version}" == expected_version, \
+        f"Minor bump failed: {original_version} -> {new_version} (expected {expected_version})"
 
     # Test major bump
     new_version = original_version.bump_major()
     print(f"Major bump: {original_version} -> {new_version}")
-    assert f"{new_version}" == "2.0.0"
+    expected_version = "2.0.0"
+    assert f"{new_version}" == expected_version, \
+        f"Major bump failed: {original_version} -> {new_version} (expected {expected_version})"
 
 
 if __name__ == '__main__':
