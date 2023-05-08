@@ -1,19 +1,25 @@
+import random
+import shutil
 from pathlib import Path
 
+import pytest
 from semver import VersionInfo
 
 from python_ci_toolkit.versions import read_project_version, get_latest_pypi_package_version, parse_semantic_version
 from python_ci_toolkit.versions.version_file_handlers import VERSION_FILE_HANDLERS, VersionFileHandler
 
-TEST_VERSION_FILES_FOLDER = Path("../test_version_files")
+TEMPLATE_VERSION_FILES_DIRECTORY = Path(__file__).parent / "input/template_version_files"
+TEMPLATE_VERSION = VersionInfo(1, 0, 0, "test")
 
 
+@pytest.mark.skip(reason="Not implemented properly yet")
 def test_project_version():
     project_root = "../"
     version = read_project_version(project_root)
     print(f"Project version: {version}")
 
 
+@pytest.mark.skip(reason="Not implemented properly yet")
 def test_latest():
     test_package = "pip"
     latest_pip_version = get_latest_pypi_package_version(test_package)
@@ -44,44 +50,77 @@ def test_version_parsing():
             f"Version string '{version_string}' should be parsed as '{expected_version_info}', but it was '{version}'"
 
 
+def create_version_file_from_template(template_name: str) -> Path:
+    """
+    Creates a version file from the given template.
+
+    Notes:
+        This can be used in tests to avoid modifying the original template files.
+
+    Args:
+        template_name: Name of the original version file.
+
+    Returns:
+        Path to the created temporary version file.
+    """
+
+    # make sure the template exists
+    template_path = Path(TEMPLATE_VERSION_FILES_DIRECTORY, template_name)
+    assert template_path.exists(), \
+        f"Template version file '{template_name}' does not exist in '{TEMPLATE_VERSION_FILES_DIRECTORY}'."
+
+    # create a copy
+    random_index = random.randint(0, 1000000)
+    version_file_path = Path(__file__).parent / f"output/{random_index}/{template_name}"
+    version_file_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(template_path, version_file_path)
+
+    return version_file_path
+
+
+def test_version_read():
+    for (version_file_name, version_file_handler) in VERSION_FILE_HANDLERS.items():
+        version_file_handler_name = type(version_file_handler).__name__
+        print(f"Testing reading with version file handler '{version_file_handler_name}'...")
+
+        version_file_path = create_version_file_from_template(version_file_name)
+
+        version_file_handler: VersionFileHandler = version_file_handler
+        read_version = version_file_handler.read_version(version_file_path)
+
+        assert read_version == TEMPLATE_VERSION, \
+            f"Version read from '{version_file_name}' should be '{TEMPLATE_VERSION}', but it was '{read_version}'"
+
+
 def test_version_write():
     for (version_file_name, version_file_handler) in VERSION_FILE_HANDLERS.items():
         version_file_handler_name = type(version_file_handler).__name__
         print(f"Testing version file handler '{version_file_handler_name}'...")
 
+        version_file_path = create_version_file_from_template(version_file_name)
+
+        # read original version
         version_file_handler: VersionFileHandler = version_file_handler
-
-        version_file_path = Path(TEST_VERSION_FILES_FOLDER, version_file_name)
-        if not version_file_path.exists():  # TODO: assert
-            print(f"Version file '{version_file_name}' does not exist in the test folder '{TEST_VERSION_FILES_FOLDER}'.")
-            continue
-
-        print("Reading current version...")
         original_version = version_file_handler.read_version(version_file_path)
-        print(f"Original version from '{version_file_name}': '{original_version}'")
 
+        # write new version
         test_version = VersionInfo(42, 69, 5318008, "axolotl")
-        print(f"Updating version to '{test_version}'...")
         version_file_handler.write_version(version_file_path, test_version)
-        print(f"Updated.")
 
-        print("Reading updated version...")
+        # read new version
         updated_version = version_file_handler.read_version(version_file_path)
-        print(f"Updated version from '{version_file_name}' is '{updated_version}'")
+        assert updated_version == test_version, \
+            (f"Version read from '{version_file_name}' should be '{test_version}', but it was '{updated_version}'.\n"
+             f"Handler '{version_file_handler_name}' must be fixed.")
 
-        print(f"Resetting to '{original_version}'...")
+        # reset to the original version
         version_file_handler.write_version(version_file_path, original_version)
-        print(f"Reset.")
-
-        print("Reading reset version...")
         reset_version = version_file_handler.read_version(version_file_path)
-        print(f"Reset version from '{version_file_name}' is '{original_version}'")
+        assert reset_version == original_version, \
+            (f"Version read from '{version_file_name}' should be '{test_version}', but it was '{updated_version}'.\n"
+             f"Handler '{version_file_handler_name}' must be fixed.")
 
-        if (reset_version == original_version):  # TODO: assert
-            print(f"Reset version matches the original ({reset_version} == {original_version}). Handler '{version_file_handler_name}' works correctly.")
-        else:
-            raise RuntimeError(
-                f"Reset version does not match the original ({reset_version} != {original_version}). Handler '{version_file_handler_name}' must be fixed.")
+        print(f"Handler '{version_file_handler_name}' works correctly.")
 
 
 def test_version_bump():
