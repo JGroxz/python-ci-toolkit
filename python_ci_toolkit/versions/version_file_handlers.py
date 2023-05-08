@@ -93,7 +93,7 @@ class PackageJsonVersionFileHandler(VersionFileHandler):
     def _update_version_from_file_contents(self, file_contents: str, new_version: VersionInfo) -> str:
         project_config = json.loads(file_contents)
         version_string = f"{new_version}"
-        project_config.setdefault("version", version_string)
+        project_config["version"] = version_string
         return json.dumps(project_config, indent=2)
 
 
