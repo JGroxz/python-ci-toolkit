@@ -5,7 +5,7 @@ from semver import VersionInfo
 from python_ci_toolkit.versions import read_project_version, get_latest_pypi_package_version, parse_semantic_version
 from python_ci_toolkit.versions.version_file_handlers import VERSION_FILE_HANDLERS, VersionFileHandler
 
-TEST_VERSION_FILES_FOLDER = Path("./test_version_files")
+TEST_VERSION_FILES_FOLDER = Path("../test_version_files")
 
 
 def test_project_version():
@@ -21,26 +21,27 @@ def test_latest():
 
 
 def test_version_parsing():
-    version_strings = [
-        "0.0.0",
-        "0.0.1",
-        "0.1.0",
-        "1.1.0",
-        "0.0.0-dev",
-        "0.0.1-dev",
-        "0.1.0-dev",
-        "1.0.0-dev",
-        "v0.0.0-dev",
-        "v0.0.1-dev",
-        "v0.1.0-dev",
-        "v1.0.0-dev.1",
-        "v1.0.0-dev1",
-        "v1.0.0.dev1",
-    ]
+    version_strings = {
+        "0.0.0": VersionInfo(0, 0, 0),
+        "0.0.1": VersionInfo(0, 0, 1),
+        "0.1.0": VersionInfo(0, 1, 0),
+        "1.1.0": VersionInfo(1, 1, 0),
+        "0.0.0-dev": VersionInfo(0, 0, 0, "dev"),
+        "0.0.1-dev": VersionInfo(0, 0, 1, "dev"),
+        "0.1.0-dev": VersionInfo(0, 1, 0, "dev"),
+        "1.0.0-dev": VersionInfo(1, 0, 0, "dev"),
+        "v0.0.0-dev": VersionInfo(0, 0, 0, "dev"),
+        "v0.0.1-dev": VersionInfo(0, 0, 1, "dev"),
+        "v0.1.0-dev": VersionInfo(0, 1, 0, "dev"),
+        "v1.0.0-dev.1": VersionInfo(1, 0, 0, "dev-1"),
+        "v1.0.0-dev1": VersionInfo(1, 0, 0, "dev1"),
+        "v1.0.0.dev1": VersionInfo(1, 0, 0, "dev1"),
+    }
 
-    for version_string in version_strings:
+    for (version_string, expected_version_info) in version_strings.items():
         version = parse_semantic_version(version_string)
-        print(f"{version_string} -> {version}")
+        assert version == expected_version_info, \
+            f"Version string '{version_string}' should be parsed as '{expected_version_info}', but it was '{version}'"
 
 
 def test_version_write():
