@@ -15,6 +15,8 @@ class CiEnvironmentType(Enum):
     """Unknown type of CI environment, or running on a local machine"""
     BitbucketPipelines = 1
     """Bitbucket Pipelines"""
+    GitHubActions = 2
+    """GitHub Actions"""
 
 
 def get_current_ci_environment() -> CiEnvironmentType:
@@ -26,6 +28,9 @@ def get_current_ci_environment() -> CiEnvironmentType:
     """
     if os.environ.get("BITBUCKET_PIPELINE_UUID"):
         return CiEnvironmentType.BitbucketPipelines
+
+    if os.environ.get("GITHUB_WORKSPACE"):
+        return CiEnvironmentType.GitHubActions
 
     return CiEnvironmentType.Unknown
 
@@ -39,6 +44,8 @@ def get_ci_environment_name() -> str:
     """
     if ci_environment_type == CiEnvironmentType.BitbucketPipelines:
         return "Bitbucket Pipelines"
+    elif ci_environment_type == CiEnvironmentType.GitHubActions:
+        return "GitHub Actions"
     elif ci_environment_type == CiEnvironmentType.Unknown:
         return "Unknown/Local"
 

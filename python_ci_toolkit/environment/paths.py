@@ -29,6 +29,8 @@ def get_project_root_directory_path() -> Path:
     """
     if ci_environment_type == CiEnvironmentType.BitbucketPipelines:
         return Path(os.environ["BITBUCKET_CLONE_DIR"])
+    elif ci_environment_type == CiEnvironmentType.GitHubActions:
+        return Path(os.environ["GITHUB_WORKSPACE"])
     elif ci_environment_type == CiEnvironmentType.Unknown:
         # general case: find the root of the enclosing Git repository
         result = run_shell_command("git rev-parse --show-toplevel", use_wsl_on_windows=False,
