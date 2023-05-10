@@ -69,7 +69,7 @@ def _complete_action_identifier(ctx: Context, param: Argument, incomplete: str):
 
     # determine how much time passed since the last call to this autocompletion function;
     # this is done to avoid cloning the remote action repo on every consecutive call within a specific time window
-    from python_ci_toolkit.environment import _ci_temp_files_shared_directory
+    from python_ci_toolkit.environment.paths import _ci_temp_files_shared_directory
     timestamp_file_path = _ci_temp_files_shared_directory / "cli_actions_last_autocomplete_timestamp"
     if timestamp_file_path.exists():
         last_call_timestamp = os.path.getctime(timestamp_file_path)

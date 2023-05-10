@@ -18,7 +18,7 @@ def test_project_root_directory_path():
 def test_temp_directory_path():
     print(f"Python-provided temp directory: {tempfile.gettempdir()}")
 
-    from python_ci_toolkit.environment import _ci_temp_files_root_directory, _ci_temp_files_shared_directory, _ci_temp_files_projects_root_directory
+    from python_ci_toolkit.environment.paths import _ci_temp_files_root_directory, _ci_temp_files_shared_directory, _ci_temp_files_projects_root_directory
     print(f"Root temp directory:      '{_ci_temp_files_root_directory}'")
     print(f"Shared temp directory:    '{_ci_temp_files_shared_directory}'")
     print(f"Projects temp directory:  '{_ci_temp_files_projects_root_directory}'")
