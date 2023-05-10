@@ -1,40 +1,84 @@
+import os
 from pathlib import Path
 
-import rich
-import rich.pretty
-from rich.console import Console
-from rich.panel import Panel
+import pytest
 
 from python_ci_toolkit.shell import run_shell_command
 
-test_console = Console()
-print = test_console.print
+IS_ON_WINDOWS = (os.name == "nt")
 
 
-def run():
-    aws_domain = "pyci"
-    aws_domain_owner = "755432789552"
-    aws_region = "eu-west-1"
+def test_exit_codes():
+    assert not IS_ON_WINDOWS, \
+        "This test is not tested on Windows (yet)."
 
-    # error, output = run_shell_command(
-    #     f"aws codeartifact get-authorization-token --domain {aws_domain} --domain-owner {aws_domain_owner} --query authorizationToken --output text")
+    # test a valid command with zero exit code
+    command = "true" if not IS_ON_WINDOWS else "exit /b 0"
+    result = run_shell_command(command, raise_on_error=False)
 
-    test_command = f"bash tests/files/shell/slow_print.sh"
-    test_cwd = "../"
+    assert result.is_successful, \
+        f"Command '{command}' must successfully execute with exit code 0."
 
-    def print_run_result(run_result):
-        print(Panel(rich.pretty.Pretty(run_result, expand_all=True), title=f"Result", title_align="left", border_style="light_goldenrod1"))
+    # test a valid command with non-zero exit code (without raising an exception
+    command = "false" if not IS_ON_WINDOWS else "exit /b 42"
+    excepted_exit_code = 1
+    result = run_shell_command(command, raise_on_error=False)
 
-    print(f"Running '{test_command}' openly:", style="italic light_goldenrod1")
-    result = run_shell_command(test_command, test_cwd)
-    print_run_result(result)
+    assert result.is_failed, \
+        f"Command '{command}' must fail with non-zero exit code."
+    assert result.exit_code == excepted_exit_code, \
+        f"Command '{command}' must fail with exit code {excepted_exit_code}."
 
-    print()
-
-    print(f"Running '{test_command}' silently:", style="italic light_goldenrod1")
-    result = run_shell_command(test_command, test_cwd, silence_output=True)
-    print_run_result(result)
+    # test a valid command with non-zero exit code (with raise_on_error)
+    with pytest.raises(RuntimeError):
+        run_shell_command(command, raise_on_error=True)
 
 
-if __name__ == '__main__':
-    run()
+def test_cwd():
+    """Test that the working directory is being set correctly when running a shell command."""
+
+    command = "cd" if IS_ON_WINDOWS else "pwd"
+
+    # current working directory
+    result = run_shell_command(command)
+
+    assert result.is_successful, \
+        f"Command '{command}' must successfully execute."
+    assert result.output_stripped == os.getcwd(), \
+        f"Working directory is not correct."
+
+    # custom working directory
+    custom_cwd = str(Path(__file__).parent)
+    result = run_shell_command(command, cwd=custom_cwd)
+
+    assert result.is_successful, \
+        f"Command '{command}' must successfully execute."
+    assert result.output_stripped == custom_cwd, \
+        f"Custom working directory is not correct."
+
+
+def test_output():
+    """Test that a valid shell command is executed correctly."""
+
+    test_echo_message_lines = [
+        "The cake is a lie.",
+        "But this test is not.",
+    ]
+    test_echo_message = "\n".join(test_echo_message_lines)
+
+    command = f"echo '{test_echo_message}'"
+    result = run_shell_command(command, use_wsl_on_windows=True)
+
+    assert result.is_successful, \
+        f"Command '{command}' must successfully execute."
+    assert result.output_stripped == test_echo_message, \
+        f"Stripped captured output of the command is not correct."
+    assert result.output_lines == test_echo_message_lines, \
+        f"Captured output of the command split into lines is not correct."
+
+
+def test_invalid_command():
+    # test an invalid command (it must raise an exception even if raise_on_error is False)
+    invalid_command = "invalid_command_that_doesnt_exist --with-invalid-arguments --and-invalid-options"
+    with pytest.raises(FileNotFoundError):
+        run_shell_command(invalid_command, raise_on_error=False)

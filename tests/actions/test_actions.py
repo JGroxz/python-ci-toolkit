@@ -1,5 +1,7 @@
 import time
 
+import pytest
+
 from python_ci_toolkit.logging import configure_ci_logging
 from python_ci_toolkit.shell import run_shell_command
 
@@ -14,8 +16,10 @@ def test_retrieve_action_repo():
     repo_directory = retrieve_action_repo(git_repo_url=DEFAULT_ACTION_REPO_URL, ssh_private_key=ssh_private_key)
 
     print(f"Retrieved action repo in {(time.perf_counter() - start) * 1000} ms")
+    print(repo_directory)
 
-    assert (repo_directory / ".git").exists(), "There is no '.git' file in the action repo directory. It means the repo was not cloned."
+    assert (repo_directory / "../.git").exists(), \
+        "There is no '.git' file in the action repo directory. It means the repo was not cloned."
 
 
 def test_retrieve_ci_action_script_from_git():
@@ -36,9 +40,10 @@ def test_retrieve_ci_action_script_from_git():
     action_script_directory = action_script_path.parent
 
     with git_ssh_credentials(ssh_private_key):
-        _, output = run_shell_command(f'git status',
+        result = run_shell_command(f'git status',
                                       cwd=action_script_directory, silence_output=True, use_wsl_on_windows=False)
-        assert action_version in output, f"Action repo must be checked out at branch/tag '{action_version}', but it's not:\n{output}"
+        assert action_version in result.output, \
+            f"Action repo must be checked out at branch/tag '{action_version}', but it's not:\n{result.output}"
 
 
 def test_list_actions_in_directory():

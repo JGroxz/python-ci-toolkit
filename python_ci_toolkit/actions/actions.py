@@ -16,7 +16,7 @@ from rich.progress import Progress
 
 from .. import environment
 from ..environment import assert_environment_variable_set, assert_multiline_environment_variable_set, \
-    ci_files_directory, get_ci_environment_name, ci_project_root, ci_repo, _ci_temp_files_shared_directory
+    ci_files_directory, get_ci_environment_name, ci_project_root, _ci_temp_files_shared_directory
 from ..git import git_ssh_credentials, get_default_ssh_private_key
 from ..logging import get_logger, ci_output_console
 from ..pip import ensure_requirements_installed
@@ -71,6 +71,37 @@ def list_actions_in_directory(directory: Path) -> List[Path]:
     return simple_actions + complex_actions
 
 
+def _timeit(func):
+    """Utility decorator to time the execution of functions."""
+
+    def wrapped(*args, **kwargs):
+        start = time.perf_counter()
+
+        result = func(*args, **kwargs)
+
+        duration = time.perf_counter() - start
+        logger.debug(f"Function '{func.__name__}()' took {duration * 1000:.0f} ms to execute.")
+        return result
+
+    return wrapped
+
+
+def get_clone_directory_from_action_repo_url(git_repo_url: str) -> Path:
+    """
+    Generates a deterministic local path to clone the given Git repository based on its URL.
+
+    Args:
+        git_repo_url: URL of the Git repository to generate path for.
+
+    Returns:
+        Local path generated based on the provided Git repo URL.
+    """
+    git_repo_hash = hashlib.md5(git_repo_url.encode()).hexdigest()
+    cloned_repo_path = DOWNLOADED_ACTION_REPOS_DIRECTORY / git_repo_hash
+    return cloned_repo_path
+
+
+@_timeit
 def retrieve_action_repo(git_repo_url: str, ssh_private_key: str = None) -> Path:
     """
     Retrieves the given Git repository into the standard actions cache location.
@@ -91,21 +122,20 @@ def retrieve_action_repo(git_repo_url: str, ssh_private_key: str = None) -> Path
     os.makedirs(DOWNLOADED_ACTION_REPOS_DIRECTORY, exist_ok=True)
 
     # generate local repo path based on remote
-    git_repo_hash = hashlib.md5(git_repo_url.encode()).hexdigest()
-    cloned_repo_path = DOWNLOADED_ACTION_REPOS_DIRECTORY / git_repo_hash
+    cloned_repo_path = get_clone_directory_from_action_repo_url(git_repo_url)
 
     with git_ssh_credentials(ssh_private_key):
         if not cloned_repo_path.exists():
-            logger.debug(f"Cloning action repo from '{git_repo_url}' (md5: {git_repo_hash}).")
+            logger.debug(f"Cloning action repo from '{git_repo_url}' to '{cloned_repo_path}'.")
 
             # execute a fresh pull
             run_shell_command(f'git clone "{git_repo_url}" "{cloned_repo_path}"',
                               silence_output=True, use_wsl_on_windows=False)
         else:
-            logger.debug(f"Using cached action repo of '{git_repo_url}' (md5: {git_repo_hash}).")
+            logger.debug(f"Using cached action repo of '{git_repo_url}' from '{cloned_repo_path}'.")
 
         # fetch all available remote branches and tags
-        run_shell_command("git fetch --all --tags",
+        run_shell_command("git fetch --tags",
                           cwd=cloned_repo_path, silence_output=True, use_wsl_on_windows=False)
 
         # switch existing clone to main branch
@@ -121,6 +151,7 @@ def retrieve_action_repo(git_repo_url: str, ssh_private_key: str = None) -> Path
     return actions_directory
 
 
+@_timeit
 def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, action_version: str = None,
                                        ssh_private_key: str = None) -> Path:
     """
@@ -163,17 +194,18 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
         # clone the repo
         if action_version is None:
             # if no version specified, use the main branch (it's checked out by default)
-            run_shell_command(f'git pull', **run_shell_command_kwargs)
+            run_shell_command("git merge origin/main", **run_shell_command_kwargs)
         else:
             # find branches or tags matching the given version
-            _, output = run_shell_command(f'git show-ref', **run_shell_command_kwargs)
+            result = run_shell_command(f'git show-ref', **run_shell_command_kwargs)
+            output = result.output
             branch_exists = (f"refs/heads/{action_version}" in output) or (f"refs/remotes/origin/{action_version}" in output)
             tag_exists = (f"refs/tags/{action_version}" in output)
 
             if branch_exists:
-                logger.debug(f"'{action_version}' is a branch.")
+                logger.debug(f"'{action_version}' is a branch in '{git_repo_url}'.")
             if tag_exists:
-                logger.debug(f"'{action_version}' is a tag.")
+                logger.debug(f"'{action_version}' is a tag in '{git_repo_url}'.")
 
             # if both a branch and a tag exist with the same name, do not pull to avoid ambiguity
             if tag_exists and branch_exists:
@@ -193,14 +225,14 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
             run_shell_command(f'git checkout "{action_version}"', **run_shell_command_kwargs)
 
             # if on a branch, pull updates
-            _, output = run_shell_command(f'git status', **run_shell_command_kwargs)
-            is_on_a_branch = ("On branch" in output)
+            result = run_shell_command(f'git status', **run_shell_command_kwargs)
+            is_on_a_branch = ("On branch" in result.output)
             if is_on_a_branch:
-                run_shell_command(f'git pull', **run_shell_command_kwargs)
+                run_shell_command(f'git merge "origin/{action_version}"', **run_shell_command_kwargs)
 
     # check if the repo had the requested action script
     if not action_script_path.exists():
-        logger.error(f"Cloned repository '{git_repo_url}' does include action '{action_name}' (expected script path is '{action_script_path}').\n"
+        logger.error(f"Cloned repository '{git_repo_url}' does not include action '{action_name}' (expected script path is '{action_script_path}').\n"
                      f"Please make sure that the remote repository has the required action script.")
         sys.exit(4)
 
@@ -264,6 +296,8 @@ def loading_animation(description: str) -> None:
         with Progress(console=ci_output_console, transient=True, refresh_per_second=60) as progress:
             progress.add_task(f"[blue]{description}...", total=None)
 
+            # TODO: add thread which will update description of the task with a timer if it takes longer than 10 s
+
             yield  # <- within this context, clone repos, install requirements etc.
     else:
         # cloud environments normally don't support erasing terminal output,
@@ -275,14 +309,9 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
     """
     Executes CI action by the given action name.
     """
-    # sanity checks
-    if ci_repo is None:
-        logger.critical(f"Current CI project root [red]is not a Git repository[/] ('{ci_project_root}').\n"
-                        "Actions are only allowed to run inside Git repositories to avoid accidentally cluttering random places with temporary files.\n"
-                        "Exiting.",
-                        extra={"markup": True})
-        sys.exit(1)
-
+    """
+    Executes CI action by the given action name.
+    """
     # craft action name for logs
     action_display_name = (action_name
                            if (action_version is None)
@@ -341,7 +370,7 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
     logger.debug(f"Importing Python module of the action '{action_name}'...")
     with loading_animation("Importing action's Python module..."):
         try:
-            action_module = import_module_from_file(f"{action_name}", f"{action_script_path}")
+            action_module = import_module_from_file(f"{action_name}", action_script_path)
         except Exception:
             logger.error(
                 f"Error when importing Python module from action script '{action_script_path}' (action '{action_display_name}' from {action_source}).")

@@ -81,17 +81,19 @@ def get_project_root_directory_path() -> Path:
         return Path(os.environ["BITBUCKET_CLONE_DIR"])
     elif ci_environment_type == CiEnvironmentType.Unknown:
         # general case: find the root of the enclosing Git repository
-        return_code, git_repo_root = run_shell_command("git rev-parse --show-toplevel", use_wsl_on_windows=False,
-                                                       throw_exception_on_error=False, silence_output=True,
-                                                       cwd=os.getcwd())
-        if return_code == 0:
-            return Path(git_repo_root.strip())
+        result = run_shell_command("git rev-parse --show-toplevel", use_wsl_on_windows=False,
+                                   raise_on_error=False, silence_output=True,
+                                   cwd=os.getcwd())
+
+        if result.is_successful:
+            git_repo_root = result.output_stripped
+            return Path(git_repo_root)
 
         # other case: we are not inside a Git repo, so the root cannot be reliably determined
-        logger.warning(f"Could not determine project's root directory: not a Git repo.\n"
-                       f"  CI environment: '{get_ci_environment_name()}'\n"
-                       f"  CWD: '{os.getcwd()}'\n"
-                       f"Assuming current working directory as the current CI project's root.")
+        logger.debug(f"Could not determine project's root directory: not a Git repo.\n"
+                     f"  CI environment: '{get_ci_environment_name()}'\n"
+                     f"  CWD: '{os.getcwd()}'\n"
+                     f"Assuming current working directory as the current CI project's root.")
         return Path(os.getcwd())
 
 
