@@ -120,7 +120,8 @@ def assert_multiline_environment_variable_set(variable_name: str, usage_explanat
     if not is_fallback_used:
         # list of CI environment types which do not support defining multiline environment variables
         unsupported_environments: list[CiEnvironmentType] = [
-            CiEnvironmentType.BitbucketPipelines
+            CiEnvironmentType.BitbucketPipelines,
+            CiEnvironmentType.GitHubActions
         ]
 
         # recover if we are in an unsupported environment
