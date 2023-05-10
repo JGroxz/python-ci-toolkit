@@ -31,6 +31,8 @@ class ShellCommandResult:
     """
     Result of executing a shell command.
     """
+    command: str
+    """Command that was executed."""
     exit_code: int
     """Exit code of the command."""
     output: str
@@ -186,6 +188,7 @@ def run_shell_command(command: str,
                            f"{output_string}")
 
     return ShellCommandResult(
+        command=command,
         exit_code=exit_code,
         output=captured_output
     )
