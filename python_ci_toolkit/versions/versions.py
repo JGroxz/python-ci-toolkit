@@ -180,11 +180,11 @@ def get_all_available_pypi_package_versions(package_name: str) -> List[VersionIn
         List of package versions in semantic VersionInfo format.
     """
     # TODO: gracefully handle situations when the package does not exist in the remote repository
-    _, output = run_shell_command(f"pip index versions {package_name}", use_wsl_on_windows=False)
+    result = run_shell_command(f"pip index versions {package_name}", use_wsl_on_windows=False)
 
     versions_anchor_string = "Available versions: "
-    versions_start_index = output.find(versions_anchor_string) + len(versions_anchor_string)
-    versions_list = output[versions_start_index:].split("\n")[0].split(",")
+    versions_start_index = result.output.find(versions_anchor_string) + len(versions_anchor_string)
+    versions_list = result.output[versions_start_index:].split("\n")[0].split(",")
     available_versions = [parse_semantic_version(version_string.strip()) for version_string in versions_list]
 
     return available_versions
