@@ -154,7 +154,7 @@ def run_shell_command(command: str,
     with process.stdout, process.stderr:
         # we read stdout and stderr in threads to be able to print live logs from both streams concurrently
         with ThreadPoolExecutor(max_workers=2) as executor:
-            executor.submit(capture_subprocess_output, process.stdout)
+            executor.submit(capture_subprocess_output, process.stdout, stderr=False)
             executor.submit(capture_subprocess_output, process.stderr, stderr=True)
             executor.shutdown(wait=True)
     exit_code = process.wait()
