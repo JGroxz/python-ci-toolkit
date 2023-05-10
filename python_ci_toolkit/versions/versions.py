@@ -150,7 +150,7 @@ def write_project_version(project_root_folder_path: str | Path, version: Version
         logging.info(f"Updated version to {version} in {len(updated_version_files)} files in the repository:\n{updated_file_names}")
 
 
-def get_latest_pypi_package_version(package_name: str) -> VersionInfo:
+def get_latest_pypi_package_version(package_name: str) -> VersionInfo | None:
     """
     Returns the latest semantic version of the given PyPI package in currently configured repositories.
 
@@ -161,8 +161,11 @@ def get_latest_pypi_package_version(package_name: str) -> VersionInfo:
         The latest package version in semantic VersionInfo format.
     """
     all_versions = get_all_available_pypi_package_versions(package_name)
-    latest_version = all_versions[0]
 
+    if len(all_versions) == 0:
+        return None
+
+    latest_version = all_versions[0]
     return latest_version
 
 
@@ -179,8 +182,19 @@ def get_all_available_pypi_package_versions(package_name: str) -> List[VersionIn
     Returns:
         List of package versions in semantic VersionInfo format.
     """
-    # TODO: gracefully handle situations when the package does not exist in the remote repository
-    result = run_shell_command(f"pip index versions {package_name}", use_wsl_on_windows=False)
+    result = run_shell_command(f"pip index versions {package_name}", raise_on_error=False, use_wsl_on_windows=False)
+
+    missing_package_log = f"No matching distribution found for {package_name}"
+    if missing_package_log in result.output:
+        # the package does not exist in the remote repository
+        return []
+
+    if result.is_failed:
+        # if the c
+        raise RuntimeError(f"Could not get available versions for package '{package_name}'.\n"
+                           f"  Executed command: {result.command}\n"
+                           f"  Exit code: {result.exit_code}\n",
+                           f"  Output: {result.output}")
 
     versions_anchor_string = "Available versions: "
     versions_start_index = result.output.find(versions_anchor_string) + len(versions_anchor_string)
