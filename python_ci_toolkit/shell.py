@@ -51,6 +51,13 @@ class ShellCommandResult:
         return not self.is_successful
 
     @property
+    def output_lines(self) -> list[str]:
+        """
+        Captured output of the command split into lines.
+        """
+        return self.output.splitlines()
+
+    @property
     def output_stripped(self) -> str:
         """
         Captured output of the command with leading and trailing whitespaces and newlines removed.
@@ -58,11 +65,16 @@ class ShellCommandResult:
         return self.output.strip(" \n")
 
     @property
-    def output_lines(self) -> list[str]:
+    def output_value(self) -> str | None:
         """
-        Captured output of the command split into lines.
+        Similar to output_stripped, but returns None if the stripped output is an empty string.
+
+        Notes:
+            Useful when the output of the command is expected to be a single-line string which has to be used in further logic.
         """
-        return self.output.splitlines()
+        stripped = self.output_stripped
+
+        return stripped if (stripped != "") else None
 
 
 def run_shell_command(command: str,
