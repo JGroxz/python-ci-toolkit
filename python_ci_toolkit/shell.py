@@ -55,7 +55,7 @@ class ShellCommandResult:
         """
         Captured output of the command with leading and trailing whitespaces and newlines removed.
         """
-        return self.output.strip()
+        return self.output.strip(" \n")
 
     @property
     def output_lines(self) -> list[str]:
