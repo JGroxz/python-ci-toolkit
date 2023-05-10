@@ -197,7 +197,8 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
             run_shell_command("git merge origin/main", **run_shell_command_kwargs)
         else:
             # find branches or tags matching the given version
-            _, output = run_shell_command(f'git show-ref', **run_shell_command_kwargs)
+            result = run_shell_command(f'git show-ref', **run_shell_command_kwargs)
+            output = result.output
             branch_exists = (f"refs/heads/{action_version}" in output) or (f"refs/remotes/origin/{action_version}" in output)
             tag_exists = (f"refs/tags/{action_version}" in output)
 
@@ -224,14 +225,14 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
             run_shell_command(f'git checkout "{action_version}"', **run_shell_command_kwargs)
 
             # if on a branch, pull updates
-            _, output = run_shell_command(f'git status', **run_shell_command_kwargs)
-            is_on_a_branch = ("On branch" in output)
+            result = run_shell_command(f'git status', **run_shell_command_kwargs)
+            is_on_a_branch = ("On branch" in result.output)
             if is_on_a_branch:
                 run_shell_command(f'git merge "origin/{action_version}"', **run_shell_command_kwargs)
 
     # check if the repo had the requested action script
     if not action_script_path.exists():
-        logger.error(f"Cloned repository '{git_repo_url}' does include action '{action_name}' (expected script path is '{action_script_path}').\n"
+        logger.error(f"Cloned repository '{git_repo_url}' does not include action '{action_name}' (expected script path is '{action_script_path}').\n"
                      f"Please make sure that the remote repository has the required action script.")
         sys.exit(4)
 
