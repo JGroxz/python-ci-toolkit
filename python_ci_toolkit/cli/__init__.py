@@ -15,7 +15,7 @@ def purge_ci_toolkit_caches() -> None:
     """
     Deletes cache directories used by the toolkit to store temporary files.
     """
-    from python_ci_toolkit.environment import _ci_temp_files_root_directory
+    from python_ci_toolkit.environment.paths import _ci_temp_files_root_directory
 
     print(f":boom: Purging cache directory '{_ci_temp_files_root_directory}'...")
 
