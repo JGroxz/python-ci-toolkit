@@ -19,7 +19,8 @@ def _get_ci_output_console() -> Console:
     """
     Returns a Rich Console configured for the use in CI environment.
     """
-    if ci_environment_type == CiEnvironmentType.BitbucketPipelines:
+    if (ci_environment_type == CiEnvironmentType.BitbucketPipelines
+            or ci_environment_type == CiEnvironmentType.GitHubActions):
         return Console(force_terminal=True)
 
     return Console()
