@@ -135,6 +135,10 @@ def action(action_identifier: str, action_args: List[str]) -> None:
      - Any arguments passed after the action name/tag will be passed to the executed action script.\n
     """
 
+    # initialize logging
+    from python_ci_toolkit.logging import configure_ci_logging
+    configure_ci_logging("INFO")  # TODO: check for condition and enable debug logs here if set
+
     from python_ci_toolkit.actions import run_ci_action
     from python_ci_toolkit.actions.actions import ACTION_VERSION_SEPARATOR
 
