@@ -1,0 +1,12 @@
+name: "Handle development version"
+
+on:
+  push:
+    branches:
+      - 'develop'
+
+jobs:
+  handle-semver-development:
+    name: Handle development version
+    uses: pyci/.github/.github/workflows/handle-semver-development.yml@main
+    secrets: inherit
