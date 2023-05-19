@@ -8,5 +8,5 @@ on:
 jobs:
   publish-poetry-package:
     name: Publish Poetry package
-    uses: pyci/.github/.github/workflows/publish_poetry_package.yml@main
+    uses: pyci/.github/.github/workflows/publish-poetry-package.yml@main
     secrets: inherit
