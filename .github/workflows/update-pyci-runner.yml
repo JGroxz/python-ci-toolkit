@@ -1,9 +1,6 @@
 name: "Update Python CI Runner"
 
-on:
-  push:
-    tags:
-      - 'v*'
+on: workflow_call
 
 env:
   AWS_DEFAULT_REGION: ${{ vars.AWS_DEFAULT_REGION }}
