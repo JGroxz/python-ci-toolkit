@@ -1,0 +1,12 @@
+name: "Publish Poetry package"
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish-poetry-package:
+    name: Publish Poetry package
+    uses: pyci/.github/.github/workflows/publish_poetry_package.yml@main
+    secrets: inherit
