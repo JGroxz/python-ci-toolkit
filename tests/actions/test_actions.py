@@ -1,6 +1,8 @@
 import time
 
-from python_ci_toolkit.console import initialize_ci_console
+import pytest
+
+from python_ci_toolkit.logging import configure_ci_logging
 from python_ci_toolkit.shell import run_shell_command
 
 
@@ -14,8 +16,10 @@ def test_retrieve_action_repo():
     repo_directory = retrieve_action_repo(git_repo_url=DEFAULT_ACTION_REPO_URL, ssh_private_key=ssh_private_key)
 
     print(f"Retrieved action repo in {(time.perf_counter() - start) * 1000} ms")
+    print(repo_directory)
 
-    assert (repo_directory / ".git").exists(), "There is no '.git' file in the action repo directory. It means the repo was not cloned."
+    assert (repo_directory / "../.git").exists(), \
+        "There is no '.git' file in the action repo directory. It means the repo was not cloned."
 
 
 def test_retrieve_ci_action_script_from_git():
@@ -36,14 +40,14 @@ def test_retrieve_ci_action_script_from_git():
     action_script_directory = action_script_path.parent
 
     with git_ssh_credentials(ssh_private_key):
-        _, output = run_shell_command(f'git status',
+        result = run_shell_command(f'git status',
                                       cwd=action_script_directory, silence_output=True, use_wsl_on_windows=False)
-        assert action_version in output, f"Action repo must be checked out at branch/tag '{action_version}', but it's not:\n{output}"
+        assert action_version in result.output, \
+            f"Action repo must be checked out at branch/tag '{action_version}', but it's not:\n{result.output}"
 
 
 def test_list_actions_in_directory():
-    from python_ci_toolkit.actions.actions import list_actions_in_directory, LOCAL_ACTIONS_DIRECTORY, DOWNLOADED_ACTION_REPOS_DIRECTORY
-    from python_ci_toolkit.environment import ci_temp_files_directory
+    from python_ci_toolkit.actions.actions import list_actions_in_directory, DOWNLOADED_ACTION_REPOS_DIRECTORY
 
     # local_actions = list_actions_in_directory(LOCAL_ACTIONS_DIRECTORY)
     # print(local_actions)
@@ -52,9 +56,8 @@ def test_list_actions_in_directory():
     print([x.stem for x in downloaded_actions])
 
 
-
 if __name__ == '__main__':
-    initialize_ci_console()
+    configure_ci_logging("DEBUG")
     # test_retrieve_action_repo()
     # test_retrieve_ci_action_script_from_git()
     test_list_actions_in_directory()
