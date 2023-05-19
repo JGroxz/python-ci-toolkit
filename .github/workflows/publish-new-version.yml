@@ -13,4 +13,4 @@ jobs:
   update-python-ci-runner:
     name: Update self dependency in Python CI Runner
     depends-on: publish-poetry-package
-    uses: ./.github/update-python-ci-runner.yml
+    uses: ./update-python-ci-runner.yml
