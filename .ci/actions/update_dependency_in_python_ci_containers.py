@@ -25,7 +25,7 @@ PYTHON_CI_PUSH_SSH_PRIVATE_KEY = assert_multiline_environment_variable_set(
     usage_explanation="An SSH private key with read and write access to the python-ci-containers repository is required to update it.",
     fallback_value_getter=get_default_ssh_private_key)
 
-PYTHON_CI_CONTAINERS_REPO_URL = "git@bitbucket.org:pyci/python-ci-containers.git"
+PYTHON_CI_CONTAINERS_REPO_URL = "git@github.com:pyci/python-ci-runner.git"
 TEMP_REPO_CLONE_PATH = ci_temp_files_directory.joinpath("python-ci-containers-clone")
 TOOLKIT_VERSION_DEFINITION_REGEX = re.compile('(python-ci-toolkit==".*")', flags=re.UNICODE)
 
