@@ -1,0 +1,29 @@
+name: "Publish Poetry package"
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  AWS_DEFAULT_REGION: ${{ vars.AWS_DEFAULT_REGION }}
+  AWS_CI_ACCESS_KEY_ID: ${{ secrets.AWS_CI_ACCESS_KEY_ID }}
+  AWS_CI_SECRET_ACCESS_KEY: ${{ secrets.AWS_CI_SECRET_ACCESS_KEY }}
+  PYTHON_CI_ACTIONS_GIT_REPO_URL: ${{ secrets.PYTHON_CI_ACTIONS_GIT_REPO_URL }}
+  PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY: ${{ secrets.PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY }}
+
+jobs:
+  build-dockers-and-push:
+    name: Publish Poetry package
+    runs-on: ubuntu-latest
+    container:
+      image: "ghcr.io/pyci/ci-runner:latest"
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v3
+      - run: pyci print_environment_info
+      - run: pyci setup_aws_cli
+      - run: pyci build_poetry_package
+      - run: pyci publish_poetry_package
