@@ -18,6 +18,9 @@ rich-click = "^1.6.0"
 
 [tool.poetry.dev-dependencies]
 
+[tool.poetry.group.test.dependencies]
+pytest = "^7.2.1"
+
 [tool.poetry.scripts]
 python-ci = "python_ci_toolkit.cli:cli"
 pyci = "python_ci_toolkit.cli.action:action"
