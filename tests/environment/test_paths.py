@@ -11,7 +11,7 @@ def test_project_root_directory_path():
 
     print(f"Project root: '{project_root}'")
 
-    assert project_root == Path(__file__).parent.parent
+    assert project_root == Path(__file__).parent.parent.parent
 
 
 def test_temp_directory_path():
