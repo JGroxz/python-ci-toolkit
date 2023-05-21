@@ -26,7 +26,7 @@ from ..shell import run_shell_command
 
 # Constants
 ACTION_VERSION_SEPARATOR = "@"
-DEFAULT_ACTION_REPO_URL = "git@bitbucket.org:pyci/python-ci-actions.git"
+DEFAULT_ACTION_REPO_URL = "git@github.com:pyci/python-ci-actions.git"
 DOWNLOADED_ACTION_REPOS_DIRECTORY = _ci_temp_files_shared_directory / "downloaded_action_repos"
 LOCAL_ACTIONS_DIRECTORY = ci_files_directory / "actions"
 
