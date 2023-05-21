@@ -12,20 +12,20 @@ from pathlib import Path
 from git import Repo
 
 from python_ci_toolkit.actions.actions import get_action_logger
-from python_ci_toolkit.environment import assert_multiline_environment_variable_set, ci_project_root, \
-    ci_temp_files_directory
+from python_ci_toolkit.environment import retrieve_environment_variable, ci_project_root, ci_temp_files_directory
 from python_ci_toolkit.git import delete_git_repo
 from python_ci_toolkit.git import get_default_ssh_private_key, git_ssh_credentials
 from python_ci_toolkit.versions import versions
 
 logger = get_action_logger(__name__)
 
-PYTHON_CI_PUSH_SSH_PRIVATE_KEY = assert_multiline_environment_variable_set(
+PYTHON_CI_PUSH_SSH_PRIVATE_KEY = retrieve_environment_variable(
     "PYTHON_CI_PUSH_SSH_PRIVATE_KEY",
     usage_explanation="An SSH private key with read and write access to the python-ci-containers repository is required to update it.",
-    fallback_value_getter=get_default_ssh_private_key)
+    fallback_value=get_default_ssh_private_key
+)
 
-PYTHON_CI_CONTAINERS_REPO_URL = "git@bitbucket.org:pyci/python-ci-containers.git"
+PYTHON_CI_CONTAINERS_REPO_URL = "git@github.com:pyci/python-ci-runner.git"
 TEMP_REPO_CLONE_PATH = ci_temp_files_directory.joinpath("python-ci-containers-clone")
 TOOLKIT_VERSION_DEFINITION_REGEX = re.compile('(python-ci-toolkit==".*")', flags=re.UNICODE)
 
