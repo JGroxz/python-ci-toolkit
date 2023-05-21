@@ -277,7 +277,7 @@ def _print_action_header(action_name: str, action_version: str, action_source: s
                 f"     CI toolkit version: [blue]{version}[/]\n"
                 f"     CI environment: [blue]{ci_environment_name}[/]\n"
                 f"     Action version: [blue]{action_version}[/]\n"
-                f"     Action source: {action_source}", extra={"markup": True, "highlighter": None})
+                f"     Action source: [blue]{action_source}[/]", extra={"markup": True, "highlighter": None})
 
 
 @contextmanager
@@ -375,8 +375,7 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
         try:
             action_module = import_module_from_file(f"{action_name}", action_script_path)
         except Exception:
-            logger.error(
-                f"Error when importing Python module from action script '{action_script_path}' (action '{action_display_name}' from {action_source}).")
+            logger.error(f"Error when importing Python module from action script '{action_script_path}' (action '{action_display_name}' from {action_source}).")
             raise
     logger.debug("Import completed.")
 
