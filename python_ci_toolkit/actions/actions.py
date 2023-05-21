@@ -17,7 +17,7 @@ from rich.progress import Progress
 from .. import environment
 from ..environment.info import get_ci_environment_name
 from ..environment.paths import ci_files_directory, ci_project_root, _ci_temp_files_shared_directory
-from ..environment.variables import assert_environment_variable_set, assert_multiline_environment_variable_set
+from ..environment.variables import retrieve_environment_variable
 from ..git import git_ssh_credentials, get_default_ssh_private_key
 from ..logging import get_logger, ci_output_console
 from ..pip import ensure_requirements_installed
@@ -26,7 +26,7 @@ from ..shell import run_shell_command
 
 # Constants
 ACTION_VERSION_SEPARATOR = "@"
-DEFAULT_ACTION_REPO_URL = "git@bitbucket.org:pyci/python-ci-actions.git"
+DEFAULT_ACTION_REPO_URL = "git@github.com:pyci/python-ci-actions.git"
 DOWNLOADED_ACTION_REPOS_DIRECTORY = _ci_temp_files_shared_directory / "downloaded_action_repos"
 LOCAL_ACTIONS_DIRECTORY = ci_files_directory / "actions"
 
@@ -330,14 +330,16 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
             start_time = time.perf_counter()
 
             # Git repo
-            actions_git_repo_url = assert_environment_variable_set(
+            actions_git_repo_url = retrieve_environment_variable(
                 "PYTHON_CI_ACTIONS_GIT_REPO_URL",
                 f"URL address of the Git repository is required to pull the code for action '{action_display_name}'.",
-                fallback_value_getter=lambda: DEFAULT_ACTION_REPO_URL)
-            actions_ssh_private_key = assert_multiline_environment_variable_set(
+                fallback_value=DEFAULT_ACTION_REPO_URL
+            )
+            actions_ssh_private_key = retrieve_environment_variable(
                 "PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY",
                 "SSH private key is required to pull actions from the private remote Git repositories.",
-                fallback_value_getter=get_default_ssh_private_key)
+                fallback_value=get_default_ssh_private_key
+            )
 
             action_script_path = retrieve_ci_action_script_from_git(
                 git_repo_url=actions_git_repo_url,

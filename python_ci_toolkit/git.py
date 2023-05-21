@@ -13,7 +13,7 @@ from pathlib import Path
 
 from git import Repo, GitCommandError
 
-from python_ci_toolkit.environment import ci_environment_type, CiEnvironmentType, assert_environment_variable_set, ci_temp_files_directory
+from python_ci_toolkit.environment import ci_environment_type, CiEnvironmentType, retrieve_environment_variable, ci_temp_files_directory
 
 
 def get_default_ssh_private_key_file_path() -> Path:
@@ -21,7 +21,7 @@ def get_default_ssh_private_key_file_path() -> Path:
     Returns the path to the default location of the private SSH key file on the current system.
     """
     if ci_environment_type == CiEnvironmentType.BitbucketPipelines:
-        bitbucket_ssh_key_path = assert_environment_variable_set(
+        bitbucket_ssh_key_path = retrieve_environment_variable(
             "BITBUCKET_SSH_KEY_FILE",
             "This variable is only available for pipelines running on Bitbucket Cloud and the Linux Docker Pipelines runner. "
             "See https://support.atlassian.com/bitbucket-cloud/docs/variables-and-secrets/.")

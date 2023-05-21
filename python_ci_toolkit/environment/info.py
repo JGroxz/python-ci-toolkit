@@ -19,7 +19,7 @@ class CiEnvironmentType(Enum):
     """GitHub Actions"""
 
 
-def get_current_ci_environment() -> CiEnvironmentType:
+def get_ci_environment_type() -> CiEnvironmentType:
     """
     Tries to detect current CI environment type.
 
@@ -33,6 +33,15 @@ def get_current_ci_environment() -> CiEnvironmentType:
         return CiEnvironmentType.GitHubActions
 
     return CiEnvironmentType.Unknown
+
+
+ci_environment_type = get_ci_environment_type()
+"""
+Type of the current CI environment (e.g. CiEnvironmentType.BitbucketPipelines).
+
+Notes:
+    See CiEnvironmentType enum for all supported CI environment types. 
+"""
 
 
 def get_ci_environment_name() -> str:
@@ -50,10 +59,7 @@ def get_ci_environment_name() -> str:
         return "Unknown/Local"
 
 
-ci_environment_type = get_current_ci_environment()
+ci_environment_name = get_ci_environment_name()
 """
-Type of the current CI environment (e.g. BitbucketPipelines).
-
-Notes:
-    See CiEnvironmentType enum for all supported CI environment types. 
+Name of the current CI environment (e.g. "Bitbucket Pipelines").
 """
