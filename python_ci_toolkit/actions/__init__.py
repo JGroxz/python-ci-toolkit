@@ -1,3 +1,1 @@
-from .actions import run_ci_action, cli
-
-__all__ = ["run_ci_action", "cli"]
+from .actions import run_ci_action, get_action_logger
