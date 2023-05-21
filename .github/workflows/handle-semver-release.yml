@@ -1,0 +1,9 @@
+name: "Create release version"
+
+on: workflow_dispatch
+
+jobs:
+  handle-semver-release:
+    name: Create release version
+    uses: pyci/.github/.github/workflows/handle-semver-release.yml@main
+    secrets: inherit

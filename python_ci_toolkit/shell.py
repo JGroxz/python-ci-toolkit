@@ -8,12 +8,14 @@ import shlex
 import subprocess
 import threading
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Tuple
 
 from rich.style import Style
 from rich.table import Table
 from rich.text import Text
+
+_IS_ON_WINDOWS = (os.name == "nt")
 
 SHELL_OUTPUT_PREFIX_WIDTH_MIN = 15
 SHELL_OUTPUT_PREFIX_WIDTH_MAX = 26
@@ -21,15 +23,68 @@ SHELL_OUTPUT_PREFIX_STYLE = Style(color="blue")
 SHELL_OUTPUT_COMMAND_STYLE = Style(color="deep_sky_blue4", italic=True)
 SHELL_OUTPUT_STDERR_STYLE = Style(color="red")
 
-ci_console = None
+_output_console = None
+
+
+@dataclass
+class ShellCommandResult:
+    """
+    Result of executing a shell command.
+    """
+    command: str
+    """Command that was executed."""
+    exit_code: int
+    """Exit code of the command."""
+    output: str
+    """Captured raw output of the command."""
+
+    @property
+    def is_successful(self) -> bool:
+        """
+        Returns True if the command completed successfully (exit code is 0), False otherwise.
+        """
+        return self.exit_code == 0
+
+    @property
+    def is_failed(self) -> bool:
+        """
+        Returns True if the command failed (exit code is non-zero), False otherwise.
+        """
+        return not self.is_successful
+
+    @property
+    def output_lines(self) -> list[str]:
+        """
+        Captured output of the command split into lines.
+        """
+        return self.output.splitlines()
+
+    @property
+    def output_stripped(self) -> str:
+        """
+        Captured output of the command with leading and trailing whitespaces and newlines removed.
+        """
+        return self.output.strip(" \n")
+
+    @property
+    def output_value(self) -> str | None:
+        """
+        Similar to output_stripped, but returns None if the stripped output is an empty string.
+
+        Notes:
+            Useful when the output of the command is expected to be a single-line string which has to be used in further logic.
+        """
+        stripped = self.output_stripped
+
+        return stripped if (stripped != "") else None
 
 
 def run_shell_command(command: str,
                       cwd: str | Path = os.getcwd(),
-                      silence_output: bool = False,
                       raw_output: bool = False,
-                      throw_exception_on_error: bool = True,
-                      use_wsl_on_windows: bool = True) -> Tuple[int, str]:
+                      silence_output: bool = False,
+                      raise_on_error: bool = True,
+                      use_wsl_on_windows: bool = True) -> ShellCommandResult:
     """
     Executes the given command in a subprocess.
 
@@ -39,11 +94,11 @@ def run_shell_command(command: str,
     Args:
         command: Command to execute.
         cwd: Working directory to execute the command in. Defaults to current working directory.
-        silence_output: If set to True, command output will be suppressed.
         raw_output: If set to True, the output from the executed command will be printed as is.
-            If set to False, the output will be printed with pretty Rich formatting through ci_console.
+            If set to False, the output will be printed with pretty Rich formatting through ci_output_console.
             Has effect only with 'silence_output' set to False.
-        throw_exception_on_error: If set to True (default), an exception will be thrown if the executed command exits with a non-zero exit code.
+        silence_output: If set to True, command output will be suppressed.
+        raise_on_error: If set to True (default), an exception will be thrown if the executed command exits with a non-zero exit code.
         use_wsl_on_windows: If set to True (default) and running on Windows, the provided command will be run in WSL.
 
     Returns:
@@ -55,20 +110,20 @@ def run_shell_command(command: str,
     """
 
     # lazy-initialize CI console if using pretty output
-    global ci_console
-    if (not silence_output) and (not raw_output) and (ci_console is None):
-        from .console import ci_console as c
-        ci_console = c
+    global _output_console
+    if (not silence_output) and (_output_console is None):
+        from .logging import ci_output_console
+        _output_console = ci_output_console
 
     # use WSL if required on Windows
-    if os.name == "nt" and use_wsl_on_windows:
+    if _IS_ON_WINDOWS and use_wsl_on_windows:
         command = f"wsl {command}"
 
     # print header if using pretty output
     if (not silence_output) and (not raw_output):
         header = Text("Running shell command:", style=SHELL_OUTPUT_PREFIX_STYLE) + " " + Text(f"{command}",
                                                                                               style=SHELL_OUTPUT_COMMAND_STYLE)
-        ci_console.print(header)
+        _output_console.print(header)
 
     # prepare command args
     args = shlex.split(command)
@@ -93,7 +148,7 @@ def run_shell_command(command: str,
                 lock.acquire()
                 decoded_line = decoded_line.rstrip(" \n")
                 if raw_output:
-                    print(decoded_line)
+                    _output_console.print(decoded_line)
                 else:
                     grid = Table.grid()
                     grid.add_column(style=SHELL_OUTPUT_PREFIX_STYLE, min_width=SHELL_OUTPUT_PREFIX_WIDTH_MIN,
@@ -105,7 +160,7 @@ def run_shell_command(command: str,
                         (decoded_line if (not stderr) else Text(decoded_line, style=SHELL_OUTPUT_STDERR_STYLE))
                     )
                     # noinspection PyUnresolvedReferences
-                    ci_console.print(grid, end="")
+                    _output_console.print(grid, end="")
                 lock.release()
 
     # run the shell command and capture its output
@@ -113,12 +168,12 @@ def run_shell_command(command: str,
     with process.stdout, process.stderr:
         # we read stdout and stderr in threads to be able to print live logs from both streams concurrently
         with ThreadPoolExecutor(max_workers=2) as executor:
-            executor.submit(capture_subprocess_output, process.stdout)
+            executor.submit(capture_subprocess_output, process.stdout, stderr=False)
             executor.submit(capture_subprocess_output, process.stderr, stderr=True)
             executor.shutdown(wait=True)
-    exitcode = process.wait()
+    exit_code = process.wait()
 
-    if (exitcode != 0) and throw_exception_on_error:
+    if (exit_code != 0) and raise_on_error:
         if silence_output:
             output_string = (f"  Output:\n"
                              f"    ↓ ↓ ↓ Command output start ↓ ↓ ↓\n"
@@ -127,9 +182,13 @@ def run_shell_command(command: str,
         else:
             output_string = "  Output of the command can be seen before the stacktrace above."
 
-        raise RuntimeError(f"Error executing command (exit code {exitcode})\n"
+        raise RuntimeError(f"Error executing command (exit code {exit_code})\n"
                            f"  Command:\n"
                            f"    {command}\n"
                            f"{output_string}")
 
-    return exitcode, captured_output
+    return ShellCommandResult(
+        command=command,
+        exit_code=exit_code,
+        output=captured_output
+    )
