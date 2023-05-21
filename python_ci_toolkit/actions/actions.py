@@ -302,7 +302,7 @@ def loading_animation(description: str) -> None:
             yield  # <- within this context, clone repos, install requirements etc.
     else:
         # cloud environments normally don't support erasing terminal output,
-        # so progres bars get messed up; in this case we don't display them
+        # so progress bars get messed up; in this case we don't display them
         yield
 
 
