@@ -1,7 +1,7 @@
 """
 Miscellaneous utility functions of the actions package.
 """
-
+import hashlib
 import time
 
 from ..logging import get_logger
@@ -22,3 +22,10 @@ def timeit(func):
         return result
 
     return wrapped
+
+
+def hash_string(string: str) -> str:
+    """
+    Returns a hash of the given string.
+    """
+    return hashlib.md5(string.encode()).hexdigest()
