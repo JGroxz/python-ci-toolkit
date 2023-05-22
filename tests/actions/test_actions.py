@@ -4,7 +4,8 @@ from python_ci_toolkit.shell import run_shell_command
 
 
 def test_retrieve_action_repo():
-    from python_ci_toolkit.actions._retrieval import retrieve_action_repo, DEFAULT_ACTION_REPO_URL
+    from python_ci_toolkit.actions._constants import DEFAULT_ACTION_REPO_URL
+    from python_ci_toolkit.actions._retrieval._remote import retrieve_action_repo
     from python_ci_toolkit.git import get_default_ssh_private_key
 
     start = time.perf_counter()
@@ -44,7 +45,8 @@ def test_retrieve_ci_action_script_from_git():
 
 
 def test_list_actions_in_directory():
-    from python_ci_toolkit.actions._retrieval import list_actions_in_directory, DOWNLOADED_ACTION_REPOS_DIRECTORY
+    from python_ci_toolkit.actions._constants import DOWNLOADED_ACTION_REPOS_DIRECTORY
+    from python_ci_toolkit.actions._retrieval._local import list_actions_in_directory
 
     # local_actions = list_actions_in_directory(LOCAL_ACTIONS_DIRECTORY)
     # print(local_actions)

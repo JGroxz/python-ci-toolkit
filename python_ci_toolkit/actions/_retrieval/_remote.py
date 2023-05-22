@@ -1,46 +1,19 @@
 """
-Functions for locating and retrieving local and remote action files.
+Functions for retrieving actions from remote sources.
 """
-import glob
+
 import hashlib
 import logging
-import os
 import sys
-import time
 from pathlib import Path
 
-from ..actions._constants import DOWNLOADED_ACTION_REPOS_DIRECTORY, ACTION_VERSION_SEPARATOR, LOCAL_ACTIONS_DIRECTORY, DEFAULT_ACTION_REPO_URL
-from ..actions._logging import loading_animation, get_action_display_name
-from ..actions._utils import timeit
-from ..environment import retrieve_environment_variable
-from ..git import git_ssh_credentials, get_default_ssh_private_key
-from ..shell import run_shell_command
+from .._constants import DOWNLOADED_ACTION_REPOS_DIRECTORY
+from .._logging import get_action_display_name
+from .._utils import timeit
+from ...git import git_ssh_credentials
+from ...shell import run_shell_command
 
 logger = logging.getLogger(__name__)
-
-
-def list_actions_in_directory(directory: Path) -> list[Path]:
-    """
-    Lists all action scripts available in the given directory.
-
-    Args:
-        directory: Directory to search for actions in.
-
-    Returns:
-        List of absolute paths of the located action scripts.
-    """
-    # find all 'simple' action scripts; these are scripts that are individual Python files
-    simple_actions = [Path(p) for p in glob.glob(str(directory / "*.py"))]
-
-    # find all 'complex' action scripts; these are Python scripts nested in the directories with the matching name
-    complex_actions: list[Path] = []
-    child_directories = [Path(x[0]) for x in os.walk(directory) if Path(x[0]) != directory]
-    for child in child_directories:
-        nested_action_script_path = child / f"{child.name}.py"
-        if nested_action_script_path.exists():
-            complex_actions.append(nested_action_script_path)
-
-    return simple_actions + complex_actions
 
 
 def get_clone_directory_from_action_repo_url(git_repo_url: str) -> Path:
@@ -76,28 +49,28 @@ def retrieve_action_repo(git_repo_url: str, ssh_private_key: str = None) -> Path
     """
 
     # prepare downloads directory
-    os.makedirs(DOWNLOADED_ACTION_REPOS_DIRECTORY, exist_ok=True)
+    DOWNLOADED_ACTION_REPOS_DIRECTORY.mkdir(exist_ok=True, parents=True)
 
     # generate local repo path based on remote
     cloned_repo_path = get_clone_directory_from_action_repo_url(git_repo_url)
+
+    # default kwargs for run_shell_command() calls
+    RUN_KWARGS = dict(cwd=cloned_repo_path, silence_output=True, use_wsl_on_windows=False)
 
     with git_ssh_credentials(ssh_private_key):
         if not cloned_repo_path.exists():
             logger.debug(f"Cloning action repo from '{git_repo_url}' to '{cloned_repo_path}'.")
 
             # execute a fresh pull
-            run_shell_command(f'git clone "{git_repo_url}" "{cloned_repo_path}"',
-                              silence_output=True, use_wsl_on_windows=False)
+            run_shell_command(f'git clone "{git_repo_url}" "{cloned_repo_path}"', **RUN_KWARGS)
         else:
             logger.debug(f"Using cached action repo of '{git_repo_url}' from '{cloned_repo_path}'.")
 
         # fetch all available remote branches and tags
-        run_shell_command("git fetch --tags",
-                          cwd=cloned_repo_path, silence_output=True, use_wsl_on_windows=False)
+        run_shell_command("git fetch --tags", **RUN_KWARGS)
 
         # switch existing clone to main branch
-        run_shell_command("git checkout main",
-                          cwd=cloned_repo_path, silence_output=True, use_wsl_on_windows=False)
+        run_shell_command("git checkout main", **RUN_KWARGS)
 
     # check if actions directory is present before returning it
     actions_directory = cloned_repo_path / "actions"
@@ -194,79 +167,3 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
         sys.exit(4)
 
     return action_script_path
-
-
-def retrieve_ci_action_script_local(action_name: str) -> Path:
-    """
-    Tries to locate the given Python CI action in the current CI project's '.ci/actions' directory.
-
-    Args:
-        action_name: Name of the action to locate.
-
-    Returns:
-        Full path to the given action's Python file.
-    """
-    action_file_path = LOCAL_ACTIONS_DIRECTORY / f"{action_name}.py"
-
-    if not action_file_path.exists():
-        raise FileNotFoundError(
-            f"Cannot run action '{action_name}' from local file '{action_file_path}': file does not exist.\n"
-            f"When you run actions in local mode, make sure that the corresponding action file exists in '.ci/actions' folder in your CI project's root.")
-
-    return action_file_path
-
-
-@timeit
-def retrieve_ci_action_script(action_name: str, action_version: str = None) -> (Path, str):
-    """
-    Retrieves the given CI action script from the local '.ci/actions' folder or from a remote Git repository.
-
-    Args:
-        action_name: Name of the action to retrieve.
-        action_version: Version of the action to retrieve. Can be either a Git branch or a Git tag in the source repository, or "local" for local actions.
-
-    Returns:
-        Tuple of the action script's full path and the action's display name (name + version).
-    """
-    action_display_name = get_action_display_name(action_name, action_version)
-
-    if action_version == "local":
-        # local folder
-        action_script_path = retrieve_ci_action_script_local(action_name)
-        action_source = f"'{action_script_path}'"
-        logger.debug(f"Retrieved local action '{action_name}'.")
-    else:
-        # TODO: retrieve from cache here if available
-        cached = False
-        if cached:
-            raise NotImplementedError("Retrieving actions from cache is not implemented yet.")
-        else:
-            with loading_animation(f"Retrieving action from Git"):
-                start_time = time.perf_counter()
-
-                # Git repo
-                actions_git_repo_url = retrieve_environment_variable(
-                    "PYTHON_CI_ACTIONS_GIT_REPO_URL",
-                    f"URL address of the Git repository is required to pull the code for action '{action_display_name}'.",
-                    fallback_value=DEFAULT_ACTION_REPO_URL
-                )
-                actions_ssh_private_key = retrieve_environment_variable(
-                    "PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY",
-                    "SSH private key is required to pull actions from the private remote Git repositories.",
-                    fallback_value=get_default_ssh_private_key
-                )
-
-                action_script_path = retrieve_ci_action_script_from_git(
-                    git_repo_url=actions_git_repo_url,
-                    action_name=action_name,
-                    action_version=action_version,
-                    ssh_private_key=actions_ssh_private_key
-                )
-
-                action_source = f"'{action_version}' at '{actions_git_repo_url}'"
-
-                duration = time.perf_counter() - start_time
-
-            logger.info(f"Retrieved action '{action_display_name}' from Git in {duration:.3f} seconds.")
-
-    return action_script_path, action_source
