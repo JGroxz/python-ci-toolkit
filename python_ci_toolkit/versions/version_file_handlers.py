@@ -12,14 +12,34 @@ from semver import VersionInfo
 
 @dataclasses.dataclass
 class VersionFileHandler:
+    """
+    Base class for version file handlers.
+    """
 
     def read_version(self, file_path: Path) -> VersionInfo:
-        with open(file_path, "r") as file:
+        """
+        Reads the version from the given file.
+
+        Args:
+            file_path: Path to the file to read the version from.
+
+        Returns:
+            VersionInfo read from the file.
+        """
+        with file_path.open("r") as file:
             contents = file.read()
             return self._read_version_from_file_contents(contents)
 
     def write_version(self, file_path: Path, new_version: VersionInfo) -> None:
-        with open(file_path, "r+") as file:
+        """
+        Writes the given version to the given file.
+
+        Args:
+            file_path: Path to the file to write the version to.
+            new_version: Version to write to the file.
+        """
+
+        with file_path.open("r+") as file:
             contents = file.read()
             updated_contents = self._update_version_from_file_contents(contents, new_version)
             file.seek(0)
@@ -51,7 +71,8 @@ class PyProjectVersionFileHandler(VersionFileHandler):
         self._set_nested_dict_key(project_config, ["tool", "poetry", "version"], version_string)
         return toml.dumps(project_config)
 
-    def _set_nested_dict_key(self, dictionary, keys, value):
+    @staticmethod
+    def _set_nested_dict_key(dictionary, keys, value):
         for key in keys[:-1]:
             dictionary = dictionary.setdefault(key, {})
         dictionary[keys[-1]] = value
@@ -72,7 +93,7 @@ class PackageJsonVersionFileHandler(VersionFileHandler):
     def _update_version_from_file_contents(self, file_contents: str, new_version: VersionInfo) -> str:
         project_config = json.loads(file_contents)
         version_string = f"{new_version}"
-        project_config.setdefault("version", version_string)
+        project_config["version"] = version_string
         return json.dumps(project_config, indent=2)
 
 

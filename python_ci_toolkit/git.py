@@ -1,19 +1,20 @@
 """
 Utility functions for interacting with remote Git repositories.
 """
+from __future__ import annotations
+
 import io
 import logging
 import os
+import shutil
+import stat
+import uuid
+from contextlib import contextmanager
 from pathlib import Path
 
 from git import Repo, GitCommandError
 
-from python_ci_toolkit.environment import ci_project_root, ci_environment_type, CiEnvironmentType, assert_environment_variable_set
-
-TEMP_PRIVATE_SSH_KEY_FILE_PATH = ci_project_root.joinpath(".ci/temp/ssh_key")
-
-ci_repo = Repo(ci_project_root)
-"""GitPython reference to the local Git repository of the current CI project."""
+from .environment import ci_environment_type, CiEnvironmentType, retrieve_environment_variable, ci_temp_files_directory
 
 
 def get_default_ssh_private_key_file_path() -> Path:
@@ -21,7 +22,7 @@ def get_default_ssh_private_key_file_path() -> Path:
     Returns the path to the default location of the private SSH key file on the current system.
     """
     if ci_environment_type == CiEnvironmentType.BitbucketPipelines:
-        bitbucket_ssh_key_path = assert_environment_variable_set(
+        bitbucket_ssh_key_path = retrieve_environment_variable(
             "BITBUCKET_SSH_KEY_FILE",
             "This variable is only available for pipelines running on Bitbucket Cloud and the Linux Docker Pipelines runner. "
             "See https://support.atlassian.com/bitbucket-cloud/docs/variables-and-secrets/.")
@@ -47,18 +48,23 @@ def get_default_ssh_private_key() -> str | None:
     return default_ssh_key
 
 
-def prepare_git_ssh(ssh_private_key: str = None) -> None:
+@contextmanager
+def git_ssh_credentials(ssh_private_key: str = None) -> None:
     """
-    Configures Git to use the provided private SSH key when interacting with remote repositories
+    Context manager that configures Git to use the provided private SSH key when interacting with remote repositories
     by setting 'GIT_SSH_COMMAND' variable.
 
     Notes:
         This generates a temporary key file at '.ci/temp/ssh_key' at the current CI project root.
-        To clean up this file after you are done, call 'reset_git_ssh()'.
+        This file is automatically deleted when this context manager exits.
 
     Args:
         ssh_private_key: Private SSH key to use with Git.
     """
+    # Save current GIT_SSH_COMMAND
+    original_git_ssh_command = os.environ.get("GIT_SSH_COMMAND", default="")
+
+    # In case SSH key is not provided, try retrieving a default one
     if (ssh_private_key is None) or (ssh_private_key == ""):
         # Try to retrieve the default SSH key
         logging.info("Private SSH key string is not provided, trying to locate SSH keys file in the default directory...")
@@ -73,35 +79,41 @@ def prepare_git_ssh(ssh_private_key: str = None) -> None:
             logging.info(f"Default private SSH key loaded successfully from '{default_path}'.")
 
     # Make sure that temporary folder for the key file exists
-    os.makedirs(os.path.dirname(TEMP_PRIVATE_SSH_KEY_FILE_PATH), exist_ok=True)
+    temp_private_ssh_key_file_path = ci_temp_files_directory.joinpath("ssh", f"{uuid.uuid4()}")
+    os.makedirs(os.path.dirname(temp_private_ssh_key_file_path), exist_ok=True)
 
-    # Save Git SSH key to file
-    with io.open(TEMP_PRIVATE_SSH_KEY_FILE_PATH, "w", newline="\n") as file:
-        file.write(ssh_private_key)
+    try:
+        # Save Git SSH key to file
+        with io.open(temp_private_ssh_key_file_path, "w", newline="\n") as file:
+            file.write(ssh_private_key)
 
-    # Adjust SSH key permissions on UNIX-like systems to prevent 'ssh' command from complaining
-    if os.name == "posix":
-        os.chmod(TEMP_PRIVATE_SSH_KEY_FILE_PATH, 0o600)
+        # Adjust SSH key permissions on UNIX-like systems to prevent 'ssh' command from complaining
+        if os.name == "posix":
+            os.chmod(temp_private_ssh_key_file_path, 0o600)
 
-    # Tell Git to use the new SSH key file
-    os.environ["GIT_SSH_COMMAND"] = f'ssh -i "{TEMP_PRIVATE_SSH_KEY_FILE_PATH}" -o IdentitiesOnly=yes'
+        # Tell Git to use the new SSH key file
+        os.environ["GIT_SSH_COMMAND"] = f'ssh -i "{temp_private_ssh_key_file_path}" ' \
+                                        f'-o IdentitiesOnly=yes ' \
+                                        f'-o StrictHostKeyChecking=accept-new'
 
+        yield  # <- within this context, clone repos, push changes etc.
+    except Exception:
+        raise
+    finally:
+        # Restore original GIT_SSH_COMMAND
+        os.environ["GIT_SSH_COMMAND"] = original_git_ssh_command
 
-def reset_git_ssh() -> None:
-    """
-    Removes temporary private SSH key file created by 'prepare_git_ssh()' command and resets 'GIT_SSH_COMMAND' environment variable.
-    """
-    # Reset environment variable
-    os.environ["GIT_SSH_COMMAND"] = ""
-
-    # Clean up the file; this will throw an error if the file cannot be deleted due to permissions etc.
-    if TEMP_PRIVATE_SSH_KEY_FILE_PATH.exists():
-        os.remove(TEMP_PRIVATE_SSH_KEY_FILE_PATH)
+        # Clean up the temporary key file; this will throw an error if the file cannot be deleted due to permissions etc.
+        if temp_private_ssh_key_file_path.exists():
+            os.remove(temp_private_ssh_key_file_path)
 
 
 def ensure_remote_is_ssh(repo: Repo) -> None:
     """
     Makes sure that the remote origin repository's address is in SSH format.
+
+    Notes:
+        If the remote's URL is in HTTP(S) format, this function will automatically convert it to SSH.
 
     Args:
         repo: Repository to check the origin in.
@@ -111,8 +123,8 @@ def ensure_remote_is_ssh(repo: Repo) -> None:
     remote_url = repo.remote().url
 
     if remote_url.startswith("git"):
-        # It's and SSH address, all good
-        logging.info(f"Remote '{remote_url}' is an SSH address. Proceeding.")
+        # It's an SSH address, all good
+        logging.info(f"Remote '{remote_url}' is already an SSH address.")
         return
 
     logging.warning(f"Remote '{remote_url}' is an HTTP(S) address.")
@@ -129,7 +141,7 @@ def ensure_remote_is_ssh(repo: Repo) -> None:
         # If this command failed, Git LFS is not installed; in this case, we don't care
         pass
 
-    # Convert origin remote URL to SSH format
+    # Convert origin remote URL into SSH format
     logging.info("Converting remote URL into SSH format...")
 
     host = remote_url.split("://")[1].split("@")[-1].split("/")[0]
@@ -140,14 +152,68 @@ def ensure_remote_is_ssh(repo: Repo) -> None:
 
     # Update remote URL
     repo.remote().set_url(ssh_remote_url)
-    logging.info(f"Updated remote URL: '{ssh_remote_url}'")
+    logging.info(f"Updated remote URL: '{ssh_remote_url}'.")
 
 
 def ensure_remote_is_https(repo: Repo) -> None:
     """
-    Makes sure that the remote origin repository's address is in SSH format.
+    Makes sure that the remote origin repository's address is in HTTPS format.
+
+    Notes:
+        If the remote's URL is in SSH format, this function will automatically convert it to HTTPS.
 
     Args:
         repo: Repository to check the origin in.
     """
-    raise NotImplementedError
+    logging.info("Checking remote address...")
+
+    remote_url = repo.remote().url
+
+    if remote_url.startswith("http"):
+        if not remote_url.startswith("https"):
+            # It's an HTTP address, just make sure its HTTPS
+            logging.info("Remote URL uses HTTP. Switching to HTTPS...")
+            https_remote_url = remote_url.replace("http", "https", 1)
+            repo.remote().set_url(https_remote_url)
+            logging.info(f"Updated remote URL: '{https_remote_url}'.")
+        else:
+            # All good
+            logging.info(f"Remote '{remote_url}' is an HTTPS address.")
+        return
+
+    logging.warning(f"Remote '{remote_url}' is an SSH address.")
+
+    # Convert origin remote URL into HTTPS format
+    logging.info("Converting remote URL into HTTPS format...")
+
+    host = remote_url.split("@")[1].split(":")[0]
+    user_name = remote_url.split("@")[1].split(":")[1].split("/")[0]
+    repository_name = remote_url.split("@")[1].split(":")[1].split("/")[1]
+
+    https_remote_url = f"https://{host}/{user_name}/{repository_name}"
+
+    # Update remote URL
+    repo.remote().set_url(https_remote_url)
+    logging.info(f"Updated remote URL: '{https_remote_url}'.")
+
+
+def delete_git_repo(repo_path: Path) -> None:
+    """
+    Deletes Git repository in the given folder.
+
+    Notes:
+        Deleting Git directory requires special treatment, because a normal shutil.rmtree() call can fail
+        because of certain files in .git folder which get marked as read-only when cloning.
+
+    Args:
+        repo_path: Path to the Git repository's folder.
+    """
+    if not repo_path.exists():
+        return
+
+    def on_rm_error(func, path, exc_info):
+        # from: https://stackoverflow.com/a/4829285
+        os.chmod(path, stat.S_IWRITE)
+        os.unlink(path)
+
+    shutil.rmtree(repo_path, onerror=on_rm_error)
