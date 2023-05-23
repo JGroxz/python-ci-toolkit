@@ -5,7 +5,7 @@ import logging
 import os
 from typing import Callable
 
-from python_ci_toolkit.environment import CiEnvironmentType, ci_environment_type
+from ..environment import CiEnvironmentType, ci_environment_type
 
 logger = logging.getLogger(__name__)
 

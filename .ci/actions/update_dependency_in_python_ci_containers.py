@@ -11,7 +11,7 @@ from pathlib import Path
 
 from git import Repo
 
-from python_ci_toolkit.actions.actions import get_action_logger
+from python_ci_toolkit.actions import get_action_logger
 from python_ci_toolkit.environment import retrieve_environment_variable, ci_project_root, ci_temp_files_directory
 from python_ci_toolkit.git import delete_git_repo
 from python_ci_toolkit.git import get_default_ssh_private_key, git_ssh_credentials
@@ -89,6 +89,12 @@ def update_self_dependency_version_in_dockerfile(containers_repo: Repo) -> None:
 
 
 def cli() -> None:
+    current_toolkit_version = versions.read_project_version(ci_project_root)
+    if current_toolkit_version.prerelease:
+        logger.info(f"Currently checked out toolkit version ('{current_toolkit_version}') is a pre-release.\n"
+                    f"  No need to update the containers repo.")
+        raise SystemExit(0)
+
     with git_ssh_credentials(PYTHON_CI_PUSH_SSH_PRIVATE_KEY):
         logger.info("Cloning containers repo...")
         containers_repo = clone_python_ci_containers_repo()
