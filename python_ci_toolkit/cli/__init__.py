@@ -1,3 +1,5 @@
+import os
+
 import rich_click as click
 from click import Context
 from rich import print  # type: ignore
@@ -40,7 +42,8 @@ def cli(ctx: Context, debug: bool = False, purge_caches: bool = False) -> None:
 
     # initialize logging
     from ..logging import configure_ci_logging
-    configure_ci_logging("DEBUG" if debug else "INFO")
+    is_debug_enabled = (debug or os.environ.get("DEBUG", None))
+    configure_ci_logging("DEBUG" if is_debug_enabled else "INFO")
 
     # purge caches if necessary
     if purge_caches:
