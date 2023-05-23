@@ -15,12 +15,10 @@ def purge_ci_toolkit_caches() -> None:
     """
     Deletes cache directories used by the toolkit to store temporary files.
     """
-    from python_ci_toolkit.environment.paths import _ci_temp_files_root_directory
+    print(f":boom: Purging toolkit's cache directories...")
 
-    print(f":boom: Purging cache directory '{_ci_temp_files_root_directory}'...")
-
-    from python_ci_toolkit.git import delete_git_repo
-    delete_git_repo(_ci_temp_files_root_directory)  # <- we use this to delete the caches because it can handle deleting Git repos which may be present inside
+    from ..environment.paths import purge_temporary_files
+    purge_temporary_files()
 
     print(":white_check_mark: Caches successfully purged!")
 
@@ -41,7 +39,7 @@ def cli(ctx: Context, debug: bool = False, purge_caches: bool = False) -> None:
     """
 
     # initialize logging
-    from python_ci_toolkit.logging import configure_ci_logging
+    from ..logging import configure_ci_logging
     configure_ci_logging("DEBUG" if debug else "INFO")
 
     # purge caches if necessary
