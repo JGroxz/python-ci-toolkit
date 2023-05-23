@@ -3,16 +3,58 @@ Provides functions to retrieve and run CI actions based on Python scripts.
 """
 
 import sys
+from dataclasses import dataclass
+from types import ModuleType
 from typing import List
 
 from .retrieval import retrieve_ci_action_script
 from .retrieval.sources.git.caching import reset_action_cache_timestamp
+from .utils import Stopwatch
 from .utils.logging import loading_animation, print_action_header, get_action_display_name
 from ..logging import get_logger
 from ..pip import ensure_requirements_installed
 from ..python import import_module_from_file
 
 logger = get_logger(__name__)
+
+
+@dataclass
+class ActionRunResult:
+    """
+    Represents the result of a CI action run.
+    """
+    exception: BaseException = None
+
+    @property
+    def is_successful(self) -> bool:
+        """
+        Returns whether the action run was successful.
+        """
+        no_exceptions = self.exception is None
+        clean_exit = isinstance(self.exception, SystemExit) and self.exception.code == 0
+
+        return no_exceptions or clean_exit
+
+
+def execute_action_module(action_module: ModuleType,
+                          action_name: str,
+                          action_version: str) -> ActionRunResult:
+    action_display_name = get_action_display_name(action_name, action_version)
+
+    # check if the action module has a cli() method
+    if not hasattr(action_module, "cli"):
+        logger.critical(f"Action '{action_display_name}' does not have a 'cli()' method, so it won't be executed.\n"
+                        f"Please make sure that the action module has a 'cli()' method which serves as an entry point for the action logic.")
+        sys.exit(1)
+
+    # run the action
+    action_exception = None
+    try:
+        action_module.cli()
+    except BaseException as e:
+        action_exception = e
+
+    return ActionRunResult(exception=action_exception)
 
 
 def run_ci_action(action_name: str, action_version: str = None, argv: List[str] = None) -> None:
@@ -45,21 +87,34 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
     if argv is not None:
         sys.argv.extend(argv)
 
-    # run CI action using its cli() method with the given arguments
+    # import action's Python module
     logger.debug(f"Importing Python module of the action '{action_name}'...")
-    with loading_animation("Importing action's Python module..."):
+    with loading_animation("Importing action's Python module..."), Stopwatch() as import_stopwatch:
         try:
             action_module = import_module_from_file(f"{action_name}", action_script_path)
         except Exception:
             logger.error(f"Error when importing Python module from action script '{action_script_path}' (action '{action_display_name}' from {action_source}).")
             raise
-    logger.debug("Import completed.")
+    logger.debug(f"Import completed in {import_stopwatch.elapsed_time_str}.")
 
+    # run CI action using its cli() method with the given arguments
     print_action_header(action_name, action_version, action_source)
 
-    with loading_animation(f"[rgb(146,202,85)]Running CI action '{action_display_name}'"):
-        action_module.cli()
+    with loading_animation(f"[rgb(146,202,85)]Running CI action '{action_display_name}'"), Stopwatch() as run_stopwatch:
+        run_result = execute_action_module(action_module, action_name, action_version)
 
-    # reset cache timer after each successful action run
+    if not run_result.is_successful:
+        # action failed, raise the exception
+        try:
+            raise run_result.exception
+        finally:
+            logger.critical(f"[red]'{action_display_name}' action run failed in {run_stopwatch.elapsed_time_str} ({type(run_result.exception).__name__}).[/]",
+                            extra={"markup": True, "highlighter": None})
+
+    # action completed successfully
+    logger.info(f"[rgb(146,202,85)]'{action_display_name}' action run completed in {run_stopwatch.elapsed_time_str}.[/]",
+                extra={"markup": True, "highlighter": None})
+
+    # reset cache timestamps after each successful action run
     # to allow chaining actions from the same repo without re-downloading them
     reset_action_cache_timestamp(action_name, action_version)

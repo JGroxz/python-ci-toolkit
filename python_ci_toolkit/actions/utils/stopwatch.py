@@ -50,3 +50,13 @@ class Stopwatch(contextlib.AbstractContextManager):
             If the context has already exited, returns the time elapsed between the context's creation and its exit.
         """
         return self.elapsed_time * 1000
+
+    @property
+    def elapsed_time_str(self) -> str:
+        """
+        Returns the elapsed time as a pretty string.
+        """
+        if self.elapsed_time >= 1:
+            return f"{self.elapsed_time:.3f} s"
+        else:
+            return f"{self.elapsed_time_ms:.0f} ms"

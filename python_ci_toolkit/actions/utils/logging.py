@@ -73,7 +73,10 @@ def loading_animation(description: str) -> None:
 
             # TODO: add thread which will update description of the task with a timer if it takes longer than 10 s
 
-            yield  # <- within this context, clone repos, install requirements etc.
+            try:
+                yield  # <- within this context, clone repos, install requirements etc.
+            except Exception:
+                raise
     else:
         # cloud environments normally don't support erasing terminal output,
         # so progress bars get messed up; in this case we don't display them
