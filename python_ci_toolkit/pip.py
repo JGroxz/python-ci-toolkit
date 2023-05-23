@@ -1,7 +1,6 @@
 """
 Utility functions for managing Python PIP packages.
 """
-import io
 from pathlib import Path
 
 import pkg_resources
@@ -20,8 +19,8 @@ def install_package(package_name: str, silence_pip_stdout: bool = False) -> None
     Raises:
         RuntimeError if package installation fails.
     """
-    error, _ = run_shell_command(f"pip install {package_name}", silence_output=silence_pip_stdout, use_wsl_on_windows=False)
-    if error:
+    result = run_shell_command(f"pip install {package_name}", silence_output=silence_pip_stdout, use_wsl_on_windows=False)
+    if result.is_failed:
         raise RuntimeError(f"Failed to install PIP package '{package_name}'.")
 
 
