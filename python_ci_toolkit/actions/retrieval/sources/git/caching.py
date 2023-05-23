@@ -123,7 +123,7 @@ def reset_action_cache_timestamp(action_name: str, action_version: str):
     action_repo_timestamps_directory = timestamp_file_path.parent
     for action_timestamp_file in action_repo_timestamps_directory.iterdir():
         reset_file_timestamp(action_timestamp_file)
-        logger.debug(f"Successfully reset cache timestamp for action '{get_action_display_name(action_name, action_version)}'.")
+        logger.debug(f"Successfully reset cache timestamp for action '{get_action_display_name(action_timestamp_file.stem, action_version)}'.")
 
 
 def is_action_cache_fresh(action_name: str, action_version: str) -> bool:
