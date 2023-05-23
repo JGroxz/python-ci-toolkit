@@ -5,6 +5,8 @@ import time
 from types import TracebackType
 from typing import Type
 
+import math
+
 
 class Stopwatch(contextlib.AbstractContextManager):
     """
@@ -56,7 +58,13 @@ class Stopwatch(contextlib.AbstractContextManager):
         """
         Returns the elapsed time as a pretty string.
         """
-        if self.elapsed_time >= 1:
+        elapsed_floor = math.floor(self.elapsed_time)
+
+        if elapsed_floor >= 60:
+            return f"{self.elapsed_time / 60:.0f} min {self.elapsed_time % 60:.0f} s"
+        if elapsed_floor >= 10:
+            return f"{self.elapsed_time:.0f} s"
+        if elapsed_floor >= 1:
             return f"{self.elapsed_time:.3f} s"
         else:
             return f"{self.elapsed_time_ms:.0f} ms"
