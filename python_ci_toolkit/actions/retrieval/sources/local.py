@@ -1,11 +1,14 @@
 """
 Functions for retrieving actions from local CI project.
 """
+
 import glob
 import os
 from pathlib import Path
 
-from .._constants import LOCAL_ACTIONS_DIRECTORY
+from ....environment.paths import ci_files_directory
+
+LOCAL_ACTIONS_DIRECTORY = ci_files_directory / "actions"
 
 
 def list_actions_in_directory(directory: Path) -> list[Path]:

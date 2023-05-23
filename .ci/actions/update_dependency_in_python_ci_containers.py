@@ -11,7 +11,7 @@ from pathlib import Path
 
 from git import Repo
 
-from python_ci_toolkit.actions.actions import get_action_logger
+from python_ci_toolkit.actions import get_action_logger
 from python_ci_toolkit.environment import retrieve_environment_variable, ci_project_root, ci_temp_files_directory
 from python_ci_toolkit.git import delete_git_repo
 from python_ci_toolkit.git import get_default_ssh_private_key, git_ssh_credentials

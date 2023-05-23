@@ -14,7 +14,7 @@ from pathlib import Path
 
 from git import Repo, GitCommandError
 
-from python_ci_toolkit.environment import ci_environment_type, CiEnvironmentType, retrieve_environment_variable, ci_temp_files_directory
+from .environment import ci_environment_type, CiEnvironmentType, retrieve_environment_variable, ci_temp_files_directory
 
 
 def get_default_ssh_private_key_file_path() -> Path:

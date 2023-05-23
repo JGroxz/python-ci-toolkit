@@ -1,17 +1,13 @@
 from __future__ import annotations
 
 import logging
-import os
 import re
-import time
 from pathlib import Path
 from typing import List
 
 import rich_click as click
 from click import Context, Argument
 from click.shell_completion import CompletionItem
-
-from python_ci_toolkit.actions.actions import get_clone_directory_from_action_repo_url
 
 _FIRST_COMMENT_REGEX = re.compile(r'"""(?:\n)(.*?)"""', re.MULTILINE | re.UNICODE | re.DOTALL)
 
@@ -40,7 +36,7 @@ _ACTION_AUTOCOMPLETE_REMOTE_CLONE_DELAY_TIME_WINDOW = 30
 
 
 def _validate_action_identifier(ctx: Context, param: Argument, value: str) -> str:
-    from python_ci_toolkit.actions.actions import ACTION_VERSION_SEPARATOR
+    from ..actions.constants import ACTION_VERSION_SEPARATOR
 
     action_identifier = str(value)
 
@@ -69,30 +65,26 @@ def _complete_action_identifier(ctx: Context, param: Argument, incomplete: str):
 
     # determine how much time passed since the last call to this autocompletion function;
     # this is done to avoid cloning the remote action repo on every consecutive call within a specific time window
-    from python_ci_toolkit.environment.paths import _ci_temp_files_shared_directory
-    timestamp_file_path = _ci_temp_files_shared_directory / "cli_actions_last_autocomplete_timestamp"
-    if timestamp_file_path.exists():
-        last_call_timestamp = os.path.getctime(timestamp_file_path)
-        time_since_last_call = time.time() - last_call_timestamp
-    else:
-        timestamp_file_path.touch()
-        time_since_last_call = float("inf")
+    from ..environment.paths.internal import ci_temp_files_shared_directory
+    from ..actions.utils.file_timestamps import time_since_file_timestamp, reset_file_timestamp
+    timestamp_file_path = ci_temp_files_shared_directory / "cli_actions_last_autocomplete.timestamp"
+    time_since_last_call = time_since_file_timestamp(timestamp_file_path)
 
     # search for local actions
-    from python_ci_toolkit.actions.actions import list_actions_in_directory, LOCAL_ACTIONS_DIRECTORY
+    from ..actions.retrieval.sources.local import list_actions_in_directory, LOCAL_ACTIONS_DIRECTORY
     local_action_script_paths = list_actions_in_directory(LOCAL_ACTIONS_DIRECTORY)
     local_action_names = [f"{p.stem}@local" for p in local_action_script_paths]
     local_action_descriptions = [f"[local]  {_get_action_description_from_file(p)}" for p in local_action_script_paths]
     local_actions_metadata = sorted(list(zip(local_action_names, local_action_descriptions)))
 
     # remote actions
-    from python_ci_toolkit.actions.actions import retrieve_action_repo, DEFAULT_ACTION_REPO_URL
-    from python_ci_toolkit.git import get_default_ssh_private_key
-    cloned_actions_directory = get_clone_directory_from_action_repo_url(DEFAULT_ACTION_REPO_URL)
+    from ..actions.retrieval.sources.git.cloning import get_remote_action_repo, retrieve_action_repo, get_clone_directory_from_action_repo_url
+    action_repo_url, action_repo_ssh_private_key = get_remote_action_repo()
+    cloned_actions_directory = get_clone_directory_from_action_repo_url(action_repo_url)
     if time_since_last_call >= _ACTION_AUTOCOMPLETE_REMOTE_CLONE_DELAY_TIME_WINDOW:
         cloned_actions_directory = retrieve_action_repo(
-            git_repo_url=DEFAULT_ACTION_REPO_URL,
-            ssh_private_key=get_default_ssh_private_key()
+            git_repo_url=action_repo_url,
+            ssh_private_key=action_repo_ssh_private_key
         )
     remote_action_script_paths = list_actions_in_directory(cloned_actions_directory)
     remote_action_names = [f"{p.stem}" for p in remote_action_script_paths]
@@ -100,8 +92,7 @@ def _complete_action_identifier(ctx: Context, param: Argument, incomplete: str):
     remote_actions_metadata = sorted(list(zip(remote_action_names, remote_action_descriptions)))
 
     # recreate the timestamp file
-    os.remove(timestamp_file_path)
-    timestamp_file_path.touch()
+    reset_file_timestamp(timestamp_file_path)
 
     # enable logging again
     logging.root.disabled = False
@@ -136,11 +127,11 @@ def action(action_identifier: str, action_args: List[str]) -> None:
     """
 
     # initialize logging
-    from python_ci_toolkit.logging import configure_ci_logging
+    from ..logging import configure_ci_logging
     configure_ci_logging("INFO")  # TODO: check for condition and enable debug logs here if set
 
-    from python_ci_toolkit.actions import run_ci_action
-    from python_ci_toolkit.actions.actions import ACTION_VERSION_SEPARATOR
+    from ..actions import run_ci_action
+    from ..actions.constants import ACTION_VERSION_SEPARATOR
 
     # version can be included in the first argument, separated from the action name by a semicolon
     if ACTION_VERSION_SEPARATOR in action_identifier:

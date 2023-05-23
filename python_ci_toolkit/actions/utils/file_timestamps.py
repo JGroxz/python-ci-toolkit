@@ -1,7 +1,6 @@
 """
 Functions which allow to use files as persistent timestamps.
 """
-
 import os
 import time
 from pathlib import Path

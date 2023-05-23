@@ -1,19 +1,45 @@
 """
-Functions for retrieving actions from remote sources.
+Functions for retrieving action repositories from Git.
 """
 
-import hashlib
 import logging
 import sys
 from pathlib import Path
 
-from .._constants import DOWNLOADED_ACTION_REPOS_DIRECTORY
-from .._logging import get_action_display_name
-from .._utils import timeit
-from ...git import git_ssh_credentials
-from ...shell import run_shell_command
+from .caching import create_action_cache_timestamp
+from ....retrieval.sources.local import list_actions_in_directory
+from ....utils import log_execution_time, hash_string
+from ....utils.logging import get_action_display_name
+from .....environment.paths.internal import ci_temp_files_shared_directory
+from .....environment.variables import retrieve_environment_variable
+from .....git import git_ssh_credentials, get_default_ssh_private_key
+from .....shell import run_shell_command
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_ACTION_REPO_URL = "git@github.com:pyci/python-ci-actions.git"
+DOWNLOADED_ACTION_REPOS_DIRECTORY = ci_temp_files_shared_directory / "downloaded_action_repos"
+
+
+def get_remote_action_repo() -> tuple[str, str]:
+    """
+    Returns:
+        A tuple with:
+            - URL of the remote Git repository that contains actions.
+            - Secret SSH key to access the remote Git repository.
+    """
+    actions_git_repo_url = retrieve_environment_variable(
+        "PYTHON_CI_ACTIONS_GIT_REPO_URL",
+        f"URL address of the Git repository is required to pull the action code.",
+        fallback_value=DEFAULT_ACTION_REPO_URL
+    )
+    actions_ssh_private_key = retrieve_environment_variable(
+        "PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY",
+        "SSH private key is required to pull actions from the private remote Git repositories.",
+        fallback_value=get_default_ssh_private_key
+    )
+
+    return actions_git_repo_url, actions_ssh_private_key
 
 
 def get_clone_directory_from_action_repo_url(git_repo_url: str) -> Path:
@@ -26,15 +52,14 @@ def get_clone_directory_from_action_repo_url(git_repo_url: str) -> Path:
     Returns:
         Local path generated based on the provided Git repo URL.
     """
-    git_repo_hash = hashlib.md5(git_repo_url.encode()).hexdigest()
-    cloned_repo_path = DOWNLOADED_ACTION_REPOS_DIRECTORY / git_repo_hash
+    cloned_repo_path = DOWNLOADED_ACTION_REPOS_DIRECTORY / hash_string(git_repo_url)
     return cloned_repo_path
 
 
-@timeit
+@log_execution_time
 def retrieve_action_repo(git_repo_url: str, ssh_private_key: str = None) -> Path:
     """
-    Retrieves the given Git repository into the standard actions cache location.
+    Retrieves the given Git repository into the standard actions download location.
 
     Notes:
         This action will return the existing local repo if it was cloned before.
@@ -49,28 +74,29 @@ def retrieve_action_repo(git_repo_url: str, ssh_private_key: str = None) -> Path
     """
 
     # prepare downloads directory
-    DOWNLOADED_ACTION_REPOS_DIRECTORY.mkdir(exist_ok=True, parents=True)
+    DOWNLOADED_ACTION_REPOS_DIRECTORY.mkdir(parents=True, exist_ok=True)
 
     # generate local repo path based on remote
     cloned_repo_path = get_clone_directory_from_action_repo_url(git_repo_url)
-
-    # default kwargs for run_shell_command() calls
-    RUN_KWARGS = dict(cwd=cloned_repo_path, silence_output=True, use_wsl_on_windows=False)
 
     with git_ssh_credentials(ssh_private_key):
         if not cloned_repo_path.exists():
             logger.debug(f"Cloning action repo from '{git_repo_url}' to '{cloned_repo_path}'.")
 
             # execute a fresh pull
-            run_shell_command(f'git clone "{git_repo_url}" "{cloned_repo_path}"', **RUN_KWARGS)
+            run_shell_command(f'git clone "{git_repo_url}" "{cloned_repo_path}"', silence_output=True, use_wsl_on_windows=False)
         else:
-            logger.debug(f"Using cached action repo of '{git_repo_url}' from '{cloned_repo_path}'.")
+            logger.debug(f"Using local clone of action repo '{git_repo_url}' at '{cloned_repo_path}'.")
+
+        # default settings for running shell commands inside the cloned repo
+        def run_repo_command(c: str):
+            return run_shell_command(c, cwd=cloned_repo_path, silence_output=True, use_wsl_on_windows=False)
 
         # fetch all available remote branches and tags
-        run_shell_command("git fetch --tags", **RUN_KWARGS)
+        run_repo_command("git fetch --tags")
 
         # switch existing clone to main branch
-        run_shell_command("git checkout main", **RUN_KWARGS)
+        run_repo_command("git checkout main")
 
     # check if actions directory is present before returning it
     actions_directory = cloned_repo_path / "actions"
@@ -81,7 +107,7 @@ def retrieve_action_repo(git_repo_url: str, ssh_private_key: str = None) -> Path
     return actions_directory
 
 
-@timeit
+@log_execution_time
 def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, action_version: str = None,
                                        ssh_private_key: str = None) -> Path:
     """
@@ -113,21 +139,18 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
     action_script_directory = cloned_actions_directory / f"{action_name}"
     action_script_path = action_script_directory / f"{action_name}.py"
 
-    # settings for running CLI commands
-    run_shell_command_kwargs = {
-        "cwd": cloned_actions_directory,
-        "silence_output": (logger.getEffectiveLevel() > logging.DEBUG),
-        "use_wsl_on_windows": False
-    }
+    # default settings for running shell commands
+    def run_repo_command(c: str):
+        return run_shell_command(c, cwd=cloned_actions_directory, silence_output=True, use_wsl_on_windows=False)
 
+    # clone the repo
     with git_ssh_credentials(ssh_private_key):
-        # clone the repo
         if action_version is None:
             # if no version specified, use the main branch (it's checked out by default)
-            run_shell_command("git merge origin/main", **run_shell_command_kwargs)
+            run_repo_command('git merge origin/main')
         else:
             # find branches or tags matching the given version
-            result = run_shell_command(f'git show-ref', **run_shell_command_kwargs)
+            result = run_repo_command(f'git show-ref')
             output = result.output
             branch_exists = (f"refs/heads/{action_version}" in output) or (f"refs/remotes/origin/{action_version}" in output)
             tag_exists = (f"refs/tags/{action_version}" in output)
@@ -152,13 +175,22 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
                 sys.exit(3)
 
             # checkout required branch/tag
-            run_shell_command(f'git checkout "{action_version}"', **run_shell_command_kwargs)
+            run_repo_command(f'git checkout "{action_version}"')
 
             # if on a branch, pull updates
-            result = run_shell_command(f'git status', **run_shell_command_kwargs)
+            result = run_repo_command(f'git status')
             is_on_a_branch = ("On branch" in result.output)
             if is_on_a_branch:
-                run_shell_command(f'git merge "origin/{action_version}"', **run_shell_command_kwargs)
+                run_repo_command(f'git merge "origin/{action_version}"')
+
+    # create cache entries for each action script in the cloned repo
+    for action_path in list_actions_in_directory(cloned_actions_directory):
+        action_name = action_path.stem  # <- name of the action is the name of the script
+        create_action_cache_timestamp(
+            git_repo_url=git_repo_url,
+            action_name=action_name,
+            action_version=action_version
+        )
 
     # check if the repo had the requested action script
     if not action_script_path.exists():

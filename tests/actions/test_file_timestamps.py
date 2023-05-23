@@ -1,8 +1,7 @@
-import os
 import time
 from pathlib import Path
 
-from python_ci_toolkit.actions._utils._file_timestamps import reset_file_timestamp, time_since_file_timestamp, get_file_timestamp
+from python_ci_toolkit.actions.utils.file_timestamps import reset_file_timestamp, time_since_file_timestamp, get_file_timestamp
 
 
 def test_timestamp():

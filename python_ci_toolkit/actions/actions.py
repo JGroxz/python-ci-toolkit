@@ -5,9 +5,9 @@ Provides functions to retrieve and run CI actions based on Python scripts.
 import sys
 from typing import List
 
-from ._constants import ACTION_VERSION_SEPARATOR
-from ._logging import loading_animation, print_action_header, get_action_display_name
-from ._retrieval import retrieve_ci_action_script
+from .retrieval import retrieve_ci_action_script
+from .retrieval.sources.git.caching import reset_action_cache_timestamp
+from .utils.logging import loading_animation, print_action_header, get_action_display_name
 from ..logging import get_logger
 from ..pip import ensure_requirements_installed
 from ..python import import_module_from_file
@@ -59,3 +59,7 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
 
     with loading_animation(f"[rgb(146,202,85)]Running CI action '{action_display_name}'"):
         action_module.cli()
+
+    # reset cache timer after each successful action run
+    # to allow chaining actions from the same repo without re-downloading them
+    reset_action_cache_timestamp(action_name, action_version)

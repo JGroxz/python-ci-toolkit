@@ -7,9 +7,9 @@ from logging import Logger
 
 from rich.progress import Progress
 
-from ..actions._constants import ACTION_VERSION_SEPARATOR
-from ..environment import ci_project_root, ci_environment_name, CiEnvironmentType, ci_environment_type
-from ..logging import get_logger, ci_output_console
+from ..constants import ACTION_VERSION_SEPARATOR
+from ...environment import ci_project_root, ci_environment_name, CiEnvironmentType, ci_environment_type
+from ...logging import get_logger, ci_output_console
 
 logger = get_logger(__name__)
 
@@ -42,7 +42,7 @@ def print_action_header(action_name: str, action_version: str, action_source: st
         import pkg_resources
         version = pkg_resources.get_distribution('python-ci-toolkit').version
     except Exception:
-        from ..versions import read_project_version
+        from ...versions import read_project_version
         version = read_project_version(ci_project_root)
 
     action_display_name = get_action_display_name(action_name, action_version)
