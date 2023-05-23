@@ -108,12 +108,12 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
         try:
             raise run_result.exception
         finally:
-            logger.critical(f"[red]'{action_display_name}' action run failed in {run_stopwatch.elapsed_time_str} ({type(run_result.exception).__name__}).[/]",
+            logger.critical(f"[red]Action run failed in {run_stopwatch.elapsed_time_str} ({type(run_result.exception).__name__}, '{action_display_name}').[/]",
                             extra={"markup": True, "highlighter": None})
 
     # action completed successfully
-    logger.info(f"[rgb(146,202,85)]'{action_display_name}' action run completed in {run_stopwatch.elapsed_time_str}.[/]",
-                extra={"markup": True, "highlighter": None})
+    logger.info(f"[rgb(146,202,85)]Action run completed in {run_stopwatch.elapsed_time_str} ('{action_display_name}').[/]",
+                extra={"markup": True})
 
     # reset cache timestamps after each successful action run
     # to allow chaining actions from the same repo without re-downloading them
