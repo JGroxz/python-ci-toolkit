@@ -88,14 +88,14 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
         sys.argv.extend(argv)
 
     # import action's Python module
-    logger.debug(f"Importing Python module of the action '{action_name}'...")
+    logger.info(f"Importing Python module of the action '{action_name}'...")
     with loading_animation("Importing action's Python module..."), Stopwatch() as import_stopwatch:
         try:
             action_module = import_module_from_file(f"{action_name}", action_script_path)
         except Exception:
             logger.error(f"Error when importing Python module from action script '{action_script_path}' (action '{action_display_name}' from {action_source}).")
             raise
-    logger.debug(f"Import completed in {import_stopwatch.elapsed_time_str}.")
+    logger.info(f"Import completed in {import_stopwatch.elapsed_time_str}.")
 
     # run CI action using its cli() method with the given arguments
     print_action_header(action_name, action_version, action_source)
