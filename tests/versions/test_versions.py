@@ -147,17 +147,3 @@ def test_version_bump():
     expected_version = "2.0.0"
     assert f"{new_version}" == expected_version, \
         f"Major bump failed: {original_version} -> {new_version} (expected {expected_version})"
-
-
-if __name__ == '__main__':
-    # test_project_version()
-    # test_latest()
-    test_version_parsing()
-    # test_version_write()
-    # test_version_bump()
-
-    # handler = PyProjectVersionFileHandler()
-    # path = Path("../", "pyproject.toml")
-    # version = handler.read_version(path)
-    # new_version = version.bump_minor()
-    # handler.write_version(path, new_version)
