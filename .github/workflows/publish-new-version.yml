@@ -8,7 +8,7 @@ on:
 jobs:
   publish-poetry-package:
     name: Publish Poetry package
-    uses: pyci/.github/.github/workflows/publish-poetry-package.yml@main
+    uses: pyci/.github-private/.github/workflows/publish-poetry-package.yml@main
     secrets: inherit
   update-python-ci-runner:
     name: Update self dependency in Python CI Runner
