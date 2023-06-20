@@ -1,5 +1,5 @@
 """
-Utility functions for running shell commands from Python.
+Convenience function for running shell commands from Python.
 """
 from __future__ import annotations
 
@@ -134,6 +134,9 @@ def run_shell_command(command: str,
     # (if 'silence_output' is set to False)
     lock = threading.Lock()
 
+    # display only the first line of the command (for pretty output)
+    command_display_string = command.splitlines()[0]
+
     # helper function for handling the executed shell command's output
     def capture_subprocess_output(pipe, stderr: bool = False):
         for line in iter(pipe.readline, b''):  # b'\n'-separated lines
@@ -156,7 +159,7 @@ def run_shell_command(command: str,
                     grid.add_column(style=SHELL_OUTPUT_PREFIX_STYLE)
                     grid.add_column(overflow="fold")
                     grid.add_row(
-                        Text(f" > shell: ") + Text(command, style=SHELL_OUTPUT_COMMAND_STYLE), " │ ",
+                        Text(f" > shell: ") + Text(command_display_string, style=SHELL_OUTPUT_COMMAND_STYLE), " │ ",
                         (decoded_line if (not stderr) else Text(decoded_line, style=SHELL_OUTPUT_STDERR_STYLE))
                     )
                     # noinspection PyUnresolvedReferences
