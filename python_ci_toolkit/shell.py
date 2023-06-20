@@ -151,7 +151,7 @@ def run_shell_command(command: str,
                 lock.acquire()
                 decoded_line = decoded_line.rstrip(" \n")
                 if raw_output:
-                    _output_console.print(decoded_line)
+                    _output_console.print(decoded_line, highlight=False)
                 else:
                     grid = Table.grid()
                     grid.add_column(style=SHELL_OUTPUT_PREFIX_STYLE, min_width=SHELL_OUTPUT_PREFIX_WIDTH_MIN,
