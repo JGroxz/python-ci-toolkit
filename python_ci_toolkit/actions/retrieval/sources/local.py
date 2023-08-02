@@ -6,9 +6,16 @@ import glob
 import os
 from pathlib import Path
 
-from ....environment.paths import ci_files_directory
+from ....environment.paths import ci_project_root, ci_files_directory_relative
 
-LOCAL_ACTIONS_DIRECTORY = ci_files_directory / "actions"
+LOCAL_ACTIONS_DIRECTORY_RELATIVE = ci_files_directory_relative / "actions"
+"""
+Relative path to the directory where local actions are stored in a CI project.
+"""
+LOCAL_ACTIONS_DIRECTORY = ci_project_root / LOCAL_ACTIONS_DIRECTORY_RELATIVE
+"""
+Absolute path to the directory where local actions are stored in the current CI project.
+"""
 
 
 def list_actions_in_directory(directory: Path,
