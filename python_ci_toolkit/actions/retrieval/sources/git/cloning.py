@@ -185,10 +185,9 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
 
     # create cache entries for each action script in the cloned repo
     for action_path in list_actions_in_directory(cloned_actions_directory):
-        action_name = action_path.stem  # <- name of the action is the name of the script
         create_action_cache_timestamp(
             git_repo_url=git_repo_url,
-            action_name=action_name,
+            action_name=action_path.stem,  # <- name of the action is the name of the script
             action_version=action_version
         )
 

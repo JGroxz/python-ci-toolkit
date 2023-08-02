@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 from pathlib import Path
 from typing import List
@@ -94,23 +95,30 @@ def _complete_action_identifier(ctx: Context, param: Argument, incomplete: str):
     # recreate the timestamp file
     reset_file_timestamp(timestamp_file_path)
 
+    # filter out the actions based on the incomplete string
+    all_actions_metadata = local_actions_metadata + remote_actions_metadata
+    filtered_actions_metadata = [x for x in all_actions_metadata if x[0].startswith(incomplete)]
+
     # enable logging again
     logging.root.disabled = False
 
     return [CompletionItem(x[0], help=x[1])
-            for x in (local_actions_metadata + remote_actions_metadata)]
+            for x in filtered_actions_metadata]
 
 
 @click.command(context_settings=dict(
     ignore_unknown_options=True,
 ))
+@click.option("--debug",
+              is_flag=True,
+              help="Enable debug logging.")
 @click.argument("action_identifier",
                 required=1,
                 type=str,
                 callback=_validate_action_identifier,
                 shell_complete=_complete_action_identifier)
 @click.argument('action_args', nargs=-1, type=click.UNPROCESSED)
-def action(action_identifier: str, action_args: List[str]) -> None:
+def action(action_identifier: str, action_args: List[str], debug: bool = False) -> None:
     """
     Execute CI action based on the given ACTION_IDENTIFIER.\n
     Arbitrary arguments can be passed to the action in place of ACTION_ARGS.\n
@@ -128,7 +136,8 @@ def action(action_identifier: str, action_args: List[str]) -> None:
 
     # initialize logging
     from ..logging import configure_ci_logging
-    configure_ci_logging("INFO")  # TODO: check for condition and enable debug logs here if set
+    is_debug_enabled = (debug or os.environ.get("DEBUG", None))
+    configure_ci_logging("DEBUG" if is_debug_enabled else "INFO")
 
     from ..actions import run_ci_action
     from ..actions.constants import ACTION_VERSION_SEPARATOR
