@@ -18,6 +18,26 @@ Absolute path to the directory where local actions are stored in the current CI 
 """
 
 
+def get_simple_action_path_in_directory(directory: Path, action_name: str) -> Path:
+    """
+    Returns the expected path to the given simple action script in the given directory.
+
+    Notes:
+        Simple actions are individual Python files.
+    """
+    return directory / f"{action_name}.py"
+
+
+def get_complex_action_path_in_directory(directory: Path, action_name: str) -> Path:
+    """
+    Returns the expected path to the given complex action script in the given directory.
+
+    Notes:
+        Complex actions are Python scripts nested in the directories with the matching name.
+    """
+    return directory / action_name / f"{action_name}.py"
+
+
 def list_actions_in_directory(directory: Path,
                               include_simple_actions: bool = True,
                               include_complex_actions: bool = True) -> list[Path]:
