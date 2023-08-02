@@ -11,28 +11,46 @@ from ....environment.paths import ci_files_directory
 LOCAL_ACTIONS_DIRECTORY = ci_files_directory / "actions"
 
 
-def list_actions_in_directory(directory: Path) -> list[Path]:
+def list_actions_in_directory(directory: Path,
+                              include_simple_actions: bool = True,
+                              include_complex_actions: bool = True) -> list[Path]:
     """
     Lists all action scripts available in the given directory.
 
+    Notes:
+        - 'simple' actions are individual Python files
+        - 'complex' actions are Python scripts nested in the directories with the matching name
+
     Args:
         directory: Directory to search for actions in.
+        include_simple_actions: Whether to include 'simple' action scripts in the search (enabled by default).
+        include_complex_actions: Whether to include 'complex' action scripts in the search (enabled by default).
 
     Returns:
         List of absolute paths of the located action scripts.
     """
-    # find all 'simple' action scripts; these are scripts that are individual Python files
-    simple_actions = [Path(p) for p in glob.glob(str(directory / "*.py"))]
+    assert directory.exists(), f"Directory '{directory}' does not exist."
+    assert include_simple_actions or include_complex_actions, "At least one of 'include_simple_actions' or 'include_complex_actions' must be set to True."
 
-    # find all 'complex' action scripts; these are Python scripts nested in the directories with the matching name
-    complex_actions: list[Path] = []
-    child_directories = [Path(x[0]) for x in os.walk(directory) if Path(x[0]) != directory]
-    for child in child_directories:
-        nested_action_script_path = child / f"{child.name}.py"
-        if nested_action_script_path.exists():
-            complex_actions.append(nested_action_script_path)
+    found_actions: list[Path] = []
 
-    return simple_actions + complex_actions
+    if include_simple_actions:
+        # find all 'simple' action scripts; these are scripts that are individual Python files
+        simple_actions = [Path(p) for p in glob.glob(str(directory / "*.py"))]
+        found_actions.extend(simple_actions)
+
+    if include_complex_actions:
+        # find all 'complex' action scripts; these are Python scripts nested in the directories with the matching name
+        complex_actions: list[Path] = []
+        child_directories = [Path(x[0]) for x in os.walk(directory) if Path(x[0]) != directory]
+        for child in child_directories:
+            nested_action_script_path = child / f"{child.name}.py"
+            if nested_action_script_path.exists():
+                complex_actions.append(nested_action_script_path)
+        found_actions.extend(complex_actions)
+
+    # return requested actions
+    return found_actions
 
 
 def retrieve_ci_action_script_local(action_name: str) -> Path:
@@ -45,12 +63,22 @@ def retrieve_ci_action_script_local(action_name: str) -> Path:
     Returns:
         Full path to the given action's Python file.
     """
-    action_file_path = LOCAL_ACTIONS_DIRECTORY / f"{action_name}.py"
+    simple_action_file_path = LOCAL_ACTIONS_DIRECTORY / f"{action_name}.py"
+    complex_action_file_path = LOCAL_ACTIONS_DIRECTORY / action_name / f"{action_name}.py"
 
+    if simple_action_file_path.exists() and complex_action_file_path.exists():
+        raise ValueError(
+            f"Found both simple and complex action scripts for local action '{action_name}':\n"
+            f" - Simple: '{simple_action_file_path}'\n"
+            f" - Complex: '{complex_action_file_path}'\n"
+            f"Please remove one of them to avoid ambiguity before trying to retrieve the action again."
+        )
+
+    action_file_path = simple_action_file_path if simple_action_file_path.exists() else complex_action_file_path
     if not action_file_path.exists():
         raise FileNotFoundError(
-            f"Cannot run action '{action_name}' from local file '{action_file_path}': file does not exist.\n"
-            f"When you run actions in local mode, make sure that the corresponding action file exists in '.ci/actions' folder in your CI project's root."
+            f"Action '{action_name}' does not exist locally.\n"
+            f"When you run actions in local mode, make sure that the corresponding action file exists in '.ci/actions' directory in your CI project's root."
         )
 
     return action_file_path
