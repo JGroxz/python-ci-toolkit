@@ -83,7 +83,7 @@ def loading_animation(description: str) -> None:
                     time.sleep(0.1)
                     if sw.elapsed_time < 1:
                         continue
-                    progress.update(task_id, description=f"[blue]{description}... [dim]({sw.elapsed_time_str})[/]")
+                    progress.update(task_id, description=f"[blue]{description}... [dim]({sw.elapsed_time_pretty})[/]")
 
             Thread(target=update_description, daemon=True).start()
 

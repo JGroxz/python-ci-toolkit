@@ -54,7 +54,7 @@ class Stopwatch(contextlib.AbstractContextManager):
         return self.elapsed_time * 1000
 
     @property
-    def elapsed_time_str(self) -> str:
+    def elapsed_time_pretty(self) -> str:
         """
         Returns the elapsed time as a pretty string.
         """
