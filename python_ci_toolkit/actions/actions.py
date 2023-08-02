@@ -95,7 +95,7 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
         except Exception:
             logger.error(f"Error when importing Python module from action script '{action_script_path}' (action '{action_display_name}' from {action_source}).")
             raise
-    logger.info(f"Import completed in {import_stopwatch.elapsed_time_str}.")
+    logger.info(f"Import completed in {import_stopwatch.elapsed_time_pretty}.")
 
     # run CI action using its cli() method with the given arguments
     print_action_header(action_name, action_version, action_source)
@@ -108,11 +108,11 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
         try:
             raise run_result.exception
         finally:
-            logger.critical(f"[red]Action run failed in {run_stopwatch.elapsed_time_str} ({type(run_result.exception).__name__}, '{action_display_name}').[/]",
+            logger.critical(f"[red]Action run failed in {run_stopwatch.elapsed_time_pretty} ({type(run_result.exception).__name__}, '{action_display_name}').[/]",
                             extra={"markup": True, "highlighter": None})
 
     # action completed successfully
-    logger.info(f"[rgb(146,202,85)]Action run completed in {run_stopwatch.elapsed_time_str} ('{action_display_name}').[/]",
+    logger.info(f"[rgb(146,202,85)]Action run completed in {run_stopwatch.elapsed_time_pretty} ('{action_display_name}').[/]",
                 extra={"markup": True})
 
     # reset cache timestamps after each successful action run
