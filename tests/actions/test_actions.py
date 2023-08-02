@@ -2,23 +2,31 @@ from __future__ import annotations
 
 import logging
 import time
+from pathlib import Path
 
-from python_ci_toolkit.shell import run_shell_command
 from python_ci_toolkit.actions.utils.stopwatch import Stopwatch
+from python_ci_toolkit.shell import run_shell_command
 
 
 def test_retrieve_action_repo():
     from python_ci_toolkit.actions.retrieval.sources.git.cloning import retrieve_action_repo, get_remote_action_repo
+    from python_ci_toolkit.actions.retrieval.sources.local import LOCAL_ACTIONS_DIRECTORY_RELATIVE
 
     start = time.perf_counter()
 
     action_repo_url, action_repo_ssh_private_key = get_remote_action_repo()
-    repo_directory = retrieve_action_repo(action_repo_url, action_repo_ssh_private_key)
+    cloned_actions_directory: Path = retrieve_action_repo(action_repo_url, action_repo_ssh_private_key)
 
     print(f"Retrieved action repo in {(time.perf_counter() - start) * 1000} ms")
-    print(repo_directory)
+    print(cloned_actions_directory)
 
-    assert (repo_directory / "../.git").exists(), \
+    cloned_repo_root = cloned_actions_directory
+    for _ in LOCAL_ACTIONS_DIRECTORY_RELATIVE.parts:
+        cloned_repo_root = cloned_repo_root.parent
+
+    print(f"Cloned repo root: '{cloned_repo_root}'")
+
+    assert (cloned_repo_root / ".git").exists(), \
         "There is no '.git' file in the action repo directory. It means the repo was not cloned."
 
 
@@ -44,15 +52,6 @@ def test_retrieve_ci_action_script_from_git():
                                    cwd=action_script_directory, silence_output=True, use_wsl_on_windows=False)
         assert TEST_ACTION_VERSION in result.output, \
             f"Action repo must be checked out at branch/tag '{TEST_ACTION_VERSION}', but it's not:\n{result.output}"
-
-
-def test_list_actions_in_directory():
-    from python_ci_toolkit.actions.retrieval.sources.local import list_actions_in_directory, LOCAL_ACTIONS_DIRECTORY
-
-    local_actions = list_actions_in_directory(LOCAL_ACTIONS_DIRECTORY)
-
-    assert len(local_actions) > 0, \
-        f"There must be at least one action in the local actions directory: '{LOCAL_ACTIONS_DIRECTORY}', but list_actions_in_directory() returned an empty list."
 
 
 def test_remote_action_caching(caplog):
@@ -98,3 +97,20 @@ def test_remote_action_caching(caplog):
     # run the test to verify that caching works
     run_test_action_twice()
     run_test_action_twice()
+
+
+def test_list_actions_in_directory():
+    from python_ci_toolkit.actions.retrieval.sources.local import list_actions_in_directory, LOCAL_ACTIONS_DIRECTORY
+
+    local_actions = list_actions_in_directory(LOCAL_ACTIONS_DIRECTORY)
+
+    # verify the number
+    assert len(local_actions) == 2, \
+        f"Expected to find 2 local actions in '{LOCAL_ACTIONS_DIRECTORY}', but found {len(local_actions)}:\n{local_actions}"
+
+    # verify the names
+    EXPECTED_LOCAL_ACTION_NAMES = ["test_action", "update_dependency_in_python_ci_containers"]
+    local_action_names = [p.stem for p in local_actions]
+    for name in EXPECTED_LOCAL_ACTION_NAMES:
+        assert name in local_action_names, \
+            f"Expected to find action '{name}' in '{LOCAL_ACTIONS_DIRECTORY}', but found only {local_action_names}."
