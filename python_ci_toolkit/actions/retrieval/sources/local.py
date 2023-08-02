@@ -77,8 +77,8 @@ def retrieve_ci_action_script_local(action_name: str) -> Path:
     action_file_path = simple_action_file_path if simple_action_file_path.exists() else complex_action_file_path
     if not action_file_path.exists():
         raise FileNotFoundError(
-            f"Cannot run action '{action_name}' from local file '{action_file_path}': file does not exist.\n"
-            f"When you run actions in local mode, make sure that the corresponding action file exists in '.ci/actions' folder in your CI project's root."
+            f"Action '{action_name}' does not exist locally.\n"
+            f"When you run actions in local mode, make sure that the corresponding action file exists in '.ci/actions' directory in your CI project's root."
         )
 
     return action_file_path
