@@ -151,7 +151,7 @@ def run_shell_command(command: str,
                 lock.acquire()
                 decoded_line = decoded_line.rstrip(" \n")
                 if raw_output:
-                    _output_console.print(decoded_line)
+                    _output_console.print(decoded_line, highlight=False)
                 else:
                     grid = Table.grid()
                     grid.add_column(style=SHELL_OUTPUT_PREFIX_STYLE, min_width=SHELL_OUTPUT_PREFIX_WIDTH_MIN,
@@ -189,6 +189,15 @@ def run_shell_command(command: str,
                            f"  Command:\n"
                            f"    {command}\n"
                            f"{output_string}")
+
+    # print header if using pretty output
+    if (not silence_output) and (not raw_output):
+        header = (
+                Text(f"Shell command finished:", style=SHELL_OUTPUT_PREFIX_STYLE) + " "
+                + Text(f"{command}", style=SHELL_OUTPUT_COMMAND_STYLE) + " "
+                + Text(f"(exit code {exit_code})", style=SHELL_OUTPUT_PREFIX_STYLE)
+        )
+        _output_console.print(header)
 
     return ShellCommandResult(
         command=command,

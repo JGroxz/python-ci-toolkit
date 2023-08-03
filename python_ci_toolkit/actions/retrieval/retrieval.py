@@ -9,7 +9,7 @@ from .sources.git.caching import is_action_cache_fresh, retrieve_ci_action_scrip
 from .sources.git.cloning import get_remote_action_repo, retrieve_ci_action_script_from_git
 from .sources.local import retrieve_ci_action_script_local
 from ..constants import ACTION_VERSION_LOCAL_STRING
-from ..utils import log_execution_time
+from ..utils import log_execution_time, Stopwatch
 from ..utils.logging import loading_animation, get_action_display_name
 
 logger = logging.getLogger(__name__)
@@ -42,9 +42,7 @@ def retrieve_ci_action_script(action_name: str, action_version: str = None) -> t
 
         if is_action_cache_fresh(action_name, action_version):
             # from cache
-            start_time = time.perf_counter()
-
-            with loading_animation(f"Retrieving action from cache"):
+            with Stopwatch() as sw, loading_animation(f"Retrieving action from cache"):
                 action_script_path = retrieve_ci_action_script_from_cache(
                     git_repo_url=action_repo_url,
                     action_name=action_name,
@@ -53,8 +51,7 @@ def retrieve_ci_action_script(action_name: str, action_version: str = None) -> t
 
                 action_source = f"'{action_version}' at '{action_repo_url}' (cached)"
 
-            duration = time.perf_counter() - start_time
-            logger.info(f"Retrieved action '{action_display_name}' from cache in {duration * 1000:.0f} ms.")
+            logger.info(f"Retrieved action '{action_display_name}' from cache in {sw.elapsed_time_ms:.0f} ms.")
         else:
             # from remote Git repo
             start_time = time.perf_counter()

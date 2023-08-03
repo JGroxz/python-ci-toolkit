@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from .caching import create_action_cache_timestamp
-from ....retrieval.sources.local import list_actions_in_directory
+from ....retrieval.sources.local import list_actions_in_directory, _LOCAL_ACTIONS_DIRECTORY_RELATIVE, get_actions_directory_in_project
 from ....utils import log_execution_time, hash_string
 from ....utils.logging import get_action_display_name
 from .....environment.paths.internal import ci_temp_files_shared_directory
@@ -99,9 +99,9 @@ def retrieve_action_repo(git_repo_url: str, ssh_private_key: str = None) -> Path
         run_repo_command("git checkout main")
 
     # check if actions directory is present before returning it
-    actions_directory = cloned_repo_path / "actions"
+    actions_directory = get_actions_directory_in_project(cloned_repo_path)
     if not actions_directory.exists():
-        logger.error(f"Repository '{git_repo_url}' does not have 'actions' directory in it.")
+        logger.error(f"Repository '{git_repo_url}' does not have '{_LOCAL_ACTIONS_DIRECTORY_RELATIVE}' directory in it.")
         sys.exit(1)
 
     return actions_directory
@@ -183,8 +183,8 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
             if is_on_a_branch:
                 run_repo_command(f'git merge "origin/{action_version}"')
 
-    # create cache entries for each action script in the cloned repo
-    for action_path in list_actions_in_directory(cloned_actions_directory):
+    # create cache entries for each complex action script in the cloned repo
+    for action_path in list_actions_in_directory(cloned_actions_directory, include_simple_actions=False):
         create_action_cache_timestamp(
             git_repo_url=git_repo_url,
             action_name=action_path.stem,  # <- name of the action is the name of the script
