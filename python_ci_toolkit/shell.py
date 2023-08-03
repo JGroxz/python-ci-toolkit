@@ -190,6 +190,15 @@ def run_shell_command(command: str,
                            f"    {command}\n"
                            f"{output_string}")
 
+    # print header if using pretty output
+    if (not silence_output) and (not raw_output):
+        header = (
+                Text(f"Shell command finished:", style=SHELL_OUTPUT_PREFIX_STYLE) + " "
+                + Text(f"{command}", style=SHELL_OUTPUT_COMMAND_STYLE) + " "
+                + Text(f"(exit code {exit_code})", style=SHELL_OUTPUT_PREFIX_STYLE)
+        )
+        _output_console.print(header)
+
     return ShellCommandResult(
         command=command,
         exit_code=exit_code,
