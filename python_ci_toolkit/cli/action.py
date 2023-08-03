@@ -146,7 +146,7 @@ def _complete_action_identifier(ctx: Context, param: Argument, incomplete: str):
 
 @click.command(context_settings=dict(
     ignore_unknown_options=True,
-))
+), no_args_is_help=True)
 @click.option("--debug",
               is_flag=True,
               help="Enable debug logging.")
