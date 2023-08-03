@@ -6,7 +6,7 @@ import logging
 import sys
 from pathlib import Path
 
-from ..local import get_complex_action_path_in_directory, LOCAL_ACTIONS_DIRECTORY_RELATIVE
+from ..local import get_complex_action_path_in_directory, _LOCAL_ACTIONS_DIRECTORY_RELATIVE
 from ....utils import hash_string
 from ....utils.file_timestamps import time_since_file_timestamp, reset_file_timestamp
 from ....utils.logging import get_action_display_name
@@ -112,8 +112,8 @@ def reset_action_cache_timestamp(action_name: str, action_version: str):
     Resets the cache freshness timer for the Git repository the given action comes from.
 
     Args:
-        action_name: The name of the action.
-        action_version: The version of the action.
+        action_name: Name of the action.
+        action_version: Version of the action.
     """
     timestamp_file_path = _resolve_action_cache_timestamp_path(action_name, action_version)
     if timestamp_file_path is None:
@@ -163,7 +163,7 @@ def retrieve_ci_action_script_from_cache(git_repo_url: str, action_name: str, ac
 
     # prepare paths
     repo_directory = get_clone_directory_from_action_repo_url(git_repo_url)
-    action_script_path = get_complex_action_path_in_directory(repo_directory / LOCAL_ACTIONS_DIRECTORY_RELATIVE, action_name)
+    action_script_path = get_complex_action_path_in_directory(repo_directory / _LOCAL_ACTIONS_DIRECTORY_RELATIVE, action_name)
 
     # default settings for running shell commands
     def run_repo_command(c: str):
