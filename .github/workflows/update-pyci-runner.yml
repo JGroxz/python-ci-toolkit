@@ -14,6 +14,9 @@ jobs:
   update-python-ci-runner:
     name: Update self dependency in Python CI Runner
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: read
     container:
       image: "ghcr.io/pyci/ci-runner:latest"
       credentials:
