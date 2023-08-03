@@ -67,7 +67,7 @@ def rearrange_argv_before_action_run(action_name: str) -> None:
     original_argv = sys.argv.copy()
 
     # remove all arguments which come before action name
-    while sys.argv[0] != action_name:
+    while not sys.argv[0].startswith(action_name):
         sys.argv.pop(0)
 
     # popped args
