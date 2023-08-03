@@ -10,7 +10,7 @@ from python_ci_toolkit.shell import run_shell_command
 
 def test_retrieve_action_repo():
     from python_ci_toolkit.actions.retrieval.sources.git.cloning import retrieve_action_repo, get_remote_action_repo
-    from python_ci_toolkit.actions.retrieval.sources.local import LOCAL_ACTIONS_DIRECTORY_RELATIVE
+    from python_ci_toolkit.actions.retrieval.sources.local import _LOCAL_ACTIONS_DIRECTORY_RELATIVE
 
     start = time.perf_counter()
 
@@ -21,7 +21,7 @@ def test_retrieve_action_repo():
     print(cloned_actions_directory)
 
     cloned_repo_root = cloned_actions_directory
-    for _ in LOCAL_ACTIONS_DIRECTORY_RELATIVE.parts:
+    for _ in _LOCAL_ACTIONS_DIRECTORY_RELATIVE.parts:
         cloned_repo_root = cloned_repo_root.parent
 
     print(f"Cloned repo root: '{cloned_repo_root}'")

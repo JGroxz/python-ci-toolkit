@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from .caching import create_action_cache_timestamp
-from ....retrieval.sources.local import list_actions_in_directory, LOCAL_ACTIONS_DIRECTORY_RELATIVE
+from ....retrieval.sources.local import list_actions_in_directory, _LOCAL_ACTIONS_DIRECTORY_RELATIVE, get_actions_directory_in_project
 from ....utils import log_execution_time, hash_string
 from ....utils.logging import get_action_display_name
 from .....environment.paths.internal import ci_temp_files_shared_directory
@@ -99,9 +99,9 @@ def retrieve_action_repo(git_repo_url: str, ssh_private_key: str = None) -> Path
         run_repo_command("git checkout main")
 
     # check if actions directory is present before returning it
-    actions_directory = cloned_repo_path / LOCAL_ACTIONS_DIRECTORY_RELATIVE
+    actions_directory = get_actions_directory_in_project(cloned_repo_path)
     if not actions_directory.exists():
-        logger.error(f"Repository '{git_repo_url}' does not have 'actions' directory in it.")
+        logger.error(f"Repository '{git_repo_url}' does not have '{_LOCAL_ACTIONS_DIRECTORY_RELATIVE}' directory in it.")
         sys.exit(1)
 
     return actions_directory

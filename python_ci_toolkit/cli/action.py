@@ -3,12 +3,15 @@ from __future__ import annotations
 import logging
 import os
 import re
+from dataclasses import dataclass
 from pathlib import Path
 from typing import List
 
 import rich_click as click
 from click import Context, Argument
 from click.shell_completion import CompletionItem
+
+from python_ci_toolkit.actions.retrieval.sources.local import get_actions_directory_in_project
 
 _FIRST_COMMENT_REGEX = re.compile(r'"""(?:\n)(.*?)"""', re.MULTILINE | re.UNICODE | re.DOTALL)
 
@@ -60,10 +63,34 @@ def _validate_action_identifier(ctx: Context, param: Argument, value: str) -> st
     return action_identifier
 
 
-def _complete_action_identifier(ctx: Context, param: Argument, incomplete: str):
-    # disable logging (to avoid messages in the console during autocompletion)
-    logging.root.disabled = True
+@dataclass(eq=True, frozen=True)
+class ActionMetadata:
+    name: str
+    """Name of the action."""
+    description: str
+    """Description of the action."""
 
+    def __lt__(self, other: ActionMetadata) -> bool:
+        return self.name < other.name
+
+    @staticmethod
+    def from_action_file(filepath: Path) -> ActionMetadata:
+        """
+        Creates an ActionMetadata object from the given action file.
+        """
+        assert filepath.exists(), f"Action file '{filepath}' does not exist."
+        assert filepath.is_file(), f"Action file '{filepath}' is not a file."
+
+        return ActionMetadata(
+            name=filepath.stem,
+            description=_get_action_description_from_file(filepath),
+        )
+
+
+def _list_available_actions() -> list[ActionMetadata]:
+    """
+    Returns a list of all available CI actions in the current project (both remote and local).
+    """
     # determine how much time passed since the last call to this autocompletion function;
     # this is done to avoid cloning the remote action repo on every consecutive call within a specific time window
     from ..environment.paths.internal import ci_temp_files_shared_directory
@@ -74,36 +101,47 @@ def _complete_action_identifier(ctx: Context, param: Argument, incomplete: str):
     # search for local actions
     from ..actions.retrieval.sources.local import list_actions_in_directory, LOCAL_ACTIONS_DIRECTORY
     local_action_script_paths = list_actions_in_directory(LOCAL_ACTIONS_DIRECTORY)
-    local_action_names = [f"{p.stem}@local" for p in local_action_script_paths]
-    local_action_descriptions = [f"[local]  {_get_action_description_from_file(p)}" for p in local_action_script_paths]
-    local_actions_metadata = sorted(list(zip(local_action_names, local_action_descriptions)))
+    local_actions_metadata = [ActionMetadata.from_action_file(p) for p in local_action_script_paths]
+    local_actions_metadata = [ActionMetadata(f"{m.name}@local", f"[local] {m.description}") for m in local_actions_metadata]
+    local_actions_metadata.sort()
 
     # remote actions
     from ..actions.retrieval.sources.git.cloning import get_remote_action_repo, retrieve_action_repo, get_clone_directory_from_action_repo_url
     action_repo_url, action_repo_ssh_private_key = get_remote_action_repo()
-    cloned_actions_directory = get_clone_directory_from_action_repo_url(action_repo_url)
+    cloned_repo_directory = get_clone_directory_from_action_repo_url(action_repo_url)
+    cloned_actions_directory = get_actions_directory_in_project(cloned_repo_directory)
     if time_since_last_call >= _ACTION_AUTOCOMPLETE_REMOTE_CLONE_DELAY_TIME_WINDOW:
         cloned_actions_directory = retrieve_action_repo(
             git_repo_url=action_repo_url,
             ssh_private_key=action_repo_ssh_private_key
         )
     remote_action_script_paths = list_actions_in_directory(cloned_actions_directory)
-    remote_action_names = [f"{p.stem}" for p in remote_action_script_paths]
-    remote_action_descriptions = [f"[remote] {_get_action_description_from_file(p)}" for p in remote_action_script_paths]
-    remote_actions_metadata = sorted(list(zip(remote_action_names, remote_action_descriptions)))
+    remote_actions_metadata = [ActionMetadata.from_action_file(p) for p in remote_action_script_paths]
+    remote_actions_metadata = [ActionMetadata(f"{m.name}", f"[remote] {m.description}") for m in remote_actions_metadata]
+    remote_actions_metadata.sort()
 
     # recreate the timestamp file
     reset_file_timestamp(timestamp_file_path)
 
+    # return all actions
+    return local_actions_metadata + remote_actions_metadata
+
+
+def _complete_action_identifier(ctx: Context, param: Argument, incomplete: str):
+    # disable logging (to avoid messages in the console during autocompletion)
+    logging.root.disabled = True
+
+    available_actions_metadata = _list_available_actions()
+
     # filter out the actions based on the incomplete string
-    all_actions_metadata = local_actions_metadata + remote_actions_metadata
-    filtered_actions_metadata = [x for x in all_actions_metadata if x[0].startswith(incomplete)]
+    filtered_actions_metadata = [a for a in available_actions_metadata
+                                 if a.name.startswith(incomplete)]  # <- TODO: replace this with regex lookup to match inner parts of action names, too
 
     # enable logging again
     logging.root.disabled = False
 
-    return [CompletionItem(x[0], help=x[1])
-            for x in filtered_actions_metadata]
+    return [CompletionItem(a.name, help=a.description)
+            for a in filtered_actions_metadata]
 
 
 @click.command(context_settings=dict(
