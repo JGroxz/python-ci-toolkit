@@ -51,7 +51,7 @@ def retrieve_ci_action_script(action_name: str, action_version: str = None) -> t
 
                 action_source = f"'{action_version}' at '{action_repo_url}' (cached)"
 
-            logger.info(f"Retrieved action '{action_display_name}' from cache in {sw.elapsed_time_ms * 1000:.0f} ms.")
+            logger.info(f"Retrieved action '{action_display_name}' from cache in {sw.elapsed_time_ms:.0f} ms.")
         else:
             # from remote Git repo
             start_time = time.perf_counter()

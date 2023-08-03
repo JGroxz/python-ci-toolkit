@@ -3,16 +3,31 @@ Functions for retrieving actions from local CI project.
 """
 
 import glob
+import logging
 import os
 from pathlib import Path
 
 from ....environment.paths import ci_project_root, ci_files_directory_relative
 
-LOCAL_ACTIONS_DIRECTORY_RELATIVE = ci_files_directory_relative / "actions"
+logger = logging.getLogger(__name__)
+
+_LOCAL_ACTIONS_DIRECTORY_RELATIVE = ci_files_directory_relative / "actions"
 """
 Relative path to the directory where local actions are stored in a CI project.
 """
-LOCAL_ACTIONS_DIRECTORY = ci_project_root / LOCAL_ACTIONS_DIRECTORY_RELATIVE
+
+
+def get_actions_directory_in_project(project_root_path: Path) -> Path:
+    """
+    Returns an absolute path to the default directory where local actions are stored in the given CI project.
+
+    Args:
+        project_root_path: Absolute path to the root directory of the CI project.
+    """
+    return project_root_path / _LOCAL_ACTIONS_DIRECTORY_RELATIVE
+
+
+LOCAL_ACTIONS_DIRECTORY = get_actions_directory_in_project(ci_project_root)
 """
 Absolute path to the directory where local actions are stored in the current CI project.
 """
@@ -56,6 +71,10 @@ def list_actions_in_directory(directory: Path,
     Returns:
         List of absolute paths of the located action scripts.
     """
+    if not directory.exists():
+        logger.debug(f"Directory '{directory}' does not exist, so no actions can be found there.")
+        return []
+
     assert directory.exists(), f"Directory '{directory}' does not exist."
     assert include_simple_actions or include_complex_actions, "At least one of 'include_simple_actions' or 'include_complex_actions' must be set to True."
 
@@ -69,7 +88,7 @@ def list_actions_in_directory(directory: Path,
     if include_complex_actions:
         # find all 'complex' action scripts; these are Python scripts nested in the directories with the matching name
         complex_actions: list[Path] = []
-        child_directories = [Path(x[0]) for x in os.walk(directory) if Path(x[0]) != directory]
+        child_directories = [Path(d.path) for d in os.scandir(directory) if (Path(d.path) != directory) and (Path(d.path).is_dir())]
         for child in child_directories:
             nested_action_script_path = child / f"{child.name}.py"
             if nested_action_script_path.exists():
