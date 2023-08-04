@@ -164,7 +164,7 @@ def print_search_results(search_query: str, actions_metadata: list[ActionMetadat
             )
         panel_content = grid
     else:
-        panel_content = Text.from_markup(f"[red]No actions found containing [green]'{search_query}'")
+        panel_content = Text.from_markup(f"[red]No actions found containing [yellow]'{search_query}'")
         panel_content.align("center", (80 - 4))
 
     # print panel
