@@ -4,46 +4,14 @@ Functions for managing logging in CI environments.
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 
 import click
 import rich
 import rich.traceback
 import rich_click
-from rich.console import Console
 from rich.logging import RichHandler
 
-from ..environment import ci_environment_type, CiEnvironmentType
-
-_THEME_FILE_PATH = Path(__file__).parent / "rich_theme.cfg"
-
-
-def _patch_rich_console() -> Console:
-    """
-    Patches the global Rich Console instance for the use in the current CI environment.
-
-    Returns:
-        Patched Rich Console instance.
-    """
-    global_console = rich.get_console()
-
-    if (ci_environment_type == CiEnvironmentType.BitbucketPipelines
-            or ci_environment_type == CiEnvironmentType.GitHubActions):
-        global_console._force_terminal = True
-
-    # patch rich_click console
-    rich_click._console = global_console
-
-    return global_console
-
-
-_logging_console = _patch_rich_console()
-"""
-Rich Console instance used for CI Toolkit's logging output.
-
-Notes:
-    This is a global instance of Rich Console, which is patched for the current CI environment.
-"""
+from .console import _logging_console
 
 
 def configure_ci_logging(level: str | int = None) -> None:

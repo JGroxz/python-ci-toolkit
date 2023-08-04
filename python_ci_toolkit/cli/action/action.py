@@ -6,7 +6,7 @@ import re
 from typing import List
 
 import rich_click as click
-from click import Context, Argument
+from click import Context, Argument, Parameter
 from click.shell_completion import CompletionItem
 
 from python_ci_toolkit.cli.action.list import list_actions_command
@@ -55,9 +55,36 @@ def _complete_action_identifier(ctx: Context, param: Argument, incomplete: str):
             for a in filtered_actions_metadata]
 
 
+def _intercept_help_for_action(ctx: Context, param: Parameter, value: str) -> None:
+    """
+    Intercepts the --help option and prints the help message for the action command instead of the default one.
+
+    Args:
+        ctx:
+        param:
+        value:
+
+    Returns:
+
+    """
+    if not value or ctx.resilient_parsing:
+        return
+
+    print(f"Intercepted help!\n"
+          f"Value: {value}\n"
+          f"Param: {param}\n")
+    # TODO: if flag comes after command name, print help for the action
+    # TODO: otherwise, print help for the action command itself
+
+
 @click.command(context_settings=dict(
     ignore_unknown_options=True,
 ), no_args_is_help=True)
+@click.option("--help", "-h",
+              is_flag=True,
+              is_eager=True, callback=_intercept_help_for_action, expose_value=False,
+              help="Show this message and exit.",
+              hidden=True)
 @click.option("--debug",
               is_flag=True,
               help="Enable debug logging.",
