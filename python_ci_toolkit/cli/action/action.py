@@ -9,7 +9,8 @@ import rich_click as click
 from click import Context, Argument
 from click.shell_completion import CompletionItem
 
-from .find import find_action_command, list_available_actions
+from python_ci_toolkit.cli.action.list import list_actions_command
+from .find import find_actions_command, list_available_actions
 
 ACTION_IDENTIFIER_REGEX = re.compile(r'^\w+(?:@[\w\.\/\-\+]+)?', re.UNICODE)
 _ACTION_AUTOCOMPLETE_REMOTE_CLONE_CACHE_TIMEOUT = 30
@@ -62,9 +63,13 @@ def _complete_action_identifier(ctx: Context, param: Argument, incomplete: str):
               is_flag=True,
               help="Enable debug logging.",
               hidden=True)
-@click.option("--find", "-f",
+@click.option("--list", "-f",
               is_flag=True,
-              help="Find available actions based on provided ACTION_IDENTIFIER and print them to the console.")
+              is_eager=True, callback=list_actions_command, expose_value=False,
+              help="List all available actions.")
+@click.option("--find", "-f",
+              is_eager=True, callback=find_actions_command, expose_value=False,
+              help="Find available actions based on the provided string and print them to the console.")
 @click.argument("action_identifier",
                 required=1,
                 type=str,
@@ -94,11 +99,6 @@ def action(action_identifier: str, action_args: List[str], debug: bool = False, 
 
     from ...actions import run_ci_action
     from ...actions.constants import ACTION_VERSION_SEPARATOR
-
-    # search for actions if necessary
-    if find:
-        find_action_command(action_identifier)
-        return
 
     # version can be included in the first argument, separated from the action name by a semicolon
     if ACTION_VERSION_SEPARATOR in action_identifier:

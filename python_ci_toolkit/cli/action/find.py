@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-import rich
+from click import Argument, Context
 from rich import print, box
 from rich.panel import Panel
 from rich.table import Table
@@ -64,7 +64,7 @@ def list_available_actions(cache_timeout: float = -1) -> list[ActionMetadata]:
     Returns a list of all available CI actions in the current project (both remote and local).
 
     Notes:
-        Honors _AUTOCOMPLETION_REMOTE_CLONE_DELAY_TIME_WINDOW and caches the results for that time to avoid cloning the remote action repo on every consecutive call.
+        Caches the results for the specified time to avoid cloning the remote action repo on every consecutive call.
 
     Args:
         cache_timeout: Time in seconds after which the cache should be invalidated. If set to -1, the cache is never invalidated.
@@ -94,7 +94,7 @@ def list_available_actions(cache_timeout: float = -1) -> list[ActionMetadata]:
             git_repo_url=action_repo_url,
             ssh_private_key=action_repo_ssh_private_key
         )
-    remote_action_script_paths = list_actions_in_directory(cloned_actions_directory)
+    remote_action_script_paths = list_actions_in_directory(cloned_actions_directory, include_simple_actions=False)
     remote_actions_metadata = [ActionMetadata.from_action_file(p) for p in remote_action_script_paths]
     remote_actions_metadata = [ActionMetadata(f"{m.name}", f"[remote] {m.description}") for m in remote_actions_metadata]
     remote_actions_metadata.sort()
@@ -178,15 +178,21 @@ def print_search_results(search_query: str, actions_metadata: list[ActionMetadat
     print(panel)
 
 
-def find_action_command(search_query: str) -> None:
+def find_actions_command(ctx: Context, param: Argument, value: str) -> None:
     """
     Searches for actions by their name or description and prints the results to the console.
 
     Args:
         search_query: Search query to filter the actions by.
     """
+    if not value or ctx.resilient_parsing:
+        return
+
+    search_query = value
+
     from python_ci_toolkit.actions.utils.logging import loading_animation
     with loading_animation(f"Looking for actions containing [green]'{search_query}'[/]"):
         matches = find_actions_by_name_or_description(search_query)
 
     print_search_results(search_query, matches)
+    ctx.exit(0)
