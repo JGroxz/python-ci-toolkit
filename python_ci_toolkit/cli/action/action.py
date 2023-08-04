@@ -62,7 +62,7 @@ def _complete_action_identifier(ctx: Context, param: Argument, incomplete: str):
               is_flag=True,
               help="Enable debug logging.",
               hidden=True)
-@click.option("--list", "-f",
+@click.option("--list", "-l",
               is_flag=True,
               is_eager=True, callback=list_actions_command, expose_value=False,
               help="List all available actions.")
