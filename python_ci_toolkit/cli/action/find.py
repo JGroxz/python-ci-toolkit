@@ -178,13 +178,18 @@ def print_search_results(search_query: str, actions_metadata: list[ActionMetadat
     print(panel)
 
 
-def find_actions_command(ctx: Context, param: Argument, search_query: str) -> None:
+def find_actions_command(ctx: Context, param: Argument, value: str) -> None:
     """
     Searches for actions by their name or description and prints the results to the console.
 
     Args:
         search_query: Search query to filter the actions by.
     """
+    if not value or ctx.resilient_parsing:
+        return
+
+    search_query = value
+
     from python_ci_toolkit.actions.utils.logging import loading_animation
     with loading_animation(f"Looking for actions containing [green]'{search_query}'[/]"):
         matches = find_actions_by_name_or_description(search_query)

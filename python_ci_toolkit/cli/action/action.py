@@ -64,10 +64,11 @@ def _complete_action_identifier(ctx: Context, param: Argument, incomplete: str):
               help="Enable debug logging.",
               hidden=True)
 @click.option("--list", "-f",
-              is_flag=True, is_eager=True, callback=list_actions_command,
+              is_flag=True,
+              is_eager=True, callback=list_actions_command, expose_value=False,
               help="List all available actions.")
 @click.option("--find", "-f",
-              is_eager=True, callback=find_actions_command,
+              is_eager=True, callback=find_actions_command, expose_value=False,
               help="Find available actions based on the provided string and print them to the console.")
 @click.argument("action_identifier",
                 required=1,
