@@ -59,7 +59,7 @@ def get_action_description_from_file(file_path: Path) -> str:
     return description
 
 
-_DEFAULT_LIST_AVAILABLE_ACTIONS_CACHE_TIMEOUT = 60
+_DEFAULT_LIST_AVAILABLE_ACTIONS_CACHE_TIMEOUT = 600
 
 
 def list_available_actions(cache_timeout: float = _DEFAULT_LIST_AVAILABLE_ACTIONS_CACHE_TIMEOUT) -> list[ActionMetadata]:
