@@ -36,7 +36,10 @@ def print_available_actions(actions_metadata: list[ActionMetadata]) -> None:
     print(panel)
 
 
-def list_actions_command(ctx: Context, param: Argument, _: str) -> None:
+def list_actions_command(ctx: Context, param: Argument, value: str) -> None:
+    if not value or ctx.resilient_parsing:
+        return
+
     from python_ci_toolkit.actions.utils.logging import loading_animation
     with loading_animation(f"Listing available actions"):
         matches = list_available_actions()
