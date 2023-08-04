@@ -59,7 +59,10 @@ def get_action_description_from_file(file_path: Path) -> str:
     return description
 
 
-def list_available_actions(cache_timeout: float = -1) -> list[ActionMetadata]:
+_DEFAULT_LIST_AVAILABLE_ACTIONS_CACHE_TIMEOUT = 60
+
+
+def list_available_actions(cache_timeout: float = _DEFAULT_LIST_AVAILABLE_ACTIONS_CACHE_TIMEOUT) -> list[ActionMetadata]:
     """
     Returns a list of all available CI actions in the current project (both remote and local).
 
@@ -67,7 +70,7 @@ def list_available_actions(cache_timeout: float = -1) -> list[ActionMetadata]:
         Caches the results for the specified time to avoid cloning the remote action repo on every consecutive call.
 
     Args:
-        cache_timeout: Time in seconds after which the cache should be invalidated. If set to -1, the cache is never invalidated.
+        cache_timeout: Time in seconds after which the cache should be invalidated. If given a non-positive value, the cache will not be used.
     """
     # determine how much time passed since the last call to this autocompletion function;
     # this is done to avoid cloning the remote action repo on every consecutive call within a specific time window
