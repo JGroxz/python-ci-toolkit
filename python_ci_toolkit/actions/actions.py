@@ -10,8 +10,8 @@ from typing import List
 from .retrieval import retrieve_ci_action_script
 from .retrieval.sources.git.caching import reset_action_cache_timestamp
 from .utils import Stopwatch
-from .utils.logging import loading_animation, print_action_run_start, get_action_display_name, print_action_run_end_success, print_action_run_end_failure, \
-    get_action_run_in_progress_message
+from .utils.logging import (loading_animation, print_action_run_start, get_action_display_name,
+                            print_action_run_end_success, print_action_run_end_failure, get_action_run_in_progress_message)
 from ..logging import get_logger
 from ..logging.logging import LOG_WITH_MARKUP
 from ..pip import ensure_requirements_installed
@@ -123,7 +123,7 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
     # run CI action using its cli() method with the given arguments
     print_action_run_start(action_name, action_version, action_source)
     with(
-        loading_animation(get_action_run_in_progress_message(action_name)),
+        loading_animation(get_action_run_in_progress_message(action_display_name)),
         Stopwatch() as run_stopwatch
     ):
         run_result = execute_action_module(action_module, action_name, action_version)
