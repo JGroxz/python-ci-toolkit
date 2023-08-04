@@ -18,20 +18,31 @@ from ..environment import ci_environment_type, CiEnvironmentType
 _THEME_FILE_PATH = Path(__file__).parent / "rich_theme.cfg"
 
 
-def _get_ci_output_console() -> Console:
+def _patch_rich_console() -> Console:
     """
-    Returns a Rich Console configured for the use in CI environment.
+    Patches the global Rich Console instance for the use in the current CI environment.
+
+    Returns:
+        Patched Rich Console instance.
     """
+    global_console = rich.get_console()
+
     if (ci_environment_type == CiEnvironmentType.BitbucketPipelines
             or ci_environment_type == CiEnvironmentType.GitHubActions):
-        return Console(force_terminal=True)
+        global_console._force_terminal = True
 
-    return Console()
+    # patch rich_click console
+    rich_click._console = global_console
+
+    return global_console
 
 
-ci_output_console = _get_ci_output_console()  # TODO: patch global Rich directly instead of using this variable
+_logging_console = _patch_rich_console()
 """
-Rich console used by the CI toolkit's loggers.
+Rich Console instance used for CI Toolkit's logging output.
+
+Notes:
+    This is a global instance of Rich Console, which is patched for the current CI environment.
 """
 
 
@@ -53,7 +64,7 @@ def configure_ci_logging(level: str | int = None) -> None:
         level = logging.root.getEffectiveLevel()
 
     # configure tracebacks
-    rich.traceback.install(console=ci_output_console,
+    rich.traceback.install(console=_logging_console,
                            show_locals=False,
                            suppress=[click, rich_click, rich])
 
@@ -63,7 +74,7 @@ def configure_ci_logging(level: str | int = None) -> None:
         level=level,
         format=FORMAT,
         handlers=[
-            RichHandler(console=ci_output_console,
+            RichHandler(console=_logging_console,
                         show_path=False,
                         tracebacks_show_locals=False,
                         # disable Rich markup by default to avoid character clashes when printing logs;

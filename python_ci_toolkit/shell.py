@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
+import rich
 from rich.style import Style
 from rich.table import Table
 from rich.text import Text
@@ -89,13 +90,13 @@ def run_shell_command(command: str,
     Executes the given command in a subprocess.
 
     Notes:
-        If ran on a Windows machine, will use WSL for command execution.
+        If run on a Windows machine, will use WSL for command execution.
 
     Args:
         command: Command to execute.
         cwd: Working directory to execute the command in. Defaults to current working directory.
         raw_output: If set to True, the output from the executed command will be printed as is.
-            If set to False, the output will be printed with pretty Rich formatting through ci_output_console.
+            If set to False, the output will be printed with pretty formatting through the global Rich Console.
             Has effect only with 'silence_output' set to False.
         silence_output: If set to True, command output will be suppressed.
         raise_on_error: If set to True (default), an exception will be thrown if the executed command exits with a non-zero exit code.
@@ -112,8 +113,7 @@ def run_shell_command(command: str,
     # lazy-initialize CI console if using pretty output
     global _output_console
     if (not silence_output) and (_output_console is None):
-        from .logging import ci_output_console
-        _output_console = ci_output_console
+        _output_console = rich.get_console()
 
     # use WSL if required on Windows
     if _IS_ON_WINDOWS and use_wsl_on_windows:

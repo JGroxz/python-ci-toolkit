@@ -11,7 +11,7 @@ from rich.progress import Progress
 from . import Stopwatch
 from ..constants import ACTION_VERSION_SEPARATOR
 from ...environment import ci_project_root, ci_environment_name, CiEnvironmentType, ci_environment_type
-from ...logging import get_logger, ci_output_console
+from ...logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -71,7 +71,7 @@ def loading_animation(description: str) -> None:  # TODO: rework loading animati
     if ci_environment_type == CiEnvironmentType.Unknown:
         # in a local environment, display animated progress bar for visual feedback
         with (
-            Progress(console=ci_output_console, transient=True, refresh_per_second=60) as progress,
+            Progress(transient=True, refresh_per_second=60) as progress,
             Stopwatch() as sw
         ):
             task_id = progress.add_task(f"[blue]{description}...", total=None)
