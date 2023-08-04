@@ -3,25 +3,18 @@ Utility functions for interacting with remote Git repositories.
 """
 from __future__ import annotations
 
-import contextlib
 import io
 import logging
 import os
+import shutil
+import stat
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
 
-from git import Repo, GitCommandError, InvalidGitRepositoryError
+from git import Repo, GitCommandError
 
-from python_ci_toolkit.environment import ci_project_root, ci_environment_type, CiEnvironmentType, \
-    assert_environment_variable_set, ci_temp_files_directory
-
-
-try:
-    ci_repo = Repo(ci_project_root)
-    """GitPython reference to the local Git repository of the current CI project."""
-except InvalidGitRepositoryError as e:
-    logging.warning(f"Current project path ('{ci_project_root}') is not a Git repository. Setting 'ci_repo' variable to None.")
-    ci_repo = None
+from .environment import ci_environment_type, CiEnvironmentType, retrieve_environment_variable, ci_temp_files_directory
 
 
 def get_default_ssh_private_key_file_path() -> Path:
@@ -29,7 +22,7 @@ def get_default_ssh_private_key_file_path() -> Path:
     Returns the path to the default location of the private SSH key file on the current system.
     """
     if ci_environment_type == CiEnvironmentType.BitbucketPipelines:
-        bitbucket_ssh_key_path = assert_environment_variable_set(
+        bitbucket_ssh_key_path = retrieve_environment_variable(
             "BITBUCKET_SSH_KEY_FILE",
             "This variable is only available for pipelines running on Bitbucket Cloud and the Linux Docker Pipelines runner. "
             "See https://support.atlassian.com/bitbucket-cloud/docs/variables-and-secrets/.")
@@ -55,7 +48,7 @@ def get_default_ssh_private_key() -> str | None:
     return default_ssh_key
 
 
-@contextlib.contextmanager
+@contextmanager
 def git_ssh_credentials(ssh_private_key: str = None) -> None:
     """
     Context manager that configures Git to use the provided private SSH key when interacting with remote repositories
@@ -68,8 +61,6 @@ def git_ssh_credentials(ssh_private_key: str = None) -> None:
     Args:
         ssh_private_key: Private SSH key to use with Git.
     """
-    temp_private_ssh_key_file_path = ci_temp_files_directory.joinpath("ssh", f"{uuid.uuid4()}")
-
     # Save current GIT_SSH_COMMAND
     original_git_ssh_command = os.environ.get("GIT_SSH_COMMAND", default="")
 
@@ -88,29 +79,33 @@ def git_ssh_credentials(ssh_private_key: str = None) -> None:
             logging.info(f"Default private SSH key loaded successfully from '{default_path}'.")
 
     # Make sure that temporary folder for the key file exists
+    temp_private_ssh_key_file_path = ci_temp_files_directory.joinpath("ssh", f"{uuid.uuid4()}")
     os.makedirs(os.path.dirname(temp_private_ssh_key_file_path), exist_ok=True)
 
-    # Save Git SSH key to file
-    with io.open(temp_private_ssh_key_file_path, "w", newline="\n") as file:
-        file.write(ssh_private_key)
+    try:
+        # Save Git SSH key to file
+        with io.open(temp_private_ssh_key_file_path, "w", newline="\n") as file:
+            file.write(ssh_private_key)
 
-    # Adjust SSH key permissions on UNIX-like systems to prevent 'ssh' command from complaining
-    if os.name == "posix":
-        os.chmod(temp_private_ssh_key_file_path, 0o600)
+        # Adjust SSH key permissions on UNIX-like systems to prevent 'ssh' command from complaining
+        if os.name == "posix":
+            os.chmod(temp_private_ssh_key_file_path, 0o600)
 
-    # Tell Git to use the new SSH key file
-    os.environ["GIT_SSH_COMMAND"] = f'ssh -i "{temp_private_ssh_key_file_path}" ' \
-                                    f'-o IdentitiesOnly=yes ' \
-                                    f'-o StrictHostKeyChecking=accept-new'
+        # Tell Git to use the new SSH key file
+        os.environ["GIT_SSH_COMMAND"] = f'ssh -i "{temp_private_ssh_key_file_path}" ' \
+                                        f'-o IdentitiesOnly=yes ' \
+                                        f'-o StrictHostKeyChecking=accept-new'
 
-    yield  # <- with this context, clone repos, push changes etc.
+        yield  # <- within this context, clone repos, push changes etc.
+    except Exception:
+        raise
+    finally:
+        # Restore original GIT_SSH_COMMAND
+        os.environ["GIT_SSH_COMMAND"] = original_git_ssh_command
 
-    # Restore original GIT_SSH_COMMAND
-    os.environ["GIT_SSH_COMMAND"] = original_git_ssh_command
-
-    # Clean up the temporary key file; this will throw an error if the file cannot be deleted due to permissions etc.
-    if temp_private_ssh_key_file_path.exists():
-        os.remove(temp_private_ssh_key_file_path)
+        # Clean up the temporary key file; this will throw an error if the file cannot be deleted due to permissions etc.
+        if temp_private_ssh_key_file_path.exists():
+            os.remove(temp_private_ssh_key_file_path)
 
 
 def ensure_remote_is_ssh(repo: Repo) -> None:
@@ -200,3 +195,25 @@ def ensure_remote_is_https(repo: Repo) -> None:
     # Update remote URL
     repo.remote().set_url(https_remote_url)
     logging.info(f"Updated remote URL: '{https_remote_url}'.")
+
+
+def delete_git_repo(repo_path: Path) -> None:
+    """
+    Deletes Git repository in the given folder.
+
+    Notes:
+        Deleting Git directory requires special treatment, because a normal shutil.rmtree() call can fail
+        because of certain files in .git folder which get marked as read-only when cloning.
+
+    Args:
+        repo_path: Path to the Git repository's folder.
+    """
+    if not repo_path.exists():
+        return
+
+    def on_rm_error(func, path, exc_info):
+        # from: https://stackoverflow.com/a/4829285
+        os.chmod(path, stat.S_IWRITE)
+        os.unlink(path)
+
+    shutil.rmtree(repo_path, onerror=on_rm_error)

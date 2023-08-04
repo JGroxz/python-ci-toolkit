@@ -131,5 +131,8 @@ dmypy.json
 
 # Custom
 *.env
-temp/
 */cli/autocompletion_scripts/
+
+# Python CI Toolkit's temporary files directory
+.ci/temp
+output/
