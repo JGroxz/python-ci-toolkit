@@ -13,6 +13,21 @@ from rich.logging import RichHandler
 
 from .console import _logging_console
 
+LOG_WITH_MARKUP = dict(
+    extra=dict(
+        markup=True
+    )
+)
+"""Append this to a log call to enable Rich markup in the log message."""
+
+LOG_WITH_MARKUP_NO_HIGHLIGHTER = dict(
+    extra=dict(
+        markup=True,
+        highlighter=None
+    )
+)
+"""Append this to a log call to enable Rich markup in the log message, but disable Rich highlighting."""
+
 
 def configure_ci_logging(level: str | int = None) -> None:
     """
