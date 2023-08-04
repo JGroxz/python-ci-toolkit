@@ -13,7 +13,6 @@ from python_ci_toolkit.cli.action.list import list_actions_command
 from .find import find_actions_command, list_available_actions
 
 ACTION_IDENTIFIER_REGEX = re.compile(r'^\w+(?:@[\w\.\/\-\+]+)?', re.UNICODE)
-_ACTION_AUTOCOMPLETE_REMOTE_CLONE_CACHE_TIMEOUT = 30
 
 
 def _validate_action_identifier(ctx: Context, param: Argument, value: str) -> str:
