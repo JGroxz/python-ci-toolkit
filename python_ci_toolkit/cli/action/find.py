@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-import rich
+from click import Argument, Context
 from rich import print, box
 from rich.panel import Panel
 from rich.table import Table
@@ -178,7 +178,7 @@ def print_search_results(search_query: str, actions_metadata: list[ActionMetadat
     print(panel)
 
 
-def find_action_command(search_query: str) -> None:
+def find_actions_command(ctx: Context, param: Argument, search_query: str) -> None:
     """
     Searches for actions by their name or description and prints the results to the console.
 
@@ -190,3 +190,4 @@ def find_action_command(search_query: str) -> None:
         matches = find_actions_by_name_or_description(search_query)
 
     print_search_results(search_query, matches)
+    ctx.exit(0)
