@@ -47,3 +47,20 @@ Rich Console instance used for CI Toolkit's logging output.
 Notes:
     This is a global instance of Rich Console, which is patched for the current CI environment.
 """
+
+
+def _patch_rich_click_console() -> None:
+    """
+    Patches rich_click library to use the global Rich Console instance for logging.
+    """
+    from rich_click import rich_click
+
+    def get_rich_console_for_click() -> Console:
+        _logging_console.highlighter = rich_click.highlighter
+        _logging_console.width = 80
+        return _logging_console
+
+    rich_click._get_rich_console = get_rich_console_for_click
+
+
+_patch_rich_click_console()
