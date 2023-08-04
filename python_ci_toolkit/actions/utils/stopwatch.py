@@ -66,5 +66,7 @@ class Stopwatch(contextlib.AbstractContextManager):
             return f"{self.elapsed_time:.0f} s"
         if elapsed_floor >= 1:
             return f"{self.elapsed_time:.3f} s"
-        else:
+        elif self.elapsed_time_ms >= 1:
             return f"{self.elapsed_time_ms:.0f} ms"
+        else:
+            return f"{self.elapsed_time_ms * 1000:.0f} µs"

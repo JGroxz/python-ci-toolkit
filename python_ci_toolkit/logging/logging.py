@@ -4,6 +4,7 @@ Functions for managing logging in CI environments.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 import click
 import rich
@@ -13,6 +14,8 @@ from rich.console import Console
 from rich.logging import RichHandler
 
 from ..environment import ci_environment_type, CiEnvironmentType
+
+_THEME_FILE_PATH = Path(__file__).parent / "rich_theme.cfg"
 
 
 def _get_ci_output_console() -> Console:
@@ -26,7 +29,7 @@ def _get_ci_output_console() -> Console:
     return Console()
 
 
-ci_output_console = _get_ci_output_console()
+ci_output_console = _get_ci_output_console()  # TODO: patch global Rich directly instead of using this variable
 """
 Rich console used by the CI toolkit's loggers.
 """
