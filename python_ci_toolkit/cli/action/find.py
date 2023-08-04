@@ -64,7 +64,7 @@ def list_available_actions(cache_timeout: float = -1) -> list[ActionMetadata]:
     Returns a list of all available CI actions in the current project (both remote and local).
 
     Notes:
-        Honors _AUTOCOMPLETION_REMOTE_CLONE_DELAY_TIME_WINDOW and caches the results for that time to avoid cloning the remote action repo on every consecutive call.
+        Caches the results for the specified time to avoid cloning the remote action repo on every consecutive call.
 
     Args:
         cache_timeout: Time in seconds after which the cache should be invalidated. If set to -1, the cache is never invalidated.
@@ -94,7 +94,7 @@ def list_available_actions(cache_timeout: float = -1) -> list[ActionMetadata]:
             git_repo_url=action_repo_url,
             ssh_private_key=action_repo_ssh_private_key
         )
-    remote_action_script_paths = list_actions_in_directory(cloned_actions_directory)
+    remote_action_script_paths = list_actions_in_directory(cloned_actions_directory, include_simple_actions=False)
     remote_actions_metadata = [ActionMetadata.from_action_file(p) for p in remote_action_script_paths]
     remote_actions_metadata = [ActionMetadata(f"{m.name}", f"[remote] {m.description}") for m in remote_actions_metadata]
     remote_actions_metadata.sort()
