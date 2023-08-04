@@ -57,7 +57,7 @@ def print_action_header(action_name: str, action_version: str, action_source: st
 
 
 @contextmanager
-def loading_animation(description: str) -> None:
+def loading_animation(description: str) -> None:  # TODO: rework loading animation to a transient Live display which is accessible from the actions themselves
     """
     Context manager that displays a loading animation in the console.
     To be displayed to the user while doing prolonged tasks like cloning action Git repo.

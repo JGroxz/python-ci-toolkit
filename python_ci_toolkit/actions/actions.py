@@ -57,6 +57,29 @@ def execute_action_module(action_module: ModuleType,
     return ActionRunResult(exception=action_exception)
 
 
+def rearrange_argv_before_action_run(action_name: str) -> None:
+    """
+    Combines all args up to and including action name and puts them in the first argument of the argv.
+
+    Notes:
+        This is to make any CLI implementations in the actions themselves work as expected.
+    """
+    original_argv = sys.argv.copy()
+
+    # remove all arguments which come before action name
+    while not sys.argv[0].startswith(action_name):
+        sys.argv.pop(0)
+
+    # popped args
+    removed_args_count = len(original_argv) - len(sys.argv)
+    popped_args = original_argv[:removed_args_count]
+    sys.argv[0] = " ".join(popped_args) + " " + action_name
+
+    logger.debug("Cleaned sys.argv before action run:\n "
+                 f"  - Original: [blue]{original_argv}[/]\n"
+                 f"  - Cleaned:  [blue]{sys.argv}[/]", extra={"markup": True})
+
+
 def run_ci_action(action_name: str, action_version: str = None, argv: List[str] = None) -> None:
     """
     Executes CI action by the given action name and version.
@@ -83,9 +106,7 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
         logger.debug("Requirements installation complete.")
 
     # prepare action's CLI arguments
-    sys.argv = sys.argv[:1]
-    if argv is not None:
-        sys.argv.extend(argv)
+    rearrange_argv_before_action_run(action_name)
 
     # import action's Python module
     logger.info(f"Importing Python module of the action '{action_name}'...")
