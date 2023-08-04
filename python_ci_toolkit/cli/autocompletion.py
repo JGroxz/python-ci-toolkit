@@ -6,15 +6,23 @@ import re
 import shutil
 from pathlib import Path
 
+import rich
 import rich_click as click  # type: ignore
 from click import Context, UsageError
 from rich import print  # type: ignore
+from rich.theme import Theme
 
 AUTOCOMPLETION_COMMANDS_FILE_NAME = "autocompletion_commands"
 AUTOCOMPLETION_COMMANDS_FILE_PATH = Path(__file__).parent / AUTOCOMPLETION_COMMANDS_FILE_NAME
 
 CURRENT_SHELL_PATH = Path(os.environ.get("SHELL", ""))
 CURRENT_SHELL_NAME = CURRENT_SHELL_PATH.name.lower()
+
+RICH_THEME = Theme({
+    "shell": "cyan",
+    "command": "yellow",
+    "path": "green",
+})
 
 
 @click.command(hidden=True, no_args_is_help=True)
@@ -30,19 +38,19 @@ def autocompletion(ctx: Context, generate: bool, install: bool) -> None:
     """
     Manage autocompletion for this CLI.
     """
+    with rich.get_console().use_theme(RICH_THEME):
+        # get command name from context
+        command_name_from_context = ctx.find_root().info_name
 
-    # get command name from context
-    command_name_from_context = ctx.find_root().info_name
+        # get command name(s) from file
+        command_names_from_file = read_command_names_from_file(AUTOCOMPLETION_COMMANDS_FILE_PATH)
 
-    # get command name(s) from file
-    command_names_from_file = read_command_names_from_file(AUTOCOMPLETION_COMMANDS_FILE_PATH)
+        # merge all command names
+        command_names = sorted(list(set(command_names_from_file + [command_name_from_context])))
 
-    # merge all command names
-    command_names = sorted(list(set(command_names_from_file + [command_name_from_context])))
-
-    # manage autocompletion for each command
-    for command_name in command_names:
-        manage_autocompletion_for_command(command_name, generate, install)
+        # manage autocompletion for each command
+        for command_name in command_names:
+            manage_autocompletion_for_command(command_name, generate, install)
 
 
 def read_command_names_from_file(file_path: Path) -> list[str]:
@@ -122,7 +130,7 @@ def generate_autocompletion_script(shell_type: str, command_name: str, output_pa
     os.system(f'_{command_name_upper_snake}_COMPLETE={shell_type}_source {command_name} > "{output_path}"')
 
     word = "Generated" if output_path.exists() else "Re-generated"
-    print(f':sparkles: {word} [cyan]{shell_type}[/] completion file for command [cyan]{command_name}[/] at "{output_path}".')
+    print(f':sparkles: {word} [shell]{shell_type}[/] completion file for command [command]{command_name}[/] at "{output_path}".')
 
 
 def manage_installation_for_bash_or_zsh(
@@ -153,20 +161,20 @@ def manage_installation_for_bash_or_zsh(
 
     if install:
         if autocompletion_string in rc_file_content:
-            print(f":zzz: Autocompletion for [cyan]{command_name}[/] is already installed in your "
-                  f"[cyan]{rc_file_path.name}[/] file. Skipping.")
+            print(f":zzz: Autocompletion for [command]{command_name}[/] is already installed in your "
+                  f"[path]{rc_file_path.name}[/] file. Skipping.")
             return
 
         # Add entry to the user's rc file
         with rc_file_path.open("a+") as file:
             file.write(f"{autocompletion_string}")
 
-        print(f":white_check_mark: Added [cyan]{command_name}[/] autocompletion entry from your "
-              f"[cyan]{rc_file_path.name}[/] file.")
+        print(f":white_check_mark: Added [command]{command_name}[/] autocompletion entry from your "
+              f"[path]{rc_file_path.name}[/] file.")
     else:
         if autocompletion_string not in rc_file_content:
-            print(f":zzz: There is no autocompletion for [cyan]{command_name}[/] installed in your "
-                  f"[cyan]{rc_file_path.name}[/] file. Skipping.")
+            print(f":zzz: There is no autocompletion for [command]{command_name}[/] installed in your "
+                  f"[path]{rc_file_path.name}[/] file. Skipping.")
             return
 
         # Remove entry from the user's rc file
@@ -174,8 +182,8 @@ def manage_installation_for_bash_or_zsh(
         with rc_file_path.open("w") as file:
             file.write(rc_file_content)
 
-        print(f":white_check_mark: Removed [cyan]{command_name}[/] autocompletion entry from your "
-              f"[cyan]{rc_file_path.name}[/] file.")
+        print(f":white_check_mark: Removed [command]{command_name}[/] autocompletion entry from your "
+              f"[path]{rc_file_path.name}[/] file.")
 
 
 def manage_installation_for_fish(
@@ -202,16 +210,16 @@ def manage_installation_for_fish(
             destination_path,
         )
 
-        print(f":white_check_mark: Added [cyan]{command_name}[/] autocompletion script to your [cyan]fish[/] config "
+        print(f":white_check_mark: Added [command]{command_name}[/] autocompletion script to your [shell]fish[/] config "
               f"directory.")
     else:
         if not destination_path.exists():
-            print(f":zzz: Autocompletion for [cyan]{command_name}[/] is not present in your fish config directory. "
+            print(f":zzz: Autocompletion for [command]{command_name}[/] is not present in your fish config directory. "
                   f"Skipping.")
             return
 
         # Remove autocompletion script from fish config directory
         destination_path.unlink()
 
-        print(f":white_check_mark: Removed [cyan]{command_name}[/] autocompletion script from your [cyan]fish[/] "
+        print(f":white_check_mark: Removed [command]{command_name}[/] autocompletion script from your [shell]fish[/] "
               f"config directory.")

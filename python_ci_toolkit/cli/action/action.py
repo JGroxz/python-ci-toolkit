@@ -3,10 +3,11 @@ from __future__ import annotations
 import logging
 import os
 import re
+import sys
 from typing import List
 
 import rich_click as click
-from click import Context, Argument
+from click import Context, Argument, Parameter
 from click.shell_completion import CompletionItem
 
 from python_ci_toolkit.cli.action.list import list_actions_command
@@ -55,6 +56,51 @@ def _complete_action_identifier(ctx: Context, param: Argument, incomplete: str):
             for a in filtered_actions_metadata]
 
 
+def _intercept_help_for_action(ctx: Context, param: Parameter, value: str) -> None:
+    """
+    Intercepts the --help option and prints the help message for the action command instead of the default one.
+    """
+    if not value or ctx.resilient_parsing:
+        return
+
+    logging.debug(f"Intercepted help command for action.")
+
+    # find index of the last preceding command
+    last_command = ctx.command_path.split(" ")[-1]
+    last_command_index = 0
+    for last_command_index, arg in enumerate(sys.argv):
+        arg = str(arg)
+        if (arg == last_command) or arg.endswith(f"/{last_command}"):
+            break
+
+    # find index of the help flag
+    help_flag_index = 0
+    for help_flag_index, arg in enumerate(sys.argv):
+        arg = str(arg)
+        if (arg == "--help") or (arg == "-h"):
+            break
+
+    # find index of the action identifier
+    action_identifier_index = 0
+    for action_identifier_index, arg in enumerate(sys.argv):
+        if action_identifier_index <= last_command_index:
+            # action identifier is never before the last preceding command
+            continue
+
+        arg = str(arg)
+        if not arg.startswith("-"):
+            break
+
+    # check if the help flag comes after the action identifier
+    if help_flag_index > action_identifier_index:
+        # help flag belongs to the action itself, skip
+        return
+    else:
+        # help flag belongs to the command
+        click.echo(ctx.get_help(), color=ctx.color)
+        ctx.exit()
+
+
 @click.command(context_settings=dict(
     ignore_unknown_options=True,
 ), no_args_is_help=True)
@@ -69,6 +115,10 @@ def _complete_action_identifier(ctx: Context, param: Argument, incomplete: str):
 @click.option("--find", "-f",
               is_eager=True, callback=find_actions_command, expose_value=False,
               help="Find available actions based on the provided string and print them to the console.")
+@click.option("--help", "-h",
+              is_flag=True,
+              is_eager=True, callback=_intercept_help_for_action, expose_value=False,
+              help="Show this message and exit.")
 @click.argument("action_identifier",
                 required=1,
                 type=str,
