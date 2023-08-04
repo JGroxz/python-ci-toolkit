@@ -76,8 +76,8 @@ def rearrange_argv_before_action_run(action_name: str) -> None:
     sys.argv[0] = " ".join(popped_args) + " " + action_name
 
     logger.debug("Cleaned sys.argv before action run:\n "
-                 f"  - Original: [blue]{original_argv}[/]\n"
-                 f"  - Cleaned:  [blue]{sys.argv}[/]", extra={"markup": True})
+                 f"  - Original: [pyci.info]{original_argv}[/]\n"
+                 f"  - Cleaned:  [pyci.info]{sys.argv}[/]", extra={"markup": True})
 
 
 def run_ci_action(action_name: str, action_version: str = None, argv: List[str] = None) -> None:
@@ -121,7 +121,7 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
     # run CI action using its cli() method with the given arguments
     print_action_header(action_name, action_version, action_source)
 
-    with loading_animation(f"[rgb(146,202,85)]Running CI action '{action_display_name}'"), Stopwatch() as run_stopwatch:
+    with loading_animation(f"[pyci.flair]Running CI action '{action_display_name}'"), Stopwatch() as run_stopwatch:
         run_result = execute_action_module(action_module, action_name, action_version)
 
     if not run_result.is_successful:
@@ -129,11 +129,11 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
         try:
             raise run_result.exception
         finally:
-            logger.critical(f"[red]Action run failed in {run_stopwatch.elapsed_time_pretty} ({type(run_result.exception).__name__}, '{action_display_name}').[/]",
+            logger.critical(f"[pyci.error]Action run failed in {run_stopwatch.elapsed_time_pretty} ({type(run_result.exception).__name__}, '{action_display_name}').[/]",
                             extra={"markup": True, "highlighter": None})
 
     # action completed successfully
-    logger.info(f"[rgb(146,202,85)]Action run completed in {run_stopwatch.elapsed_time_pretty} ('{action_display_name}').[/]",
+    logger.info(f"[pyci.success]Action run completed in {run_stopwatch.elapsed_time_pretty} ('{action_display_name}').[/]",
                 extra={"markup": True})
 
     # reset cache timestamps after each successful action run

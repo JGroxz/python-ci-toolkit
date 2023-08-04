@@ -49,11 +49,11 @@ def print_action_header(action_name: str, action_version: str, action_source: st
 
     action_display_name = get_action_display_name(action_name, action_version)
 
-    logger.info(f"[green]>_[/][rgb(146,202,85)] Running CI action '{action_display_name}'[/]...\n"
-                f"     CI toolkit version: [blue]{version}[/]\n"
-                f"     CI environment: [blue]{ci_environment_name}[/]\n"
-                f"     Action version: [blue]{action_version}[/]\n"
-                f"     Action source: [blue]{action_source}[/]", extra={"markup": True, "highlighter": None})
+    logger.info(f"[pyci.flair]>_ Running CI action [pyci.action]'{action_display_name}'[/]...[/]\n"
+                f"     CI toolkit version: [pyci.info]{version}[/]\n"
+                f"     CI environment: [pyci.info]{ci_environment_name}[/]\n"
+                f"     Action version: [pyci.info]{action_version}[/]\n"
+                f"     Action source: [pyci.info]{action_source}[/]", extra={"markup": True, "highlighter": None})
 
 
 @contextmanager
@@ -74,7 +74,7 @@ def loading_animation(description: str) -> None:  # TODO: rework loading animati
             Progress(transient=True, refresh_per_second=60) as progress,
             Stopwatch() as sw
         ):
-            task_id = progress.add_task(f"[blue]{description}...", total=None)
+            task_id = progress.add_task(f"[pyci.info]{description}...", total=None)
 
             is_done = False
 
@@ -83,7 +83,7 @@ def loading_animation(description: str) -> None:  # TODO: rework loading animati
                     time.sleep(0.1)
                     if sw.elapsed_time < 1:
                         continue
-                    progress.update(task_id, description=f"[blue]{description}... [dim]({sw.elapsed_time_pretty})[/]")
+                    progress.update(task_id, description=f"[pyci.info]{description}... [dim]({sw.elapsed_time_pretty})[/]")
 
             Thread(target=update_description, daemon=True).start()
 
