@@ -6,11 +6,14 @@ from rich import print  # type: ignore
 
 from .action import action
 from .autocompletion import autocompletion
+from ..logging import configure_ci_logging
 
 # configure rich-click
 click.rich_click.SHOW_ARGUMENTS = True
 click.rich_click.MAX_WIDTH = 80
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
+
+configure_ci_logging()
 
 
 def purge_ci_toolkit_caches() -> None:
