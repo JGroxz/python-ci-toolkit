@@ -10,8 +10,10 @@ from typing import List
 from .retrieval import retrieve_ci_action_script
 from .retrieval.sources.git.caching import reset_action_cache_timestamp
 from .utils import Stopwatch
-from .utils.logging import loading_animation, print_action_header, get_action_display_name
+from .utils.logging import (loading_animation, print_action_run_start, get_action_display_name,
+                            print_action_run_end_success, print_action_run_end_failure, get_action_run_in_progress_message)
 from ..logging import get_logger
+from ..logging.logging import LOG_WITH_MARKUP
 from ..pip import ensure_requirements_installed
 from ..python import import_module_from_file
 
@@ -76,8 +78,8 @@ def rearrange_argv_before_action_run(action_name: str) -> None:
     sys.argv[0] = " ".join(popped_args) + " " + action_name
 
     logger.debug("Cleaned sys.argv before action run:\n "
-                 f"  - Original: [blue]{original_argv}[/]\n"
-                 f"  - Cleaned:  [blue]{sys.argv}[/]", extra={"markup": True})
+                 f"  - Original: [pyci.info]{original_argv}[/]\n"
+                 f"  - Cleaned:  [pyci.info]{sys.argv}[/]", extra={"markup": True})
 
 
 def run_ci_action(action_name: str, action_version: str = None, argv: List[str] = None) -> None:
@@ -98,7 +100,7 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
     # install action's requirements if present
     action_requirements_path = action_script_path.parent / "requirements.txt"
     if action_requirements_path.exists():
-        logger.debug(f"Action '{action_name}' has requirements file supplied with it. Installing requirements...")
+        logger.debug(f"Action [pyci.action]'{action_name}'[/] has requirements file supplied with it. Installing requirements...", **LOG_WITH_MARKUP)
 
         with loading_animation("Installing action's dependencies"):
             ensure_requirements_installed(action_requirements_path, silence_pip_stdout=False)
@@ -109,19 +111,21 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
     rearrange_argv_before_action_run(action_name)
 
     # import action's Python module
-    logger.info(f"Importing Python module of the action '{action_name}'...")
+    logger.debug(f"Importing Python module of the action [pyci.action]'{action_name}'[/]...", **LOG_WITH_MARKUP)
     with loading_animation("Importing action's Python module..."), Stopwatch() as import_stopwatch:
         try:
             action_module = import_module_from_file(f"{action_name}", action_script_path)
         except Exception:
             logger.error(f"Error when importing Python module from action script '{action_script_path}' (action '{action_display_name}' from {action_source}).")
             raise
-    logger.info(f"Import completed in {import_stopwatch.elapsed_time_pretty}.")
+    logger.debug(f"Import completed in {import_stopwatch.elapsed_time_pretty}.")
 
     # run CI action using its cli() method with the given arguments
-    print_action_header(action_name, action_version, action_source)
-
-    with loading_animation(f"[rgb(146,202,85)]Running CI action '{action_display_name}'"), Stopwatch() as run_stopwatch:
+    print_action_run_start(action_name, action_version, action_source)
+    with(
+        loading_animation(get_action_run_in_progress_message(action_display_name)),
+        Stopwatch() as run_stopwatch
+    ):
         run_result = execute_action_module(action_module, action_name, action_version)
 
     if not run_result.is_successful:
@@ -129,12 +133,10 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
         try:
             raise run_result.exception
         finally:
-            logger.critical(f"[red]Action run failed in {run_stopwatch.elapsed_time_pretty} ({type(run_result.exception).__name__}, '{action_display_name}').[/]",
-                            extra={"markup": True, "highlighter": None})
+            print_action_run_end_failure(action_display_name, run_stopwatch, run_result.exception)
 
     # action completed successfully
-    logger.info(f"[rgb(146,202,85)]Action run completed in {run_stopwatch.elapsed_time_pretty} ('{action_display_name}').[/]",
-                extra={"markup": True})
+    print_action_run_end_success(action_display_name, run_stopwatch)
 
     # reset cache timestamps after each successful action run
     # to allow chaining actions from the same repo without re-downloading them

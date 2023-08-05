@@ -4,35 +4,29 @@ Functions for managing logging in CI environments.
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 
 import click
 import rich
 import rich.traceback
 import rich_click
-from rich.console import Console
 from rich.logging import RichHandler
 
-from ..environment import ci_environment_type, CiEnvironmentType
+from .console import _logging_console
 
-_THEME_FILE_PATH = Path(__file__).parent / "rich_theme.cfg"
+LOG_WITH_MARKUP = dict(
+    extra=dict(
+        markup=True
+    )
+)
+"""Append this to a log call to enable Rich markup in the log message."""
 
-
-def _get_ci_output_console() -> Console:
-    """
-    Returns a Rich Console configured for the use in CI environment.
-    """
-    if (ci_environment_type == CiEnvironmentType.BitbucketPipelines
-            or ci_environment_type == CiEnvironmentType.GitHubActions):
-        return Console(force_terminal=True)
-
-    return Console()
-
-
-ci_output_console = _get_ci_output_console()  # TODO: patch global Rich directly instead of using this variable
-"""
-Rich console used by the CI toolkit's loggers.
-"""
+LOG_WITH_MARKUP_NO_HIGHLIGHTER = dict(
+    extra=dict(
+        markup=True,
+        highlighter=None
+    )
+)
+"""Append this to a log call to enable Rich markup in the log message, but disable Rich highlighting."""
 
 
 def configure_ci_logging(level: str | int = None) -> None:
@@ -52,10 +46,17 @@ def configure_ci_logging(level: str | int = None) -> None:
     if level is None:
         level = logging.root.getEffectiveLevel()
 
+    # ensure that level is an int
+    if type(level) is str:
+        level = getattr(logging, level.upper())
+
+    # compile suppress list
+    suppress_list = [click, rich_click, rich]
+
     # configure tracebacks
-    rich.traceback.install(console=ci_output_console,
+    rich.traceback.install(console=_logging_console,
                            show_locals=False,
-                           suppress=[click, rich_click, rich])
+                           suppress=suppress_list)
 
     # basicConfig in case logging has not been set up yet
     FORMAT = "%(message)s"
@@ -63,12 +64,13 @@ def configure_ci_logging(level: str | int = None) -> None:
         level=level,
         format=FORMAT,
         handlers=[
-            RichHandler(console=ci_output_console,
+            RichHandler(console=_logging_console,
                         show_path=False,
                         tracebacks_show_locals=False,
                         # disable Rich markup by default to avoid character clashes when printing logs;
                         # markup can still be processed on demand by explicitly adding 'extra={"markup": True}' to the log call
-                        markup=False)
+                        markup=False,
+                        tracebacks_suppress=suppress_list)
         ],
     )
 

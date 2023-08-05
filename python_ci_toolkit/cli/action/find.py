@@ -59,7 +59,7 @@ def get_action_description_from_file(file_path: Path) -> str:
     return description
 
 
-_DEFAULT_LIST_AVAILABLE_ACTIONS_CACHE_TIMEOUT = 60
+_DEFAULT_LIST_AVAILABLE_ACTIONS_CACHE_TIMEOUT = 600
 
 
 def list_available_actions(cache_timeout: float = _DEFAULT_LIST_AVAILABLE_ACTIONS_CACHE_TIMEOUT) -> list[ActionMetadata]:
@@ -139,7 +139,7 @@ def print_search_results(search_query: str, actions_metadata: list[ActionMetadat
     something_found = len(actions_metadata) > 0
 
     # panel title
-    title = f"Search results for [yellow]'{search_query}'[/]"
+    title = f"Search results for [pyci.query]'{search_query}'[/]"
     if something_found:
         title += f": {len(actions_metadata)} actions"
 
@@ -167,7 +167,7 @@ def print_search_results(search_query: str, actions_metadata: list[ActionMetadat
             )
         panel_content = grid
     else:
-        panel_content = Text.from_markup(f"[red]No actions found containing [yellow]'{search_query}'")
+        panel_content = Text.from_markup(f"[pyci.error]No actions found containing [pyci.query]'{search_query}'")
         panel_content.align("center", (80 - 4))
 
     # print panel

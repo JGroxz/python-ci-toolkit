@@ -13,6 +13,7 @@ from ....utils.logging import get_action_display_name
 from .....environment.paths.internal import ci_temp_files_shared_directory
 from .....environment.variables import retrieve_environment_variable
 from .....git import git_ssh_credentials, get_default_ssh_private_key
+from .....logging.logging import LOG_WITH_MARKUP
 from .....shell import run_shell_command
 
 logger = logging.getLogger(__name__)
@@ -193,8 +194,8 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
 
     # check if the repo had the requested action script
     if not action_script_path.exists():
-        logger.error(f"Cloned repository '{git_repo_url}' does not include action '{action_name}' (expected script path is '{action_script_path}').\n"
-                     f"Please make sure that the remote repository has the required action script.")
+        logger.error(f"Cloned repository '{git_repo_url}' does not include action [pyci.action]'{action_name}'[/] (expected script path is '{action_script_path}').\n"
+                     f"Please make sure that the remote repository has the required action script.", **LOG_WITH_MARKUP)
         sys.exit(4)
 
     return action_script_path

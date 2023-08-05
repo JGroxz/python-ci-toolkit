@@ -52,7 +52,7 @@ def list_actions_command(ctx: Context, param: Argument, value: str) -> None:
         # print a tip about searching for actions
         root_command_name = ctx.command_path
         find_flag = "--find"
-        panel_content = f"Use [yellow]'{root_command_name} {find_flag}'[/] to filter available actions by their name or description."
+        panel_content = f"Use [pyci.command]'{root_command_name} {find_flag}'[/] to filter available actions by their name or description."
         title = "💡Tip"
         panel = Panel(
             panel_content,
