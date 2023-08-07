@@ -38,21 +38,27 @@ class ActionRunResult:
         return no_exceptions or clean_exit
 
 
+_ACTION_ENTRY_POINT_FUNCTION_NAME = "action"
+"""Name of the Python method used as an entry point for the action logic."""
+
+
 def execute_action_module(action_module: ModuleType,
                           action_name: str,
                           action_version: str) -> ActionRunResult:
     action_display_name = get_action_display_name(action_name, action_version)
 
-    # check if the action module has a cli() method
-    if not hasattr(action_module, "cli"):
-        logger.critical(f"Action '{action_display_name}' does not have a 'cli()' method, so it won't be executed.\n"
-                        f"Please make sure that the action module has a 'cli()' method which serves as an entry point for the action logic.")
+    # check if the action module has the required entry point function
+    if not hasattr(action_module, _ACTION_ENTRY_POINT_FUNCTION_NAME):
+        logger.critical(f"Action '{action_display_name}' does not have a '{_ACTION_ENTRY_POINT_FUNCTION_NAME}()' function, so it won't be executed.\n"
+                        f"Please make sure that the action module has a '{_ACTION_ENTRY_POINT_FUNCTION_NAME}()' "
+                        f"function which serves as an entry point for the action logic.")
         sys.exit(1)
 
     # run the action
     action_exception = None
     try:
-        action_module.action()
+        action_function = getattr(action_module, _ACTION_ENTRY_POINT_FUNCTION_NAME)
+        action_function()
     except BaseException as e:
         action_exception = e
 
