@@ -103,6 +103,9 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
     logger.debug(f"Locating action '{action_display_name}'...")
     action_script_path, action_source = retrieve_ci_action_script(action_name, action_version)
 
+    # announce action run start
+    print_action_run_start(action_name, action_version, action_source)
+
     # install action's requirements if present
     action_requirements_path = action_script_path.parent / "requirements.txt"
     if action_requirements_path.exists():
@@ -118,16 +121,18 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
 
     # import action's Python module
     logger.debug(f"Importing Python module of the action [pyci.action]'{action_name}'[/]...", **LOG_WITH_MARKUP)
-    with loading_animation("Importing action's Python module..."), Stopwatch() as import_stopwatch:
+    with (
+        loading_animation("Importing action's Python module..."),
+        Stopwatch() as import_stopwatch
+    ):
         try:
-            action_module = import_module_from_file(f"{action_name}", action_script_path)
+            action_module = import_module_from_file(f"{action_name}", action_script_path, True)
         except Exception:
             logger.error(f"Error when importing Python module from action script '{action_script_path}' (action '{action_display_name}' from {action_source}).")
             raise
     logger.debug(f"Import completed in {import_stopwatch.elapsed_time_pretty}.")
 
     # run CI action using its cli() method with the given arguments
-    print_action_run_start(action_name, action_version, action_source)
     with(
         loading_animation(get_action_run_in_progress_message(action_display_name)),
         Stopwatch() as run_stopwatch
