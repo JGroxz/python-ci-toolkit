@@ -52,7 +52,7 @@ def execute_action_module(action_module: ModuleType,
     # run the action
     action_exception = None
     try:
-        action_module.cli()
+        action_module.action()
     except BaseException as e:
         action_exception = e
 

@@ -88,7 +88,7 @@ def update_self_dependency_version_in_dockerfile(containers_repo: Repo) -> None:
     logger.info("Bumped patch version of python-ci-containers and committed.")
 
 
-def cli() -> None:
+def action() -> None:
     current_toolkit_version = versions.read_project_version(ci_project_root)
     if current_toolkit_version.prerelease:
         logger.info(f"Currently checked out toolkit version ('{current_toolkit_version}') is a pre-release.\n"
@@ -118,4 +118,4 @@ def cli() -> None:
 
 
 if __name__ == '__main__':
-    cli()
+    action()
