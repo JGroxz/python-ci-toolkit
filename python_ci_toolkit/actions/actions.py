@@ -75,7 +75,7 @@ _running_actions_stack: list[tuple[str, str]] = [
 ]
 
 
-def run_ci_action(action_name: str, action_version: str = None, args: List[str] = None) -> ActionOutput:
+def run_ci_action(action_name: str, action_version: str = None, args: List[str] = None) -> None:
     """
     Executes CI action by the given action name and version.
 
