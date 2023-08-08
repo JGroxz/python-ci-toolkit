@@ -126,7 +126,10 @@ def run_ci_action(action_name: str, action_version: str = None, args: List[str] 
     if not is_nested_action:
         rearrange_argv_before_action_run(action_name)
     else:
-        sys.argv = args
+        if args is None:
+            args = []
+        sys.argv = [action_name, *args]
+        logger.debug(f"Updated sys.argv with provided values before nested action run: {sys.argv}")
 
     # import action's Python module
     logger.debug(f"Importing Python module of the action [pyci.action]'{action_name}'[/]...", **LOG_WITH_MARKUP)
@@ -147,7 +150,6 @@ def run_ci_action(action_name: str, action_version: str = None, args: List[str] 
         loading_animation(get_action_progress_message(action_display_name, "Running")),
         Stopwatch() as run_stopwatch
     ):
-        time.sleep(1)
         run_result = execute_action_module(action_module, action_name, action_version)
 
     if not run_result.is_successful:
@@ -167,6 +169,7 @@ def run_ci_action(action_name: str, action_version: str = None, args: List[str] 
     # restore argv of the caller action
     if is_nested_action:
         sys.argv = original_argv
+        logger.debug(f"Restored sys.argv after nested action run: {sys.argv}")
 
     # remove action from the stack
     _running_actions_stack.remove(action_stack_identifier)
