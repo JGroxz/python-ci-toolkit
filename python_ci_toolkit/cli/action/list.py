@@ -41,7 +41,7 @@ def list_actions_command(ctx: Context, param: Argument, value: str) -> None:
         return
 
     from python_ci_toolkit.actions.utils.logging import loading_animation
-    with loading_animation(f"Listing available actions"):
+    with loading_animation(f"Listing available actions..."):
         matches = list_available_actions()
 
     print_available_actions(matches)
