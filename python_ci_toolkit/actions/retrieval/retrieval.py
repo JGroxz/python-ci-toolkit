@@ -57,7 +57,7 @@ def retrieve_ci_action_script(action_name: str, action_version: str = None) -> t
             # from remote Git repo
             start_time = time.perf_counter()
 
-            with loading_animation(f"Retrieving action from Git"):
+            with loading_animation(f"Retrieving action from Git..."):
 
                 action_script_path = retrieve_ci_action_script_from_git(
                     git_repo_url=action_repo_url,

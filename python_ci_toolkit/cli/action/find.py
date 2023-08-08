@@ -157,7 +157,7 @@ def print_search_results(search_query: str, actions_metadata: list[ActionMetadat
         # prepare a highlighter
         def text_with_highlighted_search_query(text: str) -> Text:
             text = Text(text)
-            text.highlight_words([search_query], "yellow underline", case_sensitive=False)
+            text.highlight_words([search_query], "pyci.highlight", case_sensitive=False)
             return text
 
         for metadata in actions_metadata:
