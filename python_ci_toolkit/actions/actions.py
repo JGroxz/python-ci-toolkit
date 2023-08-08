@@ -100,8 +100,7 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
     logger.debug(f"Located action '{action_display_name}' at {action_source}.")
 
     # announce action run start
-    if not is_nested_action:
-        print_action_run_start(action_name, action_version, action_source)
+    print_action_run_start(action_name, action_version, action_source, is_nested_action)
 
     # install action's requirements if present
     action_requirements_path = action_script_path.parent / "requirements.txt"
@@ -148,11 +147,10 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
         try:
             raise run_result.exception
         finally:
-            print_action_run_end_failure(action_display_name, run_stopwatch, run_result.exception)
+            print_action_run_end_failure(action_display_name, run_stopwatch, run_result.exception, is_nested_action)
 
     # action completed successfully
-    if not is_nested_action:
-        print_action_run_end_success(action_display_name, run_stopwatch)
+    print_action_run_end_success(action_display_name, run_stopwatch, is_nested_action)
 
     # reset cache timestamps after each successful action run
     # to allow chaining actions from the same repo without re-downloading them
