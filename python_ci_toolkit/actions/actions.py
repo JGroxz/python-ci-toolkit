@@ -7,7 +7,7 @@ import time
 from types import ModuleType
 from typing import List
 
-from .datatypes import ActionRunResult
+from .datatypes import ActionRunResult, ActionOutput
 from .retrieval import retrieve_ci_action_script
 from .retrieval.sources.git.caching import reset_action_cache_timestamp
 from .utils import Stopwatch
@@ -39,12 +39,26 @@ def execute_action_module(action_module: ModuleType,
     # run the action
     action_exception = None
     try:
-        action_function = getattr(action_module, _ACTION_ENTRY_POINT_FUNCTION_NAME)
-        action_output = action_function()
+        action_function: callable = getattr(action_module, _ACTION_ENTRY_POINT_FUNCTION_NAME)
+
+        extra_kwargs = {}
+        is_click_command = hasattr(action_function, "no_args_is_help")
+        if is_click_command:
+            # if the action entry point is wrapped by Click, use 'standalone_mode=False' to get the return value
+            # (https://stackoverflow.com/a/66156654)
+            extra_kwargs.setdefault("standalone_mode", False)
+
+        logger.debug(f"Calling action entry point function: {action_function}")
+        return_value = action_function(**extra_kwargs)
+        logger.debug(f"Action function return value: {return_value}")
     except BaseException as e:
         action_exception = e
+        return_value = None
 
-    return ActionRunResult(exception=action_exception)
+    return ActionRunResult(
+        exception=action_exception,
+        output=ActionOutput(value=return_value)
+    )
 
 
 def rearrange_argv_before_action_run(action_name: str) -> None:
@@ -75,7 +89,7 @@ _running_actions_stack: list[tuple[str, str]] = [
 ]
 
 
-def run_ci_action(action_name: str, action_version: str = None, args: List[str] = None) -> None:
+def run_ci_action(action_name: str, action_version: str = None, args: List[str] = None) -> ActionOutput:
     """
     Executes CI action by the given action name and version.
 
@@ -173,3 +187,5 @@ def run_ci_action(action_name: str, action_version: str = None, args: List[str] 
 
     # remove action from the stack
     _running_actions_stack.remove(action_stack_identifier)
+
+    return run_result.output
