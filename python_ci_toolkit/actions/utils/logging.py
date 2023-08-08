@@ -5,10 +5,11 @@ import time
 from contextlib import contextmanager
 from logging import Logger
 from threading import Thread
+from typing import Iterable
 
 from rich import print
-from rich.progress import Progress
-from rich.text import Text
+from rich.console import RenderableType
+from rich.progress import Progress, Task, TimeRemainingColumn, TaskProgressColumn, BarColumn, TextColumn
 
 from . import Stopwatch
 from ..constants import ACTION_VERSION_SEPARATOR
@@ -16,6 +17,11 @@ from ...environment import ci_project_root, ci_environment_name, CiEnvironmentTy
 from ...logging import get_logger
 
 logger = get_logger(__name__)
+
+_ACTION_VISUAL_THREAD_OFFSET = 27
+"""
+
+"""
 
 
 def get_action_logger(name: str = None) -> Logger:
@@ -40,6 +46,38 @@ def get_action_display_name(action_name: str, action_version: str) -> str:
     return f"{action_name}{ACTION_VERSION_SEPARATOR}{action_version}"
 
 
+def _get_new_progress_instance() -> Progress:
+    """
+    Returns a new instance of the Rich Progress class.
+    """
+    progress_renderables = (
+        " ",
+        BarColumn(_ACTION_VISUAL_THREAD_OFFSET - 3, pulse_style="pyci.progress"),
+        " [pyci.flair_dark]│[/]",
+        TextColumn("[progress.description]{task.description}"),
+        TaskProgressColumn(),
+        TimeRemainingColumn(),
+    )
+    progress = Progress(*progress_renderables, transient=True, refresh_per_second=60)
+
+    # patch this Progress's get_renderables method to sort tasks by their start time when rendering
+    def get_renderables(self: Progress) -> Iterable[RenderableType]:
+        """Get a number of renderables for the progress display."""
+        sorted_tasks = sorted(self.tasks, key=lambda task: task.start_time, reverse=True)
+        table = self.make_tasks_table(sorted_tasks)
+        yield table
+
+    progress.get_renderables = get_renderables.__get__(progress)
+
+    return progress
+
+
+_progress = _get_new_progress_instance()
+"""
+Global Rich Progress instance used to display loading animations in the console.
+"""
+
+
 @contextmanager
 def loading_animation(description: str) -> None:  # TODO: rework loading animation to a transient Live display which is accessible from the actions themselves
     """
@@ -54,36 +92,95 @@ def loading_animation(description: str) -> None:  # TODO: rework loading animati
     """
     if ci_environment_type == CiEnvironmentType.Unknown:
         # in a local environment, display animated progress bar for visual feedback
-        with (
-            Progress(transient=True, refresh_per_second=60) as progress,
-            Stopwatch() as sw
-        ):
-            task_id = progress.add_task(f"[pyci.info]{description}...", total=None)
-
-            is_done = False
-
-            def update_description():
-                while not is_done:
-                    time.sleep(0.1)
-                    if sw.elapsed_time < 1:
-                        continue
-                    progress.update(task_id, description=f"[pyci.info]{description}... [dim]({sw.elapsed_time_pretty})[/]")
-
-            Thread(target=update_description, daemon=True).start()
-
-            try:
-                yield  # <- within this context, clone repos, install requirements etc.
-            except BaseException:
-                raise
-            finally:
-                is_done = True
+        global _progress
+        if not _progress.live.is_started:
+            with (
+                _get_new_progress_instance() as _progress,
+                _task_progress_updater(_progress)
+            ):
+                with _task_in_progress(_progress, description):
+                    yield
+        else:
+            with _task_in_progress(_progress, description):
+                yield
     else:
         # cloud environments normally don't support erasing terminal output,
         # so progress bars get messed up; in this case we don't display them
         yield
 
 
-_ACTION_VISUAL_THREAD_OFFSET = 27
+def _get_task_description_for_display(task: Task) -> str:
+    """
+    Crafts a message to be displayed in the progress bar while the task is running.
+
+    Args:
+        task: Task to get the description for.
+
+    Returns:
+        Message to be displayed in the progress bar.
+    """
+    # extract original description
+    description = task.fields["original_description"]
+
+    # craft elapsed time string
+    elapsed_time = task.elapsed
+    elapsed_time_pretty = Stopwatch.format_time_pretty(elapsed_time)
+    time_string = "" if (elapsed_time < 1) else f"[dim]({elapsed_time_pretty})[/]"
+
+    return f"[pyci.info]{description} {time_string}[/]"
+
+
+@contextmanager
+def _task_in_progress(progress: Progress, description: str) -> None:
+    """
+    Adds a task to the stack of tasks that are currently displayed in the progress bar.
+
+    Args:
+        progress: Progress instance to add the task to.
+        description: Description of the task.
+    """
+    task_id = progress.add_task(
+        f"[pyci.info]{description}",
+        total=None,
+        original_description=description,
+    )
+
+    yield
+
+    progress.update(task_id, completed=True)
+
+
+@contextmanager
+def _task_progress_updater(progress: Progress) -> None:
+    """
+    Updates the descriptions of all tasks in the progress bar in a background thread while the context is active.
+
+    Args:
+        progress: Progress bar object to use.
+    """
+    is_done = False
+
+    def update_tasks():
+        while not is_done:
+            time.sleep(0.1)
+
+            # remove completed tasks
+            completed_task_id = [task.id for task in progress.tasks if task.completed]
+            for task in completed_task_id:
+                progress.remove_task(task)
+
+            # update descriptions of running tasks
+            for task in progress.tasks:
+                progress.update(task.id, description=_get_task_description_for_display(task), refresh=True)
+
+    Thread(target=update_tasks, daemon=True).start()
+
+    try:
+        yield  # <- within this context, do the task
+    except BaseException:
+        raise
+    finally:
+        is_done = True
 
 
 def _get_action_run_border_tip_element(top: bool = True) -> str:
@@ -96,32 +193,24 @@ def _get_action_run_border_tip_element(top: bool = True) -> str:
         return f"╭{'─' * width}╯"
 
 
-def get_action_run_in_progress_message(action_name: str) -> str:
+def get_action_progress_message(action_name: str, status: str) -> str:
     """
     Crafts a message to be displayed in the progress bar while the action is running.
 
     Args:
         action_name: Name of the action.
+        status: Status of the action (e.g. "Importing", "Running" etc.).
 
     Returns:
         Message to be displayed in the progress bar.
     """
-    left_part = Text(f">_ '{action_name}'")
-    available_width = _ACTION_VISUAL_THREAD_OFFSET
-    overflow = len(left_part) - available_width
-    if overflow > 0:
-        ellipsized_ending = "…'"
-        left_part.right_crop(overflow + len(ellipsized_ending) + 1)
-        left_part.append(ellipsized_ending)
-    left_part.pad_left(available_width - len(left_part) - 1)
-
-    separator = f"[pyci.flair_dark]│[/]"
-    right_part = f"[pyci.flair][pyci.action]Running[/]"
-
-    return f" [pyci.flair]{left_part} {separator} {right_part}"
+    return f"[pyci.flair]>_ '{action_name}': {status}..."
 
 
-def print_action_run_start(action_name: str, action_version: str, action_source: str) -> None:
+def print_action_run_start(action_name: str,
+                           action_version: str,
+                           action_source: str,
+                           is_nested: bool) -> None:
     """
     Prints a message to the console to indicate that the action run has started.
 
@@ -129,6 +218,7 @@ def print_action_run_start(action_name: str, action_version: str, action_source:
         action_name: Name of the action.
         action_version: Version of the action.
         action_source: Source of the action (local directory, Git repo etc.).
+        is_nested: Whether the action was called from another action.
     """
     # noinspection PyBroadException
     try:
@@ -140,36 +230,45 @@ def print_action_run_start(action_name: str, action_version: str, action_source:
 
     action_display_name = get_action_display_name(action_name, action_version)
 
-    title = f"[pyci.flair] Running CI action [pyci.action]'{action_display_name}'[/]...[/]"
+    if not is_nested:
+        title = f"[pyci.flair] Running CI action [pyci.action]'{action_display_name}'[/]...[/]"
+        info_lines = [
+            f"CI toolkit version: [pyci.info]{version}[/]",
+            f"CI environment: [pyci.info]{ci_environment_name}[/]",
+            f"Action version: [pyci.info]{action_version}[/]",
+            f"Action source: [pyci.info]{action_source}[/]",
+        ]
+        print(f"[pyci.flair_dark]╭─{title}[/]")
+        for line in info_lines:
+            print(f"[pyci.flair_dark]│[/]   {line}")
+        print(f"[pyci.flair_dark]{_get_action_run_border_tip_element(True)}[/]")
+    else:
+        title = f"[pyci.flair]Running nested action [pyci.action]'{action_display_name}'[/]...[/]"
+        print(f"{' ' * (_ACTION_VISUAL_THREAD_OFFSET + 1)}[pyci.flair_dark]├─▶[/] {title}")
 
-    info_lines = [
-        f"CI toolkit version: [pyci.info]{version}[/]",
-        f"CI environment: [pyci.info]{ci_environment_name}[/]",
-        f"Action version: [pyci.info]{action_version}[/]",
-        f"Action source: [pyci.info]{action_source}[/]",
-    ]
 
-    print(f"[pyci.flair_dark]╭─{title}[/]")
-    for line in info_lines:
-        print(f"[pyci.flair_dark]│[/]   {line}")
-    print(f"[pyci.flair_dark]{_get_action_run_border_tip_element(True)}[/]")
-
-
-def print_action_run_end_success(action_name: str, stopwatch: Stopwatch) -> None:
+def print_action_run_end_success(action_name: str, stopwatch: Stopwatch, is_nested: bool) -> None:
     """
     Prints a message to the console to indicate that the action run has completed successfully.
 
     Args:
         action_name: Name of the action.
         stopwatch: Stopwatch used to measure the action run time.
+        is_nested: Whether the action was called from another action.
     """
-    message = f"Action run completed in {stopwatch.elapsed_time_pretty} ('{action_name}')."
+    if not is_nested:
+        message = f"Action run completed in {stopwatch.elapsed_time_pretty} ('{action_name}')."
+        print(f"[pyci.flair_dark]{_get_action_run_border_tip_element(False)}[/]")
+        print(f"[pyci.flair_dark]╰─[/] [pyci.success]{message}[/]")
+    else:
+        message = f"Nested action '{action_name}' completed in {stopwatch.elapsed_time_pretty}."
+        print(f"{' ' * (_ACTION_VISUAL_THREAD_OFFSET + 1)}[pyci.flair_dark]├─◀[/] [pyci.success]{message}[/]")
 
-    print(f"[pyci.flair_dark]{_get_action_run_border_tip_element(False)}[/]")
-    print(f"[pyci.flair_dark]╰─[/] [pyci.success]{message}[/]")
 
-
-def print_action_run_end_failure(action_name: str, stopwatch: Stopwatch, exception: BaseException) -> None:
+def print_action_run_end_failure(action_name: str,
+                                 stopwatch: Stopwatch,
+                                 exception: BaseException,
+                                 is_nested: bool) -> None:
     """
     Prints a message to the console to indicate that the action run has failed.
 
@@ -177,13 +276,18 @@ def print_action_run_end_failure(action_name: str, stopwatch: Stopwatch, excepti
         action_name: Name of the action.
         stopwatch: Stopwatch used to measure the action run time.
         exception: Exception that caused the action run to fail.
+        is_nested: Whether the action was called from another action.
     """
     exception_type = type(exception)
     exception_string = exception_type.__name__
     if exception_type == SystemExit:
         exception_string += f" with code {exception.code}"
 
-    message = f"Action run failed in {stopwatch.elapsed_time_pretty} ({exception_string}, '{action_name}')."
-
-    print(f"[pyci.error]{_get_action_run_border_tip_element(False)}[/]")
-    print(f"[pyci.error]╰─[/][pyci.critical] {message} [/]")
+    if not is_nested:
+        message = f"Action run failed in {stopwatch.elapsed_time_pretty} ({exception_string}, '{action_name}')."
+        print(f"[pyci.error]{_get_action_run_border_tip_element(False)}[/]")
+        print(f"[pyci.error]╰─[/][pyci.critical] {message} [/]")
+    else:
+        message = f"Nested action '{action_name}' failed in {stopwatch.elapsed_time_pretty}."
+        print(f"{' ' * (_ACTION_VISUAL_THREAD_OFFSET + 1)}[pyci.error]├─◀[/][pyci.critical] {message} [/]\n"
+              f"{' ' * (_ACTION_VISUAL_THREAD_OFFSET + 1)}[pyci.error]│  [/][pyci.critical] ({exception_string}) [/]")
