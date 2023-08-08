@@ -194,7 +194,7 @@ def find_actions_command(ctx: Context, param: Argument, value: str) -> None:
     search_query = value
 
     from python_ci_toolkit.actions.utils.logging import loading_animation
-    with loading_animation(f"Looking for actions containing [green]'{search_query}'[/]"):
+    with loading_animation(f"Looking for actions containing [pyci.query]'{search_query}'[/]..."):
         matches = find_actions_by_name_or_description(search_query)
 
     print_search_results(search_query, matches)
