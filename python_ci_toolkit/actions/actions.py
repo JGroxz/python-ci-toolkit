@@ -75,9 +75,14 @@ _running_actions_stack: list[tuple[str, str]] = [
 ]
 
 
-def run_ci_action(action_name: str, action_version: str = None, argv: List[str] = None) -> None:
+def run_ci_action(action_name: str, action_version: str = None, args: List[str] = None) -> ActionOutput:
     """
     Executes CI action by the given action name and version.
+
+    Args:
+        action_name: Name of the action to run.
+        action_version: Version of the action to run.
+        args: Vector of command-line arguments to pass to the action.
     """
     # if no version is provided, use the one from the 'main' branch
     if action_version is None:
@@ -117,8 +122,11 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
         logger.debug(f"Requirements installation complete in {requirements_installation_stopwatch.elapsed_time_pretty}.")
 
     # prepare action's CLI arguments
+    original_argv = sys.argv.copy()
     if not is_nested_action:
         rearrange_argv_before_action_run(action_name)
+    else:
+        sys.argv = args
 
     # import action's Python module
     logger.debug(f"Importing Python module of the action [pyci.action]'{action_name}'[/]...", **LOG_WITH_MARKUP)
@@ -155,6 +163,10 @@ def run_ci_action(action_name: str, action_version: str = None, argv: List[str] 
     # reset cache timestamps after each successful action run
     # to allow chaining actions from the same repo without re-downloading them
     reset_action_cache_timestamp(action_name, action_version)
+
+    # restore argv of the caller action
+    if is_nested_action:
+        sys.argv = original_argv
 
     # remove action from the stack
     _running_actions_stack.remove(action_stack_identifier)
