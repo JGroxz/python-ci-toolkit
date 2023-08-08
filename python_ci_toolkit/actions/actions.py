@@ -150,7 +150,6 @@ def run_ci_action(action_name: str, action_version: str = None, args: List[str] 
         loading_animation(get_action_progress_message(action_display_name, "Running")),
         Stopwatch() as run_stopwatch
     ):
-        time.sleep(1)
         run_result = execute_action_module(action_module, action_name, action_version)
 
     if not run_result.is_successful:
