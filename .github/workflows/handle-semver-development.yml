@@ -1,12 +1,17 @@
 name: "Handle development version"
 
 on:
-  push:
-    branches:
-      - 'develop'
+  workflow_dispatch:
+  pull_request_target:
+    types:
+      - closed
 
 jobs:
   handle-semver-development:
+    if: github.event.pull_request.merged == true
     name: Handle development version
-    uses: pyci/.github/.github/workflows/handle-semver-development.yml@main
+    uses: pyci/.github-private/.github/workflows/handle-semver-development.yml@main
     secrets: inherit
+    permissions:
+      contents: write
+      packages: read

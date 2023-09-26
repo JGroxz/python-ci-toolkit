@@ -9,8 +9,9 @@ from .sources.git.caching import is_action_cache_fresh, retrieve_ci_action_scrip
 from .sources.git.cloning import get_remote_action_repo, retrieve_ci_action_script_from_git
 from .sources.local import retrieve_ci_action_script_local
 from ..constants import ACTION_VERSION_LOCAL_STRING
-from ..utils import log_execution_time
+from ..utils import log_execution_time, Stopwatch
 from ..utils.logging import loading_animation, get_action_display_name
+from ...logging.logging import LOG_WITH_MARKUP
 
 logger = logging.getLogger(__name__)
 
@@ -35,16 +36,14 @@ def retrieve_ci_action_script(action_name: str, action_version: str = None) -> t
         # local directory
         action_script_path = retrieve_ci_action_script_local(action_name)
         action_source = f"'{action_script_path}'"
-        logger.info(f"Retrieved local action '{action_name}'.")
+        logger.debug(f"Retrieved local action [pyci.action]'{action_name}'[/].", **LOG_WITH_MARKUP)
     else:
         # get remote actions repo configuration
         action_repo_url, action_repo_ssh_private_key = get_remote_action_repo()
 
         if is_action_cache_fresh(action_name, action_version):
             # from cache
-            start_time = time.perf_counter()
-
-            with loading_animation(f"Retrieving action from cache"):
+            with Stopwatch() as sw, loading_animation(f"Retrieving action from cache..."):
                 action_script_path = retrieve_ci_action_script_from_cache(
                     git_repo_url=action_repo_url,
                     action_name=action_name,
@@ -53,13 +52,12 @@ def retrieve_ci_action_script(action_name: str, action_version: str = None) -> t
 
                 action_source = f"'{action_version}' at '{action_repo_url}' (cached)"
 
-            duration = time.perf_counter() - start_time
-            logger.info(f"Retrieved action '{action_display_name}' from cache in {duration * 1000:.0f} ms.")
+            logger.debug(f"Retrieved action '{action_display_name}' from cache in {sw.elapsed_time_ms:.0f} ms.")
         else:
             # from remote Git repo
             start_time = time.perf_counter()
 
-            with loading_animation(f"Retrieving action from Git"):
+            with loading_animation(f"Retrieving action from Git..."):
 
                 action_script_path = retrieve_ci_action_script_from_git(
                     git_repo_url=action_repo_url,
@@ -71,6 +69,6 @@ def retrieve_ci_action_script(action_name: str, action_version: str = None) -> t
                 action_source = f"'{action_version}' at '{action_repo_url}'"
 
             duration = time.perf_counter() - start_time
-            logger.info(f"Retrieved action '{action_display_name}' from Git in {duration:.3f} seconds.")
+            logger.debug(f"Retrieved action '{action_display_name}' from Git in {duration:.3f} seconds.")
 
     return action_script_path, action_source

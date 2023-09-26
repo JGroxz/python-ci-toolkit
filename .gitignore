@@ -136,3 +136,4 @@ dmypy.json
 # Python CI Toolkit's temporary files directory
 .ci/temp
 output/
+.DS_Store

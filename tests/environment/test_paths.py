@@ -3,7 +3,7 @@ from pathlib import Path
 
 from rich import print
 
-from python_ci_toolkit.environment import get_project_root_directory_path
+from python_ci_toolkit.environment.paths.paths import get_project_root_directory_path
 
 
 def test_project_root_directory_path():

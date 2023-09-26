@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import math
 import time
 from types import TracebackType
 from typing import Type
@@ -50,3 +51,31 @@ class Stopwatch(contextlib.AbstractContextManager):
             If the context has already exited, returns the time elapsed between the context's creation and its exit.
         """
         return self.elapsed_time * 1000
+
+    @property
+    def elapsed_time_pretty(self) -> str:
+        """
+        Returns the elapsed time as a pretty string.
+        """
+        return self.format_time_pretty(self.elapsed_time)
+
+    @staticmethod
+    def format_time_pretty(seconds: float) -> str:
+        """
+        Returns the given time in a pretty string format.
+
+        Args:
+            seconds: Time in seconds.
+        """
+        elapsed_floor = math.floor(seconds)
+
+        if elapsed_floor >= 60:
+            return f"{seconds / 60:.0f} min {seconds % 60:.0f} s"
+        if elapsed_floor >= 10:
+            return f"{seconds:.0f} s"
+        if elapsed_floor >= 1:
+            return f"{seconds:.3f} s"
+        elif seconds * 1000 >= 1:
+            return f"{seconds:.0f} ms"
+        else:
+            return f"{seconds * 1000:.0f} µs"

@@ -16,7 +16,7 @@ def log_execution_time(func):
         with Stopwatch() as sw:
             result = func(*args, **kwargs)
 
-        logger.debug(f"Function '{func.__name__}()' took {sw.elapsed_time_ms:.0f} ms to execute.")
+        logger.debug(f"Function '{func.__name__}()' took {sw.elapsed_time_pretty} to execute.")
         return result
 
     return wrapped
