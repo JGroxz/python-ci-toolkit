@@ -130,8 +130,7 @@ def run_ci_action(action_name: str, action_version: str = None, args: List[str] 
             loading_animation(get_action_progress_message(action_display_name, "Installing action's dependencies")),
             Stopwatch() as requirements_installation_stopwatch
         ):
-            time.sleep(1)
-            ensure_requirements_installed(action_requirements_path, silence_pip_stdout=False)
+            ensure_requirements_installed(action_requirements_path, quiet=True)
 
         logger.debug(f"Requirements installation complete in {requirements_installation_stopwatch.elapsed_time_pretty}.")
 
@@ -151,7 +150,6 @@ def run_ci_action(action_name: str, action_version: str = None, args: List[str] 
         loading_animation(get_action_progress_message(action_display_name, "Importing action's Python module")),
         Stopwatch() as import_stopwatch
     ):
-        time.sleep(1)
         try:
             action_module = import_module_from_file(f"{action_name}", action_script_path, True)
         except Exception:
