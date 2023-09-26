@@ -1,27 +1,11 @@
 """
 Utility functions for managing Python PIP packages.
 """
+import pkgutil
+import sys
 from pathlib import Path
 
-import pkg_resources
-
 from .shell import run_shell_command
-
-
-def install_package(package_name: str, silence_pip_stdout: bool = False) -> None:
-    """
-    Installs the given requirement in the current Python environment using PIP.
-
-    Args:
-        package_name: Name of the package to install.
-        silence_pip_stdout: If set to True, PIP installation logs will not be sent to stdout.
-
-    Raises:
-        RuntimeError if package installation fails.
-    """
-    result = run_shell_command(f"pip install {package_name}", silence_output=silence_pip_stdout, use_wsl_on_windows=False)
-    if result.is_failed:
-        raise RuntimeError(f"Failed to install PIP package '{package_name}'.")
 
 
 def check_package_installed(package_name: str) -> bool:
@@ -34,37 +18,53 @@ def check_package_installed(package_name: str) -> bool:
     Returns:
         True if the package is installed, False otherwise.
     """
-
-    try:
-        pkg_resources.require(package_name)
-    except (pkg_resources.DistributionNotFound, pkg_resources.VersionConflict) as e:
-        return False
-
-    return True
+    package_name = package_name.replace("-", "_")
+    return package_name in (entry.name for entry in pkgutil.iter_modules())
 
 
-def ensure_package_installed(package_name: str, silence_pip_stdout: bool = False) -> None:
+def install_package(package_name: str, quiet: bool = False) -> None:
+    """
+    Installs the given requirement in the current Python environment using PIP.
+
+    Args:
+        package_name: Name of the package to install.
+            Can contain version specifiers, e.g. "python-ci-toolkit>=0.1.0".
+        quiet: If set to True, PIP installation logs will not be sent to stdout.
+
+    Raises:
+        RuntimeError if package installation fails.
+    """
+    current_python_executable = Path(sys.executable)
+    result = run_shell_command(f"'{current_python_executable}' -m pip install {package_name}",
+                               silence_output=quiet, use_wsl_on_windows=False)
+    if result.is_failed:
+        raise RuntimeError(f"Failed to install PIP package '{package_name}'.")
+
+
+def ensure_package_installed(package_name: str, quiet: bool = False) -> None:
     """
     Makes sure that the given package is installed in the current Python environment.
 
     Args:
         package_name: Name of the package to check.
-        silence_pip_stdout: If set to True, PIP installation logs will not be sent to stdout.
+        quiet: If set to True, PIP installation logs will not be sent to stdout.
 
     Raises:
         RuntimeError if package installation fails.
     """
-    if not check_package_installed(package_name):
-        install_package(package_name, silence_pip_stdout)
+    if check_package_installed(package_name):
+        return
+
+    install_package(package_name, quiet)
 
 
-def ensure_requirements_installed(requirements_file_path: Path, silence_pip_stdout: bool = False) -> None:
+def ensure_requirements_installed(requirements_file_path: Path, quiet: bool = False) -> None:
     """
     Makes sure that the packages in the given requirements file are installed in the current Python environment.
 
     Args:
         requirements_file_path: Path to the requirements.txt file to install the requirements from.
-        silence_pip_stdout: If set to True, PIP installation logs will not be sent to stdout.
+        quiet: If set to True, PIP installation logs will not be sent to stdout.
 
     Raises:
         FileNotFoundError if the given requirements file does not exist.
@@ -77,4 +77,4 @@ def ensure_requirements_installed(requirements_file_path: Path, silence_pip_stdo
         lines = file.readlines()
 
     for line in lines:
-        ensure_package_installed(line, silence_pip_stdout)
+        ensure_package_installed(line, quiet)
