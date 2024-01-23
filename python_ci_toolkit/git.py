@@ -14,14 +14,14 @@ from pathlib import Path
 
 from git import Repo, GitCommandError
 
-from .environment import ci_environment_type, CiEnvironmentType, retrieve_environment_variable, ci_temp_files_directory
+from .environment import ci_platform, platforms, retrieve_environment_variable, ci_temp_files_directory
 
 
 def get_default_ssh_private_key_file_path() -> Path:
     """
     Returns the path to the default location of the private SSH key file on the current system.
     """
-    if ci_environment_type == CiEnvironmentType.BitbucketPipelines:
+    if ci_platform == platforms.BitbucketPipelines:
         bitbucket_ssh_key_path = retrieve_environment_variable(
             "BITBUCKET_SSH_KEY_FILE",
             "This variable is only available for pipelines running on Bitbucket Cloud and the Linux Docker Pipelines runner. "

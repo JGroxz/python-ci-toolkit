@@ -8,7 +8,8 @@ import rich
 from rich.console import Console
 from rich.theme import Theme
 
-from ..environment import ci_environment_type, CiEnvironmentType
+from ..environment import ci_platform
+from ..environment.platforms import Local
 
 _CI_TOOLKIT_RICH_THEME_FILE_PATH = Path(__file__).parent / "styles.cfg"
 CI_TOOLKIT_RICH_THEME = Theme.read(path=str(_CI_TOOLKIT_RICH_THEME_FILE_PATH))
@@ -24,10 +25,7 @@ def _patch_rich_console() -> Console:
     """
 
     # force terminal in cloud CI environments
-    force_terminal = True if (
-            ci_environment_type == CiEnvironmentType.BitbucketPipelines
-            or ci_environment_type == CiEnvironmentType.GitHubActions
-    ) else None
+    force_terminal = True if (ci_platform != Local) else None
 
     # patch global Rich Console instance
     console = Console(

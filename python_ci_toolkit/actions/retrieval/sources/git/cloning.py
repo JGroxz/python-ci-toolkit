@@ -32,12 +32,12 @@ def get_remote_action_repo() -> tuple[str, str]:
     actions_git_repo_url = retrieve_environment_variable(
         "PYTHON_CI_ACTIONS_GIT_REPO_URL",
         f"URL address of the Git repository is required to pull the action code.",
-        fallback_value=DEFAULT_ACTION_REPO_URL
+        fallback=DEFAULT_ACTION_REPO_URL
     )
     actions_ssh_private_key = retrieve_environment_variable(
         "PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY",
         "SSH private key is required to pull actions from the private remote Git repositories.",
-        fallback_value=get_default_ssh_private_key
+        fallback=get_default_ssh_private_key
     )
 
     return actions_git_repo_url, actions_ssh_private_key

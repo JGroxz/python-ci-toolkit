@@ -3,63 +3,30 @@ Functions to access the information about the current CI environment.
 """
 
 import logging
-import os
-from enum import Enum
+
+from .platforms.base import CiPlatform
 
 logger = logging.getLogger(__name__)
 
 
-class CiEnvironmentType(Enum):
-    """Enum containing CI environments supported by the toolkit."""
-    Unknown = 0
-    """Unknown type of CI environment, or running on a local machine"""
-    BitbucketPipelines = 1
-    """Bitbucket Pipelines"""
-    GitHubActions = 2
-    """GitHub Actions"""
-
-
-def get_ci_environment_type() -> CiEnvironmentType:
+def _get_ci_environment() -> type[CiPlatform]:
     """
     Tries to detect current CI environment type.
 
     Returns:
         CiEnvironmentType enum value corresponding to the CI environment this script is being run at.
     """
-    if os.environ.get("BITBUCKET_PIPELINE_UUID"):
-        return CiEnvironmentType.BitbucketPipelines
+    from .platforms import BitbucketPipelines, GitHubActions, Local
 
-    if os.environ.get("GITHUB_WORKSPACE"):
-        return CiEnvironmentType.GitHubActions
+    if BitbucketPipelines.is_current():
+        return BitbucketPipelines
+    elif GitHubActions.is_current():
+        return GitHubActions
 
-    return CiEnvironmentType.Unknown
+    return Local
 
 
-ci_environment_type = get_ci_environment_type()
+ci_platform = _get_ci_environment()
 """
-Type of the current CI environment (e.g. CiEnvironmentType.BitbucketPipelines).
-
-Notes:
-    See CiEnvironmentType enum for all supported CI environment types. 
-"""
-
-
-def get_ci_environment_name() -> str:
-    """
-    Returns the name of the current CI environment.
-
-    Returns:
-        Name of the CI environment.
-    """
-    if ci_environment_type == CiEnvironmentType.BitbucketPipelines:
-        return "Bitbucket Pipelines"
-    elif ci_environment_type == CiEnvironmentType.GitHubActions:
-        return "GitHub Actions"
-    elif ci_environment_type == CiEnvironmentType.Unknown:
-        return "Unknown/Local"
-
-
-ci_environment_name = get_ci_environment_name()
-"""
-Name of the current CI environment (e.g. "Bitbucket Pipelines").
+Object containing the info about the current CI environment (Bitbucket Pipelines, GitHub Actions etc.).
 """
