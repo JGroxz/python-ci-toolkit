@@ -29,5 +29,5 @@ def test_temp_directory_path():
     print(f"Project's temp directory (relative): '{ci_temp_files_directory_relative}'")
 
     from python_ci_toolkit.environment import ci_project_root
-    assert ci_temp_files_directory.samefile(ci_project_root / ci_temp_files_directory_relative), ("Relative temp CI directory path is does not point to the same "
-                                                                                                  "directory as the absolute temp CI directory path.")
+    assert ci_temp_files_directory.samefile(ci_project_root / ci_temp_files_directory_relative), \
+        "Relative temp CI directory path is does not point to the same directory as the absolute temp CI directory path."
