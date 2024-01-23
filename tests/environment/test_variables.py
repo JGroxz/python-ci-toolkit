@@ -6,30 +6,27 @@ import pytest
 from python_ci_toolkit.environment import retrieve_environment_variable, is_environment_variable_set, ci_platform
 
 
-def test_environment_variable_set():
-    VARIABLE_NAME = "TEST_ENVIRONMENT_VARIABLE"
+def test_environment_variable_set(variable_name: str):
     TEST_VALUE = "some test value"
 
-    os.environ[VARIABLE_NAME] = TEST_VALUE
+    os.environ[variable_name] = TEST_VALUE
 
-    assert is_environment_variable_set(VARIABLE_NAME), \
-        f"Environment variable '{VARIABLE_NAME}' must be set."
+    assert is_environment_variable_set(variable_name), \
+        f"Environment variable '{variable_name}' must be set."
 
-    value = retrieve_environment_variable(VARIABLE_NAME)
+    value = retrieve_environment_variable(variable_name)
     assert value == TEST_VALUE, \
-        f"Environment variable '{VARIABLE_NAME}' must be set to '{TEST_VALUE}'."
+        f"Environment variable '{variable_name}' must be set to '{TEST_VALUE}'."
 
 
-def test_environment_variable_not_set():
-    VARIABLE_NAME = "TEST_ENVIRONMENT_VARIABLE"
+def test_environment_variable_not_set(variable_name: str):
+    os.environ[variable_name] = ""
 
-    os.environ[VARIABLE_NAME] = ""
-
-    assert not is_environment_variable_set(VARIABLE_NAME), \
-        f"Environment variable '{VARIABLE_NAME}' must not be set."
+    assert not is_environment_variable_set(variable_name), \
+        f"Environment variable '{variable_name}' must not be set."
 
     with pytest.raises(ValueError):
-        assert retrieve_environment_variable(VARIABLE_NAME)
+        assert retrieve_environment_variable(variable_name)
 
 
 def test_environment_variable_not_set_raises_value_error(variable_name: str):
