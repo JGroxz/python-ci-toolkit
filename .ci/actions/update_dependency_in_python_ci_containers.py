@@ -22,7 +22,7 @@ logger = get_action_logger(__name__)
 PYTHON_CI_PUSH_SSH_PRIVATE_KEY = retrieve_environment_variable(
     "PYTHON_CI_PUSH_SSH_PRIVATE_KEY",
     usage_explanation="An SSH private key with read and write access to the python-ci-containers repository is required to update it.",
-    fallback_value=get_default_ssh_private_key
+    fallback=get_default_ssh_private_key
 )
 
 PYTHON_CI_CONTAINERS_REPO_URL = "git@github.com:pyci/python-ci-runner.git"

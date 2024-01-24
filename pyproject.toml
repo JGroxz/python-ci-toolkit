@@ -24,3 +24,9 @@ pyci = "python_ci_toolkit.cli.action:action"
 
 [tool.poetry.group.test.dependencies]
 pytest = "^7.2.1"
+
+[tool.pytest.ini_options]
+log_cli = true
+log_cli_level = "INFO"
+log_cli_format = "[%(asctime)s,%(msecs)03d] %(name)-40.40s %(levelname)s %(message)s"
+addopts = "--color=yes"

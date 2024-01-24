@@ -13,7 +13,7 @@ from rich.progress import Progress, Task, TimeRemainingColumn, TaskProgressColum
 
 from . import Stopwatch
 from ..constants import ACTION_VERSION_SEPARATOR
-from ...environment import ci_project_root, ci_environment_name, CiEnvironmentType, ci_environment_type
+from ...environment import ci_project_root, ci_platform, platforms
 from ...logging import get_logger
 
 logger = get_logger(__name__)
@@ -90,22 +90,25 @@ def loading_animation(description: str) -> None:  # TODO: rework loading animati
     Args:
         description: Info message describing what's happening. Will be displayed next to the animation.
     """
-    if ci_environment_type == CiEnvironmentType.Unknown:
-        # in a local environment, display animated progress bar for visual feedback
-        global _progress
-        if not _progress.live.is_started:
-            with (
-                _get_new_progress_instance() as _progress,
-                _task_progress_updater(_progress)
-            ):
-                with _task_in_progress(_progress, description):
-                    yield
-        else:
-            with _task_in_progress(_progress, description):
-                yield
-    else:
+    if ci_platform != platforms.Local:
         # cloud environments normally don't support erasing terminal output,
         # so progress bars get messed up; in this case we don't display them
+        yield
+        return
+
+    # in a local environment, display animated progress bar for visual feedback
+    global _progress
+    if _progress.live.is_started:
+        with _task_in_progress(_progress, description):
+            yield
+        return
+
+    # if no Live display is active, create a new one
+    _progress = _get_new_progress_instance()
+    with (
+        _task_progress_updater(_progress),
+        _task_in_progress(_progress, description)
+    ):
         yield
 
 
@@ -145,9 +148,10 @@ def _task_in_progress(progress: Progress, description: str) -> None:
         original_description=description,
     )
 
-    yield
-
-    progress.update(task_id, completed=True)
+    try:
+        yield
+    finally:
+        progress.update(task_id, completed=True)
 
 
 @contextmanager
@@ -177,8 +181,6 @@ def _task_progress_updater(progress: Progress) -> None:
 
     try:
         yield  # <- within this context, do the task
-    except BaseException:
-        raise
     finally:
         is_done = True
 
@@ -234,7 +236,7 @@ def print_action_run_start(action_name: str,
         title = f"[pyci.flair] Running CI action [pyci.action]'{action_display_name}'[/]...[/]"
         info_lines = [
             f"CI toolkit version: [pyci.info]{version}[/]",
-            f"CI environment: [pyci.info]{ci_environment_name}[/]",
+            f"CI environment: [pyci.info]{ci_platform.name()}[/]",
             f"Action version: [pyci.info]{action_version}[/]",
             f"Action source: [pyci.info]{action_source}[/]",
         ]
@@ -280,8 +282,8 @@ def print_action_run_end_failure(action_name: str,
     """
     exception_type = type(exception)
     exception_string = exception_type.__name__
-    if exception_type == SystemExit:
-        exception_string += f" with code {exception.code}"
+    if isinstance(exception, SystemExit):
+        exception_string += f' with code "{exception.code}"'
 
     if not is_nested:
         message = f"Action run failed in {stopwatch.elapsed_time_pretty} ({exception_string}, '{action_name}')."

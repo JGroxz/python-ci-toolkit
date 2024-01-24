@@ -1,40 +1,29 @@
 """
 This file configures the global Rich Console instance for CI Toolkit.
 """
-from os import getenv
 from pathlib import Path
 
 import rich
 from rich.console import Console
 from rich.theme import Theme
 
-from ..environment import ci_environment_type, CiEnvironmentType
+from ..environment import ci_platform, platforms
 
 _CI_TOOLKIT_RICH_THEME_FILE_PATH = Path(__file__).parent / "styles.cfg"
 CI_TOOLKIT_RICH_THEME = Theme.read(path=str(_CI_TOOLKIT_RICH_THEME_FILE_PATH))
-MAX_WIDTH = int(getenv("TERMINAL_WIDTH")) if getenv("TERMINAL_WIDTH") else None  # type: ignore
 
 
 def _patch_rich_console() -> Console:
     """
-    Patches the global Rich Console instance for the use in the current CI environment.
+    Patches the global Rich Console instance for the use on the current CI platform.
 
     Returns:
         Patched Rich Console instance.
     """
-
-    # force terminal in cloud CI environments
-    force_terminal = True if (
-            ci_environment_type == CiEnvironmentType.BitbucketPipelines
-            or ci_environment_type == CiEnvironmentType.GitHubActions
-    ) else None
-
     # patch global Rich Console instance
-    console = Console(
-        theme=CI_TOOLKIT_RICH_THEME,
-        width=MAX_WIDTH,
-        force_terminal=force_terminal
-    )
+    console = Console(theme=CI_TOOLKIT_RICH_THEME)
+    console = ci_platform.on_patch_rich_console(console, CI_TOOLKIT_RICH_THEME)
+    assert console is not None, f"CI platform's {ci_platform.on_patch_rich_console.__name__}() callback must return the Rich Console instance."
     rich._console = console
 
     return console

@@ -1,0 +1,17 @@
+name: "Generate development version"
+run-name: "Generating development version from '${{ github.head_ref || github.ref }}'"
+
+on:
+  workflow_dispatch:
+  pull_request_target:
+    types:
+      - closed
+
+jobs:
+  generate-semver-development:
+    if: github.event.pull_request.merged == true
+    name: Generate development version
+    uses: pyci/.github-private/.github/workflows/generate-semver-development.yml@main
+    secrets: inherit
+    permissions:
+      contents: write

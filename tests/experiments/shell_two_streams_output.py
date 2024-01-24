@@ -5,12 +5,12 @@ from rich.panel import Panel
 from python_ci_toolkit.shell import run_shell_command
 
 test_console = Console()
-print = test_console.print
+print = test_console.print  # type: ignore
 
 
 def run():
     """
-    Use this to see bot stdout and stderr output being printed to the console when using run_shell_command().
+    Use this to see both stdout and stderr output being printed to the console when using run_shell_command().
     """
 
     test_command = f"bash tests/files/shell/slow_print.sh"
