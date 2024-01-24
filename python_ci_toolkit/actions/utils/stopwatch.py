@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import contextlib
-import math
 import time
 from types import TracebackType
 from typing import Type
@@ -67,15 +66,16 @@ class Stopwatch(contextlib.AbstractContextManager):
         Args:
             seconds: Time in seconds.
         """
-        elapsed_floor = math.floor(seconds)
+        milliseconds = seconds * 1000
+        microseconds = seconds * 1000000
 
-        if elapsed_floor >= 60:
-            return f"{seconds / 60:.0f} min {seconds % 60:.0f} s"
-        if elapsed_floor >= 10:
-            return f"{seconds:.0f} s"
-        if elapsed_floor >= 1:
-            return f"{seconds:.3f} s"
+        if seconds >= 3600:
+            return f"{seconds / 3600:.0f} h {seconds % 3600 / 60:.0f} min {seconds % 60:.1f} s"
+        if seconds >= 60:
+            return f"{seconds / 60:.0f} min {seconds % 60:.1f} s"
+        if seconds >= 1:
+            return f"{seconds:.1f} s"
         elif seconds * 1000 >= 1:
-            return f"{seconds:.0f} ms"
+            return f"{milliseconds:.0f} ms"
         else:
-            return f"{seconds * 1000:.0f} µs"
+            return f"{microseconds:.0f} µs"
