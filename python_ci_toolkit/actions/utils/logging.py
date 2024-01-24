@@ -94,19 +94,22 @@ def loading_animation(description: str) -> None:  # TODO: rework loading animati
         # cloud environments normally don't support erasing terminal output,
         # so progress bars get messed up; in this case we don't display them
         yield
+        return
 
     # in a local environment, display animated progress bar for visual feedback
     global _progress
-    if not _progress.live.is_started:
-        _progress = _get_new_progress_instance()
-        with (
-            _task_progress_updater(_progress),
-            _task_in_progress(_progress, description)
-        ):
-            yield
-    else:
+    if _progress.live.is_started:
         with _task_in_progress(_progress, description):
             yield
+        return
+
+    # if no Live display is active, create a new one
+    _progress = _get_new_progress_instance()
+    with (
+        _task_progress_updater(_progress),
+        _task_in_progress(_progress, description)
+    ):
+        yield
 
 
 def _get_task_description_for_display(task: Task) -> str:
