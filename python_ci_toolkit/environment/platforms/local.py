@@ -2,6 +2,9 @@ import logging
 import os
 from pathlib import Path
 
+from rich.console import Console
+from rich.theme import Theme
+
 from .base import CiPlatform
 from ...shell import run_shell_command
 
@@ -42,3 +45,13 @@ class Local(CiPlatform):
                      f"  CWD: '{os.getcwd()}'\n"
                      f"Assuming current working directory as the current CI project's root.")
         return Path(os.getcwd())
+
+    @classmethod
+    def on_patch_rich_console(cls, console: Console, default_theme: Theme) -> Console:
+        # for local console output we respect the user's terminal width, if any
+        terminal_width = int(os.getenv("TERMINAL_WIDTH")) if os.getenv("TERMINAL_WIDTH") else None
+
+        return Console(
+            theme=default_theme,
+            width=terminal_width
+        )
