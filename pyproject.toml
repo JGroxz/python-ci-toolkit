@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "python-ci-toolkit"
-version = "0.30.3-dev"
+version = "0.31.0-dev"
 description = "A collection of tools for building CI Python scripts used by PyCI"
 authors = [ "PyCI <hello@pyci.dev>",]
 
@@ -22,11 +22,11 @@ rich-click = "^1.6.0"
 python-ci = "python_ci_toolkit.cli:cli"
 pyci = "python_ci_toolkit.cli.action:action"
 
-[tool.poetry.group.test.dependencies]
-pytest = "^7.2.1"
-
 [tool.pytest.ini_options]
 log_cli = true
 log_cli_level = "INFO"
 log_cli_format = "[%(asctime)s,%(msecs)03d] %(name)-40.40s %(levelname)s %(message)s"
 addopts = "--color=yes"
+
+[tool.poetry.group.test.dependencies]
+pytest = "^7.2.1"
