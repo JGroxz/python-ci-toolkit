@@ -1,0 +1,12 @@
+name: "Generate release version"
+run-name: "Generating release version from '${{ github.head_ref || github.ref }}'"
+
+on: workflow_dispatch
+
+jobs:
+  generate-semver-release:
+    name: Generate release version
+    uses: pyci/.github-private/.github/workflows/generate-semver-release.yml@main
+    secrets: inherit
+    permissions:
+      contents: write
