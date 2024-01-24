@@ -137,3 +137,5 @@ dmypy.json
 .ci/temp
 output/
 .DS_Store
+
+.idea/
