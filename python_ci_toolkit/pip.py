@@ -75,6 +75,10 @@ def ensure_requirements_installed(requirements_file_path: Path, quiet: bool = Fa
 
     with requirements_file_path.open("r") as file:
         lines = file.readlines()
+        lines = [line.strip() for line in lines]
+        # remove empty lines and comments
+        lines = [line for line in lines
+                 if (len(line) > 0) and (not line.startswith("#"))]
 
     for line in lines:
         ensure_package_installed(line, quiet)
