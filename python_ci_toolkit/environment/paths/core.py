@@ -52,7 +52,8 @@ class CiPaths:
 
         if self._git_repo_root:
             # when inside a CI project repo, generate the path based on the initial commit's short SHA
-            first_commit_sha = run_shell_command("git rev-list --max-parents=0 HEAD", cwd=self.project_root).output_stripped
+            first_commit_sha = run_shell_command("git rev-list --max-parents=0 HEAD",
+                                                 cwd=self.project_root, use_wsl_on_windows=True, silence_output=True).output_stripped
             first_commit_sha_short = first_commit_sha[:7]
             directory = ci_temp_files_projects_root_directory / first_commit_sha_short
         else:
