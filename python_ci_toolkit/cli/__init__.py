@@ -22,7 +22,7 @@ def purge_ci_toolkit_caches() -> None:
     """
     print(f":boom: Purging toolkit's cache directories...")
 
-    from ..environment.paths import purge_temporary_files
+    from ..environment.paths.caches import purge_temporary_files
     purge_temporary_files()
 
     print(":white_check_mark: Caches successfully purged!")

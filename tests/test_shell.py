@@ -13,7 +13,7 @@ def test_exit_codes():
         "This test is not tested on Windows (yet)."
 
     # test a valid command with zero exit code
-    command = "true" if not IS_ON_WINDOWS else "exit /b 0"
+    command = "true" if (not IS_ON_WINDOWS) else "exit /b 0"
     result = run_shell_command(command, raise_on_error=False)
 
     assert result.is_successful, \
@@ -37,10 +37,9 @@ def test_exit_codes():
 def test_cwd():
     """Test that the working directory is being set correctly when running a shell command."""
 
-    command = "cd" if IS_ON_WINDOWS else "pwd"
-
     # current working directory
-    result = run_shell_command(command)
+    command = "pwd"
+    result = run_shell_command("pwd")
 
     assert result.is_successful, \
         f"Command '{command}' must successfully execute."
@@ -79,6 +78,6 @@ def test_output():
 
 def test_invalid_command():
     # test an invalid command (it must raise an exception even if raise_on_error is False)
-    invalid_command = "invalid_command_that_doesnt_exist --with-invalid-arguments --and-invalid-options"
+    invalid_command = "invalid_command_that_doesnt_exist --with-invalid-option and-invalid-argument"
     with pytest.raises(FileNotFoundError):
         run_shell_command(invalid_command, raise_on_error=False)

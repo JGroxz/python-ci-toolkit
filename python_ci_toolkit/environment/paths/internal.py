@@ -1,7 +1,7 @@
 import tempfile
 from pathlib import Path
 
-ci_temp_files_root_directory: Path = Path(tempfile.gettempdir()) / "python-ci-toolkit" / "temp"
+ci_temp_files_root_directory: Path = Path(tempfile.gettempdir()) / "python-ci-toolkit"
 """
 Common root directory of all temporary file directories used by the toolkit.
 

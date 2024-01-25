@@ -57,7 +57,7 @@ def test_retrieve_ci_action_script_from_git():
 def test_remote_action_caching(caplog):
     caplog.set_level(logging.DEBUG)
 
-    from python_ci_toolkit.environment import purge_temporary_files
+    from python_ci_toolkit.environment.paths import purge_temporary_files
     from python_ci_toolkit.actions.retrieval.sources.git.cloning import DOWNLOADED_ACTION_REPOS_DIRECTORY
     from python_ci_toolkit.actions.retrieval.sources.git.caching import DOWNLOADED_ACTION_CACHE_TIMESTAMPS_DIRECTORY
 
