@@ -4,7 +4,6 @@ Automatically bumps python-ci-toolkit's version dependency in python-ci-containe
 https://bitbucket.org/pyci/python-ci-containers/src/main/
 """
 
-import io
 import os
 import re
 from pathlib import Path
@@ -12,7 +11,7 @@ from pathlib import Path
 from git import Repo
 
 from python_ci_toolkit.actions import get_action_logger
-from python_ci_toolkit.environment import retrieve_environment_variable, ci_project_root, ci_temp_files_directory
+from python_ci_toolkit.environment import retrieve_environment_variable, ci_paths
 from python_ci_toolkit.git import delete_git_repo
 from python_ci_toolkit.git import get_default_ssh_private_key, git_ssh_credentials
 from python_ci_toolkit.versions import versions
@@ -26,7 +25,7 @@ PYTHON_CI_PUSH_SSH_PRIVATE_KEY = retrieve_environment_variable(
 )
 
 PYTHON_CI_CONTAINERS_REPO_URL = "git@github.com:pyci/python-ci-runner.git"
-TEMP_REPO_CLONE_PATH = ci_temp_files_directory.joinpath("python-ci-containers-clone")
+TEMP_REPO_CLONE_PATH = ci_paths.temp_files_directory / "python-ci-containers-clone"
 TOOLKIT_VERSION_DEFINITION_REGEX = re.compile('(python-ci-toolkit==".*")', flags=re.UNICODE)
 
 
@@ -44,12 +43,12 @@ def clone_python_ci_containers_repo() -> Repo:
 def update_self_dependency_version_in_dockerfile(containers_repo: Repo) -> None:
     # Read Dockerfile
     containers_repo_root = Path(containers_repo.working_tree_dir)
-    dockerfile_path = containers_repo_root.joinpath("Dockerfile")
-    with io.open(dockerfile_path, "r") as file:
+    dockerfile_path = containers_repo_root / "Dockerfile"
+    with dockerfile_path.open("r") as file:
         content = file.read()
 
     # Get current toolkit version string
-    current_toolkit_version = versions.read_project_version(ci_project_root)
+    current_toolkit_version = versions.read_project_version(ci_paths.project_root)
     current_toolkit_version_string = f'python-ci-toolkit=="{current_toolkit_version}"'
 
     # Replace toolkit version with the current one everywhere in the Dockerfile
@@ -67,7 +66,7 @@ def update_self_dependency_version_in_dockerfile(containers_repo: Repo) -> None:
         content = content.replace(match, current_toolkit_version_string)
 
     # Write back to file
-    with io.open(dockerfile_path, "w") as file:
+    with dockerfile_path.open("w") as file:
         file.write(content)
     logger.info(f"Updated toolkit dependency to '{current_toolkit_version_string}' in '{dockerfile_path}'.")
 
@@ -89,7 +88,7 @@ def update_self_dependency_version_in_dockerfile(containers_repo: Repo) -> None:
 
 
 def action() -> None:
-    current_toolkit_version = versions.read_project_version(ci_project_root)
+    current_toolkit_version = versions.read_project_version(ci_paths.project_root)
     if current_toolkit_version.prerelease:
         logger.info(f"Currently checked out toolkit version ('{current_toolkit_version}') is a pre-release.\n"
                     f"  No need to update the containers repo.")
