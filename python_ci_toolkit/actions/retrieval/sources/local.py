@@ -7,11 +7,11 @@ import logging
 import os
 from pathlib import Path
 
-from ....environment.paths import ci_project_root, ci_files_directory_relative
+from ....environment import ci_paths
 
 logger = logging.getLogger(__name__)
 
-_LOCAL_ACTIONS_DIRECTORY_RELATIVE = ci_files_directory_relative / "actions"
+_LOCAL_ACTIONS_DIRECTORY_RELATIVE = ci_paths.ci_files_directory.relative_to(ci_paths.project_root) / "actions"
 """
 Relative path to the directory where local actions are stored in a CI project.
 """
@@ -27,7 +27,7 @@ def get_actions_directory_in_project(project_root_path: Path) -> Path:
     return project_root_path / _LOCAL_ACTIONS_DIRECTORY_RELATIVE
 
 
-LOCAL_ACTIONS_DIRECTORY = get_actions_directory_in_project(ci_project_root)
+LOCAL_ACTIONS_DIRECTORY = get_actions_directory_in_project(ci_paths.project_root)
 """
 Absolute path to the directory where local actions are stored in the current CI project.
 """

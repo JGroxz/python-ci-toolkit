@@ -13,7 +13,7 @@ from rich.progress import Progress, Task, TimeRemainingColumn, TaskProgressColum
 
 from . import Stopwatch
 from ..constants import ACTION_VERSION_SEPARATOR
-from ...environment import ci_project_root, ci_platform, platforms
+from ...environment import ci_paths, ci_platform, platforms
 from ...logging import get_logger
 
 logger = get_logger(__name__)
@@ -228,7 +228,7 @@ def print_action_run_start(action_name: str,
         version = pkg_resources.get_distribution('python-ci-toolkit').version
     except Exception:
         from ...versions import read_project_version
-        version = read_project_version(ci_project_root)
+        version = read_project_version(ci_paths.project_root)
 
     action_display_name = get_action_display_name(action_name, action_version)
 
