@@ -223,10 +223,10 @@ def print_action_run_start(action_name: str,
         is_nested: Whether the action was called from another action.
     """
     # noinspection PyBroadException
+    from importlib.metadata import distribution, PackageNotFoundError
     try:
-        import pkg_resources
-        version = pkg_resources.get_distribution('python-ci-toolkit').version
-    except Exception:
+        version = distribution('python-ci-toolkit').version
+    except PackageNotFoundError:
         from ...versions import read_project_version
         version = read_project_version(ci_paths.project_root)
 
