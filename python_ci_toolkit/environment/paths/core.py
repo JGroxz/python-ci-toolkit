@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from ...environment import ci_platform
-from ...shell import run_shell_command
+from python_ci_toolkit.environment.platform import ci_platform
+from python_ci_toolkit.shell import run_shell_command
 
 
 class CiPaths:
