@@ -8,7 +8,7 @@ class CiPaths:
 
     def __init__(self):
         # determine if we're inside a Git repo
-        result = run_shell_command("git rev-parse --show-toplevel")
+        result = run_shell_command("git rev-parse --show-toplevel", use_wsl_on_windows=False, silence_output=True)
         self._git_repo_root = Path(result.output_stripped) if result.is_successful else None
 
     @property
