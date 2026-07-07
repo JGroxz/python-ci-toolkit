@@ -100,13 +100,12 @@ def test_list_actions_in_directory():
     local_actions = list_actions_in_directory(LOCAL_ACTIONS_DIRECTORY)
 
     EXPECTED_LOCAL_ACTION_NAMES = [
-        "complex_test_action",
-        "update_dependency_in_python_ci_containers"
+        "complex_test_action"
     ]
 
     # verify the number
     assert len(local_actions) == len(EXPECTED_LOCAL_ACTION_NAMES), \
-        f"Expected to find 2 local actions in '{LOCAL_ACTIONS_DIRECTORY}', but found {len(local_actions)}:\n{local_actions}"
+        f"Expected to find {len(EXPECTED_LOCAL_ACTION_NAMES)} local actions in '{LOCAL_ACTIONS_DIRECTORY}', but found {len(local_actions)}:\n{local_actions}"
 
     # verify the names
     local_action_names = [p.stem for p in local_actions]
