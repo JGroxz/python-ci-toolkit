@@ -10,8 +10,8 @@ from ..local import get_complex_action_path_in_directory, _LOCAL_ACTIONS_DIRECTO
 from ....utils import hash_string
 from ....utils.file_timestamps import time_since_file_timestamp, reset_file_timestamp
 from ....utils.logging import get_action_display_name
+from ....logging.logging import LOG_WITH_MARKUP
 from .....environment.paths.internal import ci_temp_files_shared_directory
-from .....logging.logging import LOG_WITH_MARKUP
 from .....shell import run_shell_command
 
 logger = logging.getLogger(__name__)

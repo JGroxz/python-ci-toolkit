@@ -56,20 +56,44 @@ class VersionFileHandler:
 @dataclasses.dataclass
 class PyProjectVersionFileHandler(VersionFileHandler):
     """
-    Handler for pyproject.toml used in Poetry projects.
+    Handler for pyproject.toml files.
+
+    PEP 621 project metadata is preferred. Legacy Poetry metadata is still
+    supported so PyCI can inspect older repositories during migration.
     """
+    PEP_621_VERSION_PATH = ("project", "version")
+    POETRY_VERSION_PATH = ("tool", "poetry", "version")
 
     def _read_version_from_file_contents(self, file_contents: str) -> VersionInfo:
         from .versions import parse_semantic_version
         project_config = toml.loads(file_contents)
-        version = project_config.get("tool").get("poetry").get("version")
+        version = self._get_nested_dict_key(project_config, self.PEP_621_VERSION_PATH)
+        if version is None:
+            version = self._get_nested_dict_key(project_config, self.POETRY_VERSION_PATH)
+        if version is None:
+            raise ValueError("Could not find project version in 'pyproject.toml'.")
         return parse_semantic_version(version)
 
     def _update_version_from_file_contents(self, file_contents: str, new_version: VersionInfo) -> str:
         project_config = toml.loads(file_contents)
         version_string = f"{new_version}"
-        self._set_nested_dict_key(project_config, ["tool", "poetry", "version"], version_string)
+        if self._get_nested_dict_key(project_config, self.PEP_621_VERSION_PATH) is not None:
+            self._set_nested_dict_key(project_config, self.PEP_621_VERSION_PATH, version_string)
+        elif self._get_nested_dict_key(project_config, self.POETRY_VERSION_PATH) is not None:
+            self._set_nested_dict_key(project_config, self.POETRY_VERSION_PATH, version_string)
+        else:
+            self._set_nested_dict_key(project_config, self.PEP_621_VERSION_PATH, version_string)
         return toml.dumps(project_config)
+
+    @staticmethod
+    def _get_nested_dict_key(dictionary, keys):
+        for key in keys:
+            if not isinstance(dictionary, dict):
+                return None
+            dictionary = dictionary.get(key)
+            if dictionary is None:
+                return None
+        return dictionary
 
     @staticmethod
     def _set_nested_dict_key(dictionary, keys, value):

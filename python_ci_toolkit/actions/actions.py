@@ -13,8 +13,8 @@ from .retrieval.sources.git.caching import reset_action_cache_timestamp
 from .utils import Stopwatch
 from .utils.logging import (loading_animation, print_action_run_start, get_action_display_name,
                             print_action_run_end_success, print_action_run_end_failure, get_action_progress_message)
-from ..logging import get_logger
-from ..logging.logging import LOG_WITH_MARKUP
+from .logging import get_logger
+from .logging.logging import LOG_WITH_MARKUP
 from ..pip import ensure_requirements_installed
 from ..python import import_module_from_file
 

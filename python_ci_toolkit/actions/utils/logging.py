@@ -13,8 +13,8 @@ from rich.progress import Progress, Task, TimeRemainingColumn, TaskProgressColum
 
 from . import Stopwatch
 from ..constants import ACTION_VERSION_SEPARATOR
+from ..logging import get_logger
 from ...environment import ci_paths, ci_platform, platforms
-from ...logging import get_logger
 
 logger = get_logger(__name__)
 

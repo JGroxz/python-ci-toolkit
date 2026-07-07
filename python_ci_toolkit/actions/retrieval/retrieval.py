@@ -9,9 +9,9 @@ from .sources.git.caching import is_action_cache_fresh, retrieve_ci_action_scrip
 from .sources.git.cloning import get_remote_action_repo, retrieve_ci_action_script_from_git
 from .sources.local import retrieve_ci_action_script_local
 from ..constants import ACTION_VERSION_LOCAL_STRING
+from ..logging.logging import LOG_WITH_MARKUP
 from ..utils import log_execution_time, Stopwatch
 from ..utils.logging import loading_animation, get_action_display_name
-from ...logging.logging import LOG_WITH_MARKUP
 
 logger = logging.getLogger(__name__)
 

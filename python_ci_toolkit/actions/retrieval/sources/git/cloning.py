@@ -4,16 +4,18 @@ Functions for retrieving action repositories from Git.
 
 import logging
 import sys
+from contextlib import nullcontext
 from pathlib import Path
+from urllib.parse import urlparse
 
 from .caching import create_action_cache_timestamp
 from ....retrieval.sources.local import list_actions_in_directory, _LOCAL_ACTIONS_DIRECTORY_RELATIVE, get_actions_directory_in_project
 from ....utils import log_execution_time, hash_string
 from ....utils.logging import get_action_display_name
+from ....logging.logging import LOG_WITH_MARKUP
 from .....environment.paths.internal import ci_temp_files_shared_directory
 from .....environment.variables import retrieve_environment_variable
 from .....git import git_ssh_credentials, get_default_ssh_private_key
-from .....logging.logging import LOG_WITH_MARKUP
 from .....shell import run_shell_command
 
 logger = logging.getLogger(__name__)
@@ -22,23 +24,48 @@ DEFAULT_ACTION_REPO_URL = "git@github.com:pyci/python-ci-actions.git"
 DOWNLOADED_ACTION_REPOS_DIRECTORY = ci_temp_files_shared_directory / "downloaded_action_repos"
 
 
-def get_remote_action_repo() -> tuple[str, str]:
+def _git_repo_url_uses_ssh(git_repo_url: str) -> bool:
+    """
+    Checks whether the given Git repository URL needs SSH credentials.
+    """
+    parsed_url = urlparse(git_repo_url)
+    if parsed_url.scheme in ("ssh", "git+ssh"):
+        return True
+    if parsed_url.scheme:
+        return False
+
+    first_colon_index = git_repo_url.find(":")
+    first_at_index = git_repo_url.find("@")
+
+    return (first_at_index > 0) and (first_colon_index > first_at_index)
+
+
+def _git_authentication_context(git_repo_url: str, ssh_private_key: str | None = None):
+    if _git_repo_url_uses_ssh(git_repo_url):
+        return git_ssh_credentials(ssh_private_key)
+
+    return nullcontext()
+
+
+def get_remote_action_repo() -> tuple[str, str | None]:
     """
     Returns:
         A tuple with:
             - URL of the remote Git repository that contains actions.
-            - Secret SSH key to access the remote Git repository.
+            - Secret SSH key to access the remote Git repository, if the URL uses SSH.
     """
     actions_git_repo_url = retrieve_environment_variable(
         "PYTHON_CI_ACTIONS_GIT_REPO_URL",
         f"URL address of the Git repository is required to pull the action code.",
         fallback=DEFAULT_ACTION_REPO_URL
     )
-    actions_ssh_private_key = retrieve_environment_variable(
-        "PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY",
-        "SSH private key is required to pull actions from the private remote Git repositories.",
-        fallback=get_default_ssh_private_key
-    )
+    actions_ssh_private_key = None
+    if _git_repo_url_uses_ssh(actions_git_repo_url):
+        actions_ssh_private_key = retrieve_environment_variable(
+            "PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY",
+            "SSH private key is required to pull actions from SSH Git repositories.",
+            fallback=get_default_ssh_private_key
+        )
 
     return actions_git_repo_url, actions_ssh_private_key
 
@@ -58,7 +85,7 @@ def get_clone_directory_from_action_repo_url(git_repo_url: str) -> Path:
 
 
 @log_execution_time
-def retrieve_action_repo(git_repo_url: str, ssh_private_key: str = None) -> Path:
+def retrieve_action_repo(git_repo_url: str, ssh_private_key: str | None = None) -> Path:
     """
     Retrieves the given Git repository into the standard actions download location.
 
@@ -80,7 +107,7 @@ def retrieve_action_repo(git_repo_url: str, ssh_private_key: str = None) -> Path
     # generate local repo path based on remote
     cloned_repo_path = get_clone_directory_from_action_repo_url(git_repo_url)
 
-    with git_ssh_credentials(ssh_private_key):
+    with _git_authentication_context(git_repo_url, ssh_private_key):
         if not cloned_repo_path.exists():
             logger.debug(f"Cloning action repo from '{git_repo_url}' to '{cloned_repo_path}'.")
 
@@ -110,7 +137,7 @@ def retrieve_action_repo(git_repo_url: str, ssh_private_key: str = None) -> Path
 
 @log_execution_time
 def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, action_version: str = None,
-                                       ssh_private_key: str = None) -> Path:
+                                       ssh_private_key: str | None = None) -> Path:
     """
     Retrieves Python CI script file with the given name from Git repository specified in 'PYTHON_CI_ACTIONS_GIT_REPO_URL' environment variable.
     If the repository is private, a private SSH key can be supplied in 'PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY' environment variable.
@@ -145,7 +172,7 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
         return run_shell_command(c, cwd=cloned_actions_directory, silence_output=True, use_wsl_on_windows=False)
 
     # clone the repo
-    with git_ssh_credentials(ssh_private_key):
+    with _git_authentication_context(git_repo_url, ssh_private_key):
         if action_version is None:
             # if no version specified, use the main branch (it's checked out by default)
             run_repo_command('git merge origin/main')

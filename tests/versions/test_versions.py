@@ -123,6 +123,19 @@ def test_version_write():
         print(f"Handler '{version_file_handler_name}' works correctly.")
 
 
+def test_legacy_poetry_pyproject_version_read():
+    file_contents = """
+[tool.poetry]
+name = "legacy-poetry-project"
+version = "1.2.3-test"
+"""
+    handler = VERSION_FILE_HANDLERS["pyproject.toml"]
+
+    version = handler._read_version_from_file_contents(file_contents)
+
+    assert version == VersionInfo(1, 2, 3, "test")
+
+
 def test_version_bump():
     original_version = "v1.1.1"
     original_version = parse_semantic_version(original_version)

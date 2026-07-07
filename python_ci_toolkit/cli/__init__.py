@@ -6,7 +6,7 @@ from rich import print  # type: ignore
 
 from .action import action
 from .autocompletion import autocompletion
-from ..logging import configure_ci_logging
+from ..actions.logging import configure_ci_logging
 
 # configure rich-click
 click.rich_click.SHOW_ARGUMENTS = True
@@ -45,7 +45,7 @@ def cli(ctx: Context, debug: bool = False, purge_caches: bool = False) -> None:
     """
 
     # initialize logging
-    from ..logging import configure_ci_logging
+    from ..actions.logging import configure_ci_logging
     is_debug_enabled = (debug or os.environ.get("DEBUG", None))
     configure_ci_logging("DEBUG" if is_debug_enabled else "INFO")
 

@@ -142,7 +142,7 @@ def action(action_identifier: str, action_args: List[str], debug: bool = False, 
     """
 
     # initialize logging
-    from ...logging import configure_ci_logging
+    from ...actions.logging import configure_ci_logging
     is_debug_enabled = (debug or os.environ.get("DEBUG", None))
     configure_ci_logging("DEBUG" if is_debug_enabled else "INFO")
 
