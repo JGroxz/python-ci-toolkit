@@ -1,3 +1,12 @@
+"""
+Explicit runtime preparation for the current CI project.
+
+This module applies provider-specific compatibility steps before toolkit code
+starts touching project Git state or action repositories. Platform adapters
+report environment facts; this bootstrap decides which preparation steps are
+needed for the current project runtime.
+"""
+
 from pathlib import Path
 
 from .paths import ci_paths

@@ -1,3 +1,11 @@
+"""
+CI platform detection and platform identity exports.
+
+The selected ``ci_platform`` value is the platform class itself, not an enum
+wrapper or instance. Compare it with identity checks such as
+``ci_platform is Local`` or ``ci_platform is GitHubActions``.
+"""
+
 from .base import CiPlatform
 from .bitbucket import BitbucketPipelines
 from .github import GitHubActions
