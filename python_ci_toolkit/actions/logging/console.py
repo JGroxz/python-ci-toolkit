@@ -7,7 +7,7 @@ import rich
 from rich.console import Console
 from rich.theme import Theme
 
-from ...environment import ci_platform, platforms
+from ...environment import ci_platform
 
 _CI_TOOLKIT_RICH_THEME_FILE_PATH = Path(__file__).parent / "styles.cfg"
 CI_TOOLKIT_RICH_THEME = Theme.read(path=str(_CI_TOOLKIT_RICH_THEME_FILE_PATH))

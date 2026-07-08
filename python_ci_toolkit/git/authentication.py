@@ -4,14 +4,14 @@ import uuid
 from contextlib import contextmanager
 from pathlib import Path
 
-from python_ci_toolkit.environment import ci_paths, ci_platform, platforms, retrieve_environment_variable
+from ..environment import BitbucketPipelines, ci_paths, ci_platform, retrieve_environment_variable
 
 
 def get_default_ssh_private_key_file_path() -> Path:
     """
     Returns the path to the default location of the private SSH key file on the current system.
     """
-    if ci_platform == platforms.BitbucketPipelines:
+    if ci_platform is BitbucketPipelines:
         bitbucket_ssh_key_path = retrieve_environment_variable(
             "BITBUCKET_SSH_KEY_FILE",
             "This variable is only available for pipelines running on Bitbucket Cloud and the Linux Docker Pipelines runner. "

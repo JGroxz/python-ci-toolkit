@@ -21,6 +21,7 @@ from .utils.logging import (loading_animation, print_action_run_start, get_actio
                             print_action_run_end_success, print_action_run_end_failure, get_action_progress_message)
 from .logging import get_logger
 from .logging.logging import LOG_WITH_MARKUP
+from ..environment.bootstrap import prepare_ci_project_runtime
 from ..pip import ensure_requirements_installed
 from ..python import import_module_from_file
 
@@ -260,6 +261,8 @@ def run_ci_action(action_name: str, action_version: str = None, args: List[str] 
         are not inherited implicitly. Nested actions receive only the explicitly supplied
         child arguments, and the parent argv is restored after the nested run.
     """
+    prepare_ci_project_runtime()
+
     with _action_runtime_context(action_name, action_version) as runtime_context:
         action_script_path, action_source = _retrieve_action_script(runtime_context)
 

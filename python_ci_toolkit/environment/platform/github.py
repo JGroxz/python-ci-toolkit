@@ -5,7 +5,6 @@ from rich.console import Console
 from rich.theme import Theme
 
 from .base import CiPlatform
-from ...shell import run_shell_command
 
 
 class GitHubActions(CiPlatform):
@@ -27,14 +26,7 @@ class GitHubActions(CiPlatform):
 
     @classmethod
     def get_ci_project_root(cls) -> Path:
-        ci_project_root = Path(os.getenv("GITHUB_WORKSPACE"))
-
-        # GitHub Actions workspace directory belongs to a different user out-of-the-box,
-        # so we have to mark it as safe to be able to run all git commands without errors.
-        # See for more info: https://github.com/python-semantic-release/python-semantic-release/issues/560
-        run_shell_command(f'git config --global --add safe.directory "{ci_project_root}"', silence_output=True, use_wsl_on_windows=False)
-
-        return ci_project_root
+        return Path(os.getenv("GITHUB_WORKSPACE"))
 
     @classmethod
     def on_patch_rich_console(cls, console: Console, default_theme: Theme) -> Console:

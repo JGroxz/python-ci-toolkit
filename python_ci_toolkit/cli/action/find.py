@@ -73,6 +73,9 @@ def list_available_actions(cache_timeout: float = _DEFAULT_LIST_AVAILABLE_ACTION
     Args:
         cache_timeout: Time in seconds after which the cache should be invalidated. If given a non-positive value, the cache will not be used.
     """
+    from ...environment.bootstrap import prepare_ci_project_runtime
+    prepare_ci_project_runtime()
+
     # search for local actions
     from ...actions.retrieval.sources.local import list_actions_in_directory, LOCAL_ACTIONS_DIRECTORY
     local_action_script_paths = list_actions_in_directory(LOCAL_ACTIONS_DIRECTORY)

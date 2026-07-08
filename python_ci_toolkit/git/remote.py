@@ -1,10 +1,39 @@
 import logging
+from pathlib import Path
 
-from git import Repo, GitCommandError
+from ..shell import run_shell_command
 
 
-# TODO: make this a context manager
-def ensure_remote_is_ssh(repo: Repo) -> None:
+def _get_remote_origin_url(repo_path: Path) -> str:
+    return run_shell_command(
+        "git remote get-url origin",
+        cwd=repo_path,
+        silence_output=True,
+        use_wsl_on_windows=False,
+    ).output_stripped
+
+
+def _set_remote_origin_url(repo_path: Path, remote_url: str) -> None:
+    run_shell_command(
+        f'git remote set-url origin "{remote_url}"',
+        cwd=repo_path,
+        silence_output=True,
+        use_wsl_on_windows=False,
+    )
+
+
+def _repo_has_lfs_files(repo_path: Path) -> bool:
+    result = run_shell_command(
+        "git lfs ls-files --all",
+        cwd=repo_path,
+        silence_output=True,
+        raise_on_error=False,
+        use_wsl_on_windows=False,
+    )
+    return result.is_successful and bool(result.output_value)
+
+
+def ensure_remote_is_ssh(repo_path: Path) -> None:
     """
     Makes sure that the remote origin repository's address is in SSH format.
 
@@ -12,32 +41,25 @@ def ensure_remote_is_ssh(repo: Repo) -> None:
         If the remote's URL is in HTTP(S) format, this function will automatically convert it to SSH.
 
     Args:
-        repo: Repository to check the origin in.
+        repo_path: Path to the Git repository to update.
     """
     logging.info("Checking remote address...")
 
-    remote_url = repo.remote().url
+    remote_url = _get_remote_origin_url(repo_path)
 
     if remote_url.startswith("git"):
-        # It's an SSH address, all good
         logging.info(f"Remote '{remote_url}' is already an SSH address.")
         return
 
     logging.warning(f"Remote '{remote_url}' is an HTTP(S) address.")
 
-    # If there are files tracked by Git LFS in this repository, it is unsafe to proceed (LFS requires HTTP(S) to work correctly)
-    try:
-        lfs_output = repo.git.lfs(["ls-files", "--all"])
-        number_of_tracked_lfs_files = len(lfs_output.split("\n")) - 1
-        if number_of_tracked_lfs_files > 0:
-            logging.error(f"Current repository has {number_of_tracked_lfs_files} file(s) tracked by Git LFS, which only works with HTTP(S) remotes.\n"
-                          f"  Remote will not be overwritten.")
-            raise SystemExit(1)
-    except GitCommandError:
-        # If this command failed, Git LFS is not installed; in this case, we don't care
-        pass
+    if _repo_has_lfs_files(repo_path):
+        logging.error(
+            "Current repository has files tracked by Git LFS, which only works with HTTP(S) remotes.\n"
+            "  Remote will not be overwritten."
+        )
+        raise SystemExit(1)
 
-    # Convert origin remote URL into SSH format
     logging.info("Converting remote URL into SSH format...")
 
     host = remote_url.split("://")[1].split("@")[-1].split("/")[0]
@@ -46,13 +68,11 @@ def ensure_remote_is_ssh(repo: Repo) -> None:
 
     ssh_remote_url = f"git@{host}:{user_name}/{repository_name}"
 
-    # Update remote URL
-    repo.remote().set_url(ssh_remote_url)
+    _set_remote_origin_url(repo_path, ssh_remote_url)
     logging.info(f"Updated remote URL: '{ssh_remote_url}'.")
 
 
-# TODO: make this a context manager
-def ensure_remote_is_https(repo: Repo) -> None:
+def ensure_remote_is_https(repo_path: Path) -> None:
     """
     Makes sure that the remote origin repository's address is in HTTPS format.
 
@@ -60,27 +80,24 @@ def ensure_remote_is_https(repo: Repo) -> None:
         If the remote's URL is in SSH format, this function will automatically convert it to HTTPS.
 
     Args:
-        repo: Repository to check the origin in.
+        repo_path: Path to the Git repository to update.
     """
     logging.info("Checking remote address...")
 
-    remote_url = repo.remote().url
+    remote_url = _get_remote_origin_url(repo_path)
 
     if remote_url.startswith("http"):
         if not remote_url.startswith("https"):
-            # It's an HTTP address, just make sure its HTTPS
             logging.info("Remote URL uses HTTP. Switching to HTTPS...")
             https_remote_url = remote_url.replace("http", "https", 1)
-            repo.remote().set_url(https_remote_url)
+            _set_remote_origin_url(repo_path, https_remote_url)
             logging.info(f"Updated remote URL: '{https_remote_url}'.")
         else:
-            # All good
             logging.info(f"Remote '{remote_url}' is an HTTPS address.")
         return
 
     logging.warning(f"Remote '{remote_url}' is an SSH address.")
 
-    # Convert origin remote URL into HTTPS format
     logging.info("Converting remote URL into HTTPS format...")
 
     host = remote_url.split("@")[1].split(":")[0]
@@ -89,6 +106,5 @@ def ensure_remote_is_https(repo: Repo) -> None:
 
     https_remote_url = f"https://{host}/{user_name}/{repository_name}"
 
-    # Update remote URL
-    repo.remote().set_url(https_remote_url)
+    _set_remote_origin_url(repo_path, https_remote_url)
     logging.info(f"Updated remote URL: '{https_remote_url}'.")
