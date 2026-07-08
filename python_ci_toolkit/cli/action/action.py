@@ -125,7 +125,8 @@ def _intercept_help_for_action(ctx: Context, param: Parameter, value: str) -> No
                 callback=_validate_action_identifier,
                 shell_complete=_complete_action_identifier)
 @click.argument('action_args', nargs=-1, type=click.UNPROCESSED)
-def action(action_identifier: str, action_args: List[str], debug: bool = False, find: str = None) -> None:
+@click.pass_context
+def action(ctx: Context, action_identifier: str, action_args: List[str], debug: bool = False, find: str = None) -> None:
     """
     Execute CI action based on the given ACTION_IDENTIFIER.\n
     Arbitrary arguments can be passed to the action in place of ACTION_ARGS.\n
@@ -148,6 +149,7 @@ def action(action_identifier: str, action_args: List[str], debug: bool = False, 
 
     from ...actions import run_ci_action
     from ...actions.constants import ACTION_VERSION_SEPARATOR
+    from ...actions.retrieval.exceptions import ActionRetrievalError
 
     # version can be included in the first argument, separated from the action name by a semicolon
     if ACTION_VERSION_SEPARATOR in action_identifier:
@@ -158,7 +160,12 @@ def action(action_identifier: str, action_args: List[str], debug: bool = False, 
         action_name = action_identifier
         action_version = None
 
-    run_ci_action(action_name, action_version, action_args)
+    try:
+        run_ci_action(action_name, action_version, action_args)
+    except ActionRetrievalError as error:
+        click_error = click.ClickException(str(error))
+        click_error.exit_code = error.exit_code
+        raise click_error from error
 
 
 if __name__ == '__main__':

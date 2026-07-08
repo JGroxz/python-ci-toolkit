@@ -3,14 +3,13 @@ Functions for managing the cache of action files retrieved from remote sources.
 """
 
 import logging
-import sys
 from pathlib import Path
 
 from ..local import get_complex_action_path_in_directory, _LOCAL_ACTIONS_DIRECTORY_RELATIVE
+from ...exceptions import CachedActionScriptNotFoundError
 from ....utils import hash_string
 from ....utils.file_timestamps import time_since_file_timestamp, reset_file_timestamp
 from ....utils.logging import get_action_display_name
-from ....logging.logging import LOG_WITH_MARKUP
 from .....environment.paths.internal import ci_temp_files_shared_directory
 from .....shell import run_shell_command
 logger = logging.getLogger(__name__)
@@ -186,9 +185,10 @@ def retrieve_ci_action_script_from_cache(git_repo_url: str, action_name: str, ac
 
     # check if the repo had the requested action script
     if not action_script_path.exists():
-        logger.error(f"Cloned repository '{git_repo_url}' does not include action [pyci.action]'{action_name}'[/] (expected script path is '{action_script_path}').\n"
-                     f"Please make sure that the remote repository has the required action script.\n"
-                     f"If you are sure the action script exists, remove the action cache files and try again.", **LOG_WITH_MARKUP)
-        sys.exit(5)
+        raise CachedActionScriptNotFoundError(
+            f"Cloned repository '{git_repo_url}' does not include action '{action_name}' (expected script path is '{action_script_path}').\n"
+            f"Please make sure that the remote repository has the required action script.\n"
+            f"If you are sure the action script exists, remove the action cache files and try again."
+        )
 
     return action_script_path

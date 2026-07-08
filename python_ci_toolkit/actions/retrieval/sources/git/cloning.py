@@ -4,7 +4,6 @@ Functions for retrieving action repositories from Git.
 
 import logging
 import shutil
-import sys
 from contextlib import nullcontext
 from dataclasses import dataclass
 from enum import Enum
@@ -13,10 +12,16 @@ from urllib.parse import urlparse
 
 from .caching import create_action_cache_timestamp
 from ....constants import ACTION_VERSION_DEFAULT_REMOTE_STRING, ACTION_VERSION_LOCAL_STRING
+from ...exceptions import (
+    ActionRepositoryLayoutError,
+    AmbiguousGitActionRefError,
+    MissingGitActionRefError,
+    RemoteActionRepoNotConfiguredError,
+    RemoteActionScriptNotFoundError,
+)
 from ....retrieval.sources.local import list_actions_in_directory, _LOCAL_ACTIONS_DIRECTORY_RELATIVE, get_actions_directory_in_project
 from ....utils import log_execution_time, hash_string
 from ....utils.logging import get_action_display_name
-from ....logging.logging import LOG_WITH_MARKUP
 from .....config import load_pyci_config
 from .....environment.paths.internal import ci_temp_files_shared_directory
 from .....environment.variables import is_environment_variable_set, retrieve_environment_variable
@@ -28,12 +33,6 @@ logger = logging.getLogger(__name__)
 ACTION_REPO_URL_ENV_VAR = "PYTHON_CI_ACTIONS_GIT_REPO_URL"
 ACTION_REPO_SSH_PRIVATE_KEY_ENV_VAR = "PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY"
 DOWNLOADED_ACTION_REPOS_DIRECTORY = ci_temp_files_shared_directory / "downloaded_action_repos"
-
-
-class RemoteActionRepoNotConfiguredError(RuntimeError):
-    """
-    Raised when a remote action is requested without a configured action repository.
-    """
 
 
 class GitActionRefType(Enum):
@@ -222,16 +221,18 @@ def checkout_git_action_ref(repo_path: Path, git_repo_url: str, action_name: str
     action_display_name = get_action_display_name(action_name, action_ref.name)
 
     if action_ref.type == GitActionRefType.AMBIGUOUS:
-        logger.error(f"Both a branch and a tag named '{action_ref.name}' exist in remote repository '{git_repo_url}'.\n"
-                     f"The action '{action_display_name}' will not be pulled to avoid ambiguity.\n"
-                     f"Please remove the redundant branch or tag ('{action_ref.name}') from the repo before pulling this version again.")
-        sys.exit(2)
+        raise AmbiguousGitActionRefError(
+            f"Both a branch and a tag named '{action_ref.name}' exist in remote repository '{git_repo_url}'.\n"
+            f"The action '{action_display_name}' will not be pulled to avoid ambiguity.\n"
+            f"Please remove the redundant branch or tag ('{action_ref.name}') from the repo before pulling this version again."
+        )
 
     if action_ref.type == GitActionRefType.MISSING:
-        logger.error(f"Cannot pull action '{action_display_name}' from Git:\n"
-                     f"  Repository '{git_repo_url}' has neither a branch nor a tag named '{action_ref.name}'.\n"
-                     f"  Please make sure that the corresponding branch or tag ('{action_ref.name}') exists before pulling this version again.")
-        sys.exit(3)
+        raise MissingGitActionRefError(
+            f"Cannot pull action '{action_display_name}' from Git:\n"
+            f"  Repository '{git_repo_url}' has neither a branch nor a tag named '{action_ref.name}'.\n"
+            f"  Please make sure that the corresponding branch or tag ('{action_ref.name}') exists before pulling this version again."
+        )
 
     run_shell_command("git reset --hard", cwd=repo_path, silence_output=True, use_wsl_on_windows=False)
     run_shell_command("git clean -fdx", cwd=repo_path, silence_output=True, use_wsl_on_windows=False)
@@ -302,8 +303,9 @@ def retrieve_action_repo(git_repo_url: str, ssh_private_key: str | None = None) 
     # check if actions directory is present before returning it
     actions_directory = get_actions_directory_in_project(cloned_repo_path)
     if not actions_directory.exists():
-        logger.error(f"Repository '{git_repo_url}' does not have '{_LOCAL_ACTIONS_DIRECTORY_RELATIVE}' directory in it.")
-        sys.exit(1)
+        raise ActionRepositoryLayoutError(
+            f"Repository '{git_repo_url}' does not have '{_LOCAL_ACTIONS_DIRECTORY_RELATIVE}' directory in it."
+        )
 
     return actions_directory
 
@@ -354,8 +356,9 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
 
     # check if the repo had the requested action script
     if not action_script_path.exists():
-        logger.error(f"Cloned repository '{git_repo_url}' does not include action [pyci.action]'{action_name}'[/] (expected script path is '{action_script_path}').\n"
-                     f"Please make sure that the remote repository has the required action script.", **LOG_WITH_MARKUP)
-        sys.exit(4)
+        raise RemoteActionScriptNotFoundError(
+            f"Cloned repository '{git_repo_url}' does not include action '{action_name}' (expected script path is '{action_script_path}').\n"
+            f"Please make sure that the remote repository has the required action script."
+        )
 
     return action_script_path

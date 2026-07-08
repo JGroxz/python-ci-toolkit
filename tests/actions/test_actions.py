@@ -44,6 +44,17 @@ def _create_remote_actions_git_repo(repo_path: Path, description: str) -> Path:
     return repo_path
 
 
+def _create_git_repo_without_actions(repo_path: Path) -> Path:
+    repo_path.mkdir(parents=True)
+    (repo_path / "README.md").write_text("No CI actions here.\n", encoding="utf-8")
+
+    run_shell_command("git init", cwd=repo_path, silence_output=True, use_wsl_on_windows=False)
+    run_shell_command("git symbolic-ref HEAD refs/heads/main", cwd=repo_path, silence_output=True, use_wsl_on_windows=False)
+    _commit_remote_action_repo(repo_path, "Add readme")
+
+    return repo_path
+
+
 def _commit_remote_action_repo(repo_path: Path, message: str) -> None:
     run_shell_command("git add .", cwd=repo_path, silence_output=True, use_wsl_on_windows=False)
     run_shell_command(
@@ -104,6 +115,40 @@ def test_retrieve_action_repo_reclones_invalid_cached_path(remote_actions_git_re
     assert (cloned_repo_root / ".git").exists()
     assert not invalid_cache_file.exists()
     assert (cloned_actions_directory / "hello_world" / "hello_world.py").exists()
+
+
+def test_retrieve_action_repo_reclones_cached_clone_with_wrong_origin(
+    tmp_path: Path,
+    remote_actions_git_repo: Path,
+):
+    from python_ci_toolkit.actions.retrieval.sources.git.cloning import (
+        get_clone_directory_from_action_repo_url,
+        retrieve_action_repo,
+    )
+
+    repo_a_url = str(remote_actions_git_repo)
+    repo_b = _create_remote_actions_git_repo(tmp_path / "other-remote-actions", "Wrong origin hello world action.")
+    cloned_repo_root = get_clone_directory_from_action_repo_url(repo_a_url)
+    cloned_repo_root.parent.mkdir(parents=True, exist_ok=True)
+
+    run_shell_command(
+        f'git clone "{repo_b}" "{cloned_repo_root}"',
+        silence_output=True,
+        use_wsl_on_windows=False,
+    )
+
+    cloned_actions_directory = retrieve_action_repo(repo_a_url)
+
+    origin = run_shell_command(
+        "git config --get remote.origin.url",
+        cwd=cloned_repo_root,
+        silence_output=True,
+        use_wsl_on_windows=False,
+    )
+    cloned_action_file = cloned_actions_directory / "hello_world" / "hello_world.py"
+
+    assert origin.output_stripped == repo_a_url
+    assert "Remote hello world action." in cloned_action_file.read_text(encoding="utf-8")
 
 
 def test_retrieve_action_repo_resets_dirty_cached_clone(remote_actions_git_repo: Path):
@@ -242,32 +287,77 @@ def test_retrieve_ci_action_script_from_git_checks_out_tag(remote_actions_git_re
 
 def test_retrieve_ci_action_script_from_git_rejects_ambiguous_branch_and_tag(remote_actions_git_repo: Path):
     from python_ci_toolkit.actions.retrieval.sources.git.cloning import retrieve_ci_action_script_from_git
+    from python_ci_toolkit.actions.retrieval.exceptions import AmbiguousGitActionRefError
 
     TEST_ACTION_VERSION = "release"
     _create_remote_action_branch(remote_actions_git_repo, TEST_ACTION_VERSION, "Release branch hello world action.")
     run_shell_command(f'git tag "{TEST_ACTION_VERSION}"', cwd=remote_actions_git_repo, silence_output=True, use_wsl_on_windows=False)
 
-    with pytest.raises(SystemExit) as error:
+    with pytest.raises(AmbiguousGitActionRefError) as error:
         retrieve_ci_action_script_from_git(
             git_repo_url=str(remote_actions_git_repo),
             action_name="hello_world",
             action_version=TEST_ACTION_VERSION,
         )
 
-    assert error.value.code == 2
+    assert error.value.exit_code == 2
 
 
 def test_retrieve_ci_action_script_from_git_rejects_missing_ref(remote_actions_git_repo: Path):
     from python_ci_toolkit.actions.retrieval.sources.git.cloning import retrieve_ci_action_script_from_git
+    from python_ci_toolkit.actions.retrieval.exceptions import MissingGitActionRefError
 
-    with pytest.raises(SystemExit) as error:
+    with pytest.raises(MissingGitActionRefError) as error:
         retrieve_ci_action_script_from_git(
             git_repo_url=str(remote_actions_git_repo),
             action_name="hello_world",
             action_version="missing-version",
         )
 
-    assert error.value.code == 3
+    assert error.value.exit_code == 3
+
+
+def test_retrieve_action_repo_rejects_missing_actions_directory(tmp_path: Path):
+    from python_ci_toolkit.actions.retrieval.sources.git.cloning import retrieve_action_repo
+    from python_ci_toolkit.actions.retrieval.exceptions import ActionRepositoryLayoutError
+
+    remote_repo = _create_git_repo_without_actions(tmp_path / "remote-actions-without-actions")
+
+    with pytest.raises(ActionRepositoryLayoutError) as error:
+        retrieve_action_repo(str(remote_repo))
+
+    assert error.value.exit_code == 1
+
+
+def test_retrieve_ci_action_script_from_git_rejects_missing_action(remote_actions_git_repo: Path):
+    from python_ci_toolkit.actions.retrieval.sources.git.cloning import retrieve_ci_action_script_from_git
+    from python_ci_toolkit.actions.retrieval.exceptions import RemoteActionScriptNotFoundError
+
+    with pytest.raises(RemoteActionScriptNotFoundError) as error:
+        retrieve_ci_action_script_from_git(
+            git_repo_url=str(remote_actions_git_repo),
+            action_name="missing_action",
+            action_version="main",
+        )
+
+    assert error.value.exit_code == 4
+
+
+def test_retrieve_ci_action_script_from_cache_rejects_missing_action(remote_actions_git_repo: Path):
+    from python_ci_toolkit.actions.retrieval.sources.git.caching import retrieve_ci_action_script_from_cache
+    from python_ci_toolkit.actions.retrieval.sources.git.cloning import retrieve_action_repo
+    from python_ci_toolkit.actions.retrieval.exceptions import CachedActionScriptNotFoundError
+
+    retrieve_action_repo(str(remote_actions_git_repo))
+
+    with pytest.raises(CachedActionScriptNotFoundError) as error:
+        retrieve_ci_action_script_from_cache(
+            git_repo_url=str(remote_actions_git_repo),
+            action_name="missing_action",
+            action_version="main",
+        )
+
+    assert error.value.exit_code == 5
 
 
 def test_retrieve_ci_action_script_from_git_rejects_local_version(remote_actions_git_repo: Path):
@@ -298,6 +388,33 @@ def test_remote_branch_action_cache_uses_explicit_branch_checkout(remote_actions
 
     assert "Cached branch hello world action." in action_script_path.read_text(encoding="utf-8")
     assert action_source == f"'{TEST_ACTION_VERSION}' at '{remote_actions_git_repo}' (cached)"
+
+
+def test_remote_tag_action_cache_uses_explicit_detached_checkout(remote_actions_git_repo: Path):
+    from python_ci_toolkit.actions.retrieval import retrieve_ci_action_script
+
+    TEST_ACTION_VERSION = "v2.0.0"
+    _create_remote_action_tag(remote_actions_git_repo, TEST_ACTION_VERSION, "Cached tag hello world action.")
+
+    action_script_path, action_source = retrieve_ci_action_script("hello_world", TEST_ACTION_VERSION)
+    action_script_path.write_text("dirty cached tag checkout", encoding="utf-8")
+
+    action_script_path, action_source = retrieve_ci_action_script("hello_world", TEST_ACTION_VERSION)
+    cloned_repo_root = _get_cloned_repo_root(action_script_path.parent.parent)
+    current_branch = run_shell_command(
+        "git symbolic-ref -q --short HEAD",
+        cwd=cloned_repo_root,
+        silence_output=True,
+        raise_on_error=False,
+        use_wsl_on_windows=False,
+    )
+    cloned_head = run_shell_command("git rev-parse HEAD", cwd=cloned_repo_root, silence_output=True, use_wsl_on_windows=False)
+    tag_head = run_shell_command(f'git rev-list -n 1 "{TEST_ACTION_VERSION}"', cwd=remote_actions_git_repo, silence_output=True, use_wsl_on_windows=False)
+
+    assert "Cached tag hello world action." in action_script_path.read_text(encoding="utf-8")
+    assert action_source == f"'{TEST_ACTION_VERSION}' at '{remote_actions_git_repo}' (cached)"
+    assert current_branch.is_failed
+    assert cloned_head.output_stripped == tag_head.output_stripped
 
 
 def test_remote_action_caching(remote_actions_git_repo: Path, caplog):
@@ -392,6 +509,37 @@ def test_remote_action_cache_is_stale_when_cloned_repo_is_missing(remote_actions
     assert action_source == f"'main' at '{remote_actions_git_repo}'"
 
 
+def test_remote_action_cache_is_stale_when_timestamp_expires(remote_actions_git_repo: Path):
+    import os
+    import time
+
+    from python_ci_toolkit.actions.retrieval import retrieve_ci_action_script
+    from python_ci_toolkit.actions.retrieval.sources.git.caching import (
+        DEFAULT_REMOTE_ACTIONS_CACHE_INVALIDATION_TIMEOUT,
+        _get_action_cache_timestamp_path,
+    )
+    from python_ci_toolkit.environment.paths import purge_temporary_files
+
+    purge_temporary_files()
+
+    repo_url = str(remote_actions_git_repo)
+    action_script_path, action_source = retrieve_ci_action_script("hello_world", "main")
+    assert action_script_path.exists()
+    assert action_source == f"'main' at '{remote_actions_git_repo}'"
+
+    _write_remote_hello_world_action(remote_actions_git_repo, "Updated after cache expiry.")
+    _commit_remote_action_repo(remote_actions_git_repo, "Update hello world action after cache expiry")
+
+    timestamp_path = _get_action_cache_timestamp_path(repo_url, "hello_world", "main")
+    expired_timestamp = time.time() - DEFAULT_REMOTE_ACTIONS_CACHE_INVALIDATION_TIMEOUT - 1
+    os.utime(timestamp_path, (expired_timestamp, expired_timestamp))
+
+    action_script_path, action_source = retrieve_ci_action_script("hello_world", "main")
+
+    assert "Updated after cache expiry." in action_script_path.read_text(encoding="utf-8")
+    assert action_source == f"'main' at '{remote_actions_git_repo}'"
+
+
 def test_remote_action_cache_is_stale_when_cached_action_script_is_missing(remote_actions_git_repo: Path):
     from python_ci_toolkit.actions.retrieval import retrieve_ci_action_script
     from python_ci_toolkit.actions.retrieval.sources.git.caching import is_action_cache_fresh
@@ -479,6 +627,25 @@ def test_remote_action_without_config_fails_clearly(tmp_path: Path, monkeypatch:
 
     with pytest.raises(RemoteActionRepoNotConfiguredError, match="Remote action repository is not configured"):
         retrieve_ci_action_script("hello_world", "main")
+
+
+def test_action_cli_renders_retrieval_errors_without_traceback(monkeypatch: pytest.MonkeyPatch):
+    import python_ci_toolkit.actions as actions_module
+    from click.testing import CliRunner
+
+    from python_ci_toolkit.actions.retrieval.exceptions import MissingGitActionRefError
+    from python_ci_toolkit.cli.action.action import action
+
+    def fail_run_ci_action(action_name: str, action_version: str | None = None, args: list[str] | None = None) -> None:
+        raise MissingGitActionRefError("Cannot pull action 'hello_world@missing-version' from Git.")
+
+    monkeypatch.setattr(actions_module, "run_ci_action", fail_run_ci_action)
+
+    result = CliRunner().invoke(action, ["hello_world@missing-version"])
+
+    assert result.exit_code == MissingGitActionRefError.exit_code
+    assert "Cannot pull action 'hello_world@missing-version' from Git." in result.output
+    assert "Traceback" not in result.output
 
 
 def test_list_actions_in_directory():
