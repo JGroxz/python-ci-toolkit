@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+import pytest
+
 from python_ci_toolkit.shell import run_shell_command
 
 
@@ -10,7 +12,9 @@ def test_retrieve_action_repo(remote_actions_git_repo: Path):
     from python_ci_toolkit.actions.retrieval.sources.git.cloning import retrieve_action_repo, get_remote_action_repo
     from python_ci_toolkit.actions.retrieval.sources.local import _LOCAL_ACTIONS_DIRECTORY_RELATIVE
 
-    action_repo_url, action_repo_ssh_private_key = get_remote_action_repo()
+    action_repo = get_remote_action_repo()
+    assert action_repo is not None
+    action_repo_url, action_repo_ssh_private_key = action_repo
     cloned_actions_directory: Path = retrieve_action_repo(action_repo_url, action_repo_ssh_private_key)
 
     print(cloned_actions_directory)
@@ -33,7 +37,9 @@ def test_retrieve_ci_action_script_from_git(remote_actions_git_repo: Path):
     TEST_ACTION_NAME = "hello_world"
     TEST_ACTION_VERSION = "main"
 
-    action_repo_url, action_repo_ssh_private_key = get_remote_action_repo()
+    action_repo = get_remote_action_repo()
+    assert action_repo is not None
+    action_repo_url, action_repo_ssh_private_key = action_repo
     action_script_path = retrieve_ci_action_script_from_git(
         git_repo_url=action_repo_url,
         action_name=TEST_ACTION_NAME,
@@ -92,6 +98,74 @@ def test_remote_action_caching(remote_actions_git_repo: Path, caplog):
     # run the test to verify that caching works
     run_test_action_twice()
     run_test_action_twice()
+
+
+def test_remote_action_repo_is_optional(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    from python_ci_toolkit.actions.retrieval.sources.git.cloning import get_remote_action_repo
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("PYTHON_CI_ACTIONS_GIT_REPO_URL", raising=False)
+    monkeypatch.delenv("PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY", raising=False)
+
+    assert get_remote_action_repo() is None
+
+
+def test_remote_action_repo_can_come_from_project_config(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    remote_actions_git_repo_path: Path,
+):
+    from python_ci_toolkit.config import get_pyci_config_path
+    from python_ci_toolkit.actions.retrieval.sources.git.cloning import get_remote_action_repo
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("PYTHON_CI_ACTIONS_GIT_REPO_URL", raising=False)
+    monkeypatch.delenv("PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY", raising=False)
+    config_path = get_pyci_config_path()
+    config_path.parent.mkdir(parents=True)
+    config_path.write_text(
+        "[actions]\n"
+        f'remote_repository = "{remote_actions_git_repo_path}"\n',
+        encoding="utf-8"
+    )
+
+    assert get_remote_action_repo() == (str(remote_actions_git_repo_path), None)
+
+
+def test_remote_action_repo_env_var_overrides_project_config(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    remote_actions_git_repo_path: Path,
+):
+    from python_ci_toolkit.config import get_pyci_config_path
+    from python_ci_toolkit.actions.retrieval.sources.git.cloning import get_remote_action_repo
+
+    configured_repo_path = tmp_path / "configured-actions"
+    configured_repo_path.mkdir()
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PYTHON_CI_ACTIONS_GIT_REPO_URL", str(remote_actions_git_repo_path))
+    monkeypatch.delenv("PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY", raising=False)
+    config_path = get_pyci_config_path()
+    config_path.parent.mkdir(parents=True)
+    config_path.write_text(
+        "[actions]\n"
+        f'remote_repository = "{configured_repo_path}"\n',
+        encoding="utf-8"
+    )
+
+    assert get_remote_action_repo() == (str(remote_actions_git_repo_path), None)
+
+
+def test_remote_action_without_config_fails_clearly(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    from python_ci_toolkit.actions.retrieval import retrieve_ci_action_script
+    from python_ci_toolkit.actions.retrieval.sources.git.cloning import RemoteActionRepoNotConfiguredError
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("PYTHON_CI_ACTIONS_GIT_REPO_URL", raising=False)
+    monkeypatch.delenv("PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY", raising=False)
+
+    with pytest.raises(RemoteActionRepoNotConfiguredError, match="Remote action repository is not configured"):
+        retrieve_ci_action_script("hello_world", "main")
 
 
 def test_list_actions_in_directory():

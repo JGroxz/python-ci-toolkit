@@ -13,15 +13,23 @@ from ....retrieval.sources.local import list_actions_in_directory, _LOCAL_ACTION
 from ....utils import log_execution_time, hash_string
 from ....utils.logging import get_action_display_name
 from ....logging.logging import LOG_WITH_MARKUP
+from .....config import load_pyci_config
 from .....environment.paths.internal import ci_temp_files_shared_directory
-from .....environment.variables import retrieve_environment_variable
+from .....environment.variables import is_environment_variable_set, retrieve_environment_variable
 from .....git import git_ssh_credentials, get_default_ssh_private_key
 from .....shell import run_shell_command
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_ACTION_REPO_URL = "git@github.com:pyci/python-ci-actions.git"
+ACTION_REPO_URL_ENV_VAR = "PYTHON_CI_ACTIONS_GIT_REPO_URL"
+ACTION_REPO_SSH_PRIVATE_KEY_ENV_VAR = "PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY"
 DOWNLOADED_ACTION_REPOS_DIRECTORY = ci_temp_files_shared_directory / "downloaded_action_repos"
+
+
+class RemoteActionRepoNotConfiguredError(RuntimeError):
+    """
+    Raised when a remote action is requested without a configured action repository.
+    """
 
 
 def _git_repo_url_uses_ssh(git_repo_url: str) -> bool:
@@ -47,27 +55,50 @@ def _git_authentication_context(git_repo_url: str, ssh_private_key: str | None =
     return nullcontext()
 
 
-def get_remote_action_repo() -> tuple[str, str | None]:
+def _get_configured_action_repo_url() -> str | None:
+    if is_environment_variable_set(ACTION_REPO_URL_ENV_VAR):
+        return retrieve_environment_variable(ACTION_REPO_URL_ENV_VAR)
+
+    return load_pyci_config().actions.remote_repository
+
+
+def get_remote_action_repo() -> tuple[str, str | None] | None:
     """
     Returns:
-        A tuple with:
+        None if no remote action repository is configured.
+        Otherwise, a tuple with:
             - URL of the remote Git repository that contains actions.
             - Secret SSH key to access the remote Git repository, if the URL uses SSH.
     """
-    actions_git_repo_url = retrieve_environment_variable(
-        "PYTHON_CI_ACTIONS_GIT_REPO_URL",
-        f"URL address of the Git repository is required to pull the action code.",
-        fallback=DEFAULT_ACTION_REPO_URL
-    )
+    actions_git_repo_url = _get_configured_action_repo_url()
+    if actions_git_repo_url is None:
+        return None
+
     actions_ssh_private_key = None
     if _git_repo_url_uses_ssh(actions_git_repo_url):
         actions_ssh_private_key = retrieve_environment_variable(
-            "PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY",
+            ACTION_REPO_SSH_PRIVATE_KEY_ENV_VAR,
             "SSH private key is required to pull actions from SSH Git repositories.",
             fallback=get_default_ssh_private_key
         )
 
     return actions_git_repo_url, actions_ssh_private_key
+
+
+def require_remote_action_repo() -> tuple[str, str | None]:
+    """
+    Returns configured remote action repository or raises a clear policy error.
+    """
+    action_repo = get_remote_action_repo()
+    if action_repo is not None:
+        return action_repo
+
+    raise RemoteActionRepoNotConfiguredError(
+        "Remote action repository is not configured.\n"
+        f"To run remote actions, set '{ACTION_REPO_URL_ENV_VAR}' or add "
+        "'actions.remote_repository' to '.ci/pyci.toml'.\n"
+        "To run a local action, use '<action_name>@local'."
+    )
 
 
 def get_clone_directory_from_action_repo_url(git_repo_url: str) -> Path:

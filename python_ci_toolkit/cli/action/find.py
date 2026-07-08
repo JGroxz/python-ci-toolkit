@@ -64,21 +64,15 @@ _DEFAULT_LIST_AVAILABLE_ACTIONS_CACHE_TIMEOUT = 600
 
 def list_available_actions(cache_timeout: float = _DEFAULT_LIST_AVAILABLE_ACTIONS_CACHE_TIMEOUT) -> list[ActionMetadata]:
     """
-    Returns a list of all available CI actions in the current project (both remote and local).
+    Returns a list of all local and configured remote CI actions in the current project.
 
     Notes:
-        Caches the results for the specified time to avoid cloning the remote action repo on every consecutive call.
+        If a remote action repository is configured, caches the results for the specified time to avoid cloning
+        the remote action repo on every consecutive call.
 
     Args:
         cache_timeout: Time in seconds after which the cache should be invalidated. If given a non-positive value, the cache will not be used.
     """
-    # determine how much time passed since the last call to this autocompletion function;
-    # this is done to avoid cloning the remote action repo on every consecutive call within a specific time window
-    from ...environment.paths.internal import ci_temp_files_shared_directory
-    from ...actions.utils.file_timestamps import time_since_file_timestamp, reset_file_timestamp
-    timestamp_file_path = ci_temp_files_shared_directory / "cli_actions_last_autocomplete.timestamp"
-    time_since_last_call = time_since_file_timestamp(timestamp_file_path)
-
     # search for local actions
     from ...actions.retrieval.sources.local import list_actions_in_directory, LOCAL_ACTIONS_DIRECTORY
     local_action_script_paths = list_actions_in_directory(LOCAL_ACTIONS_DIRECTORY)
@@ -89,7 +83,18 @@ def list_available_actions(cache_timeout: float = _DEFAULT_LIST_AVAILABLE_ACTION
     # remote actions
     from ...actions.retrieval.sources.git.cloning import get_remote_action_repo, retrieve_action_repo, get_clone_directory_from_action_repo_url
     from ...actions.retrieval.sources.local import get_actions_directory_in_project
-    action_repo_url, action_repo_ssh_private_key = get_remote_action_repo()
+    action_repo = get_remote_action_repo()
+    if action_repo is None:
+        return local_actions_metadata
+
+    # determine how much time passed since the last call to this autocompletion function;
+    # this is done to avoid cloning the remote action repo on every consecutive call within a specific time window
+    from ...environment.paths.internal import ci_temp_files_shared_directory
+    from ...actions.utils.file_timestamps import time_since_file_timestamp, reset_file_timestamp
+    timestamp_file_path = ci_temp_files_shared_directory / "cli_actions_last_autocomplete.timestamp"
+    time_since_last_call = time_since_file_timestamp(timestamp_file_path)
+
+    action_repo_url, action_repo_ssh_private_key = action_repo
     cloned_repo_directory = get_clone_directory_from_action_repo_url(action_repo_url)
     cloned_actions_directory = get_actions_directory_in_project(cloned_repo_directory)
     if time_since_last_call >= cache_timeout:

@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 
 from .sources.git.caching import is_action_cache_fresh, retrieve_ci_action_script_from_cache
-from .sources.git.cloning import get_remote_action_repo, retrieve_ci_action_script_from_git
+from .sources.git.cloning import require_remote_action_repo, retrieve_ci_action_script_from_git
 from .sources.local import retrieve_ci_action_script_local
 from ..constants import ACTION_VERSION_LOCAL_STRING
 from ..logging.logging import LOG_WITH_MARKUP
@@ -39,7 +39,7 @@ def retrieve_ci_action_script(action_name: str, action_version: str = None) -> t
         logger.debug(f"Retrieved local action [pyci.action]'{action_name}'[/].", **LOG_WITH_MARKUP)
     else:
         # get remote actions repo configuration
-        action_repo_url, action_repo_ssh_private_key = get_remote_action_repo()
+        action_repo_url, action_repo_ssh_private_key = require_remote_action_repo()
 
         if is_action_cache_fresh(action_name, action_version):
             # from cache

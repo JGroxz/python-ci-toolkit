@@ -40,7 +40,7 @@ Follow the existing straightforward Python style.
 - Prefer explicit, small functions over broad abstractions.
 - Keep edits scoped to the issue being worked.
 - Use type annotations for new or modified function signatures when practical.
-- This project supports Python `>=3.10`; do not use syntax that requires newer Python versions.
+- This project supports Python `>=3.11`; do not use syntax that requires newer Python versions.
 - Use f-strings for string formatting, including logs.
 - Keep comments rare and useful. Add a short comment when a multi-step block would otherwise hide intent.
 - Preserve existing public behavior unless the task explicitly changes it.

@@ -1,6 +1,23 @@
 from pathlib import Path
 
 
+def test_autocompletion_lists_local_actions_without_remote_config(monkeypatch):
+    from python_ci_toolkit.cli.action.find import ActionMetadata, list_available_actions
+    from python_ci_toolkit.actions.retrieval.sources.local import list_actions_in_directory, LOCAL_ACTIONS_DIRECTORY
+
+    monkeypatch.delenv("PYTHON_CI_ACTIONS_GIT_REPO_URL", raising=False)
+    monkeypatch.delenv("PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY", raising=False)
+
+    all_actions_metadata = list_available_actions(cache_timeout=0)
+    all_local_actions = list_actions_in_directory(LOCAL_ACTIONS_DIRECTORY)
+    all_local_actions_metadata = [
+        ActionMetadata(f"{metadata.name}@local", f"[local] {metadata.description}")
+        for metadata in [ActionMetadata.from_action_file(p) for p in all_local_actions]
+    ]
+
+    assert all_actions_metadata == sorted(all_local_actions_metadata)
+
+
 def test_autocompletion_list_available_actions(remote_actions_git_repo: Path):
     from python_ci_toolkit.cli.action.find import ActionMetadata, list_available_actions
 

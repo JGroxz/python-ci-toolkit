@@ -21,9 +21,9 @@ def variable_name() -> str:
 
 
 @pytest.fixture
-def remote_actions_git_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+def remote_actions_git_repo_path(tmp_path: Path) -> Path:
     """
-    Creates a local Git repository with a test CI action and configures the toolkit to use it as the remote action repo.
+    Creates a local Git repository with a test CI action.
     """
     repo_path = tmp_path / "remote-actions"
     action_directory = repo_path / ".ci" / "actions" / "hello_world"
@@ -48,6 +48,16 @@ def remote_actions_git_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
         silence_output=True,
         use_wsl_on_windows=False
     )
+
+    return repo_path
+
+
+@pytest.fixture
+def remote_actions_git_repo(remote_actions_git_repo_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """
+    Creates a local Git repository with a test CI action and configures the toolkit to use it as the remote action repo.
+    """
+    repo_path = remote_actions_git_repo_path
 
     monkeypatch.setenv("PYTHON_CI_ACTIONS_GIT_REPO_URL", str(repo_path))
     monkeypatch.delenv("PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY", raising=False)
