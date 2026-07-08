@@ -60,6 +60,5 @@ def remote_actions_git_repo(remote_actions_git_repo_path: Path, monkeypatch: pyt
     repo_path = remote_actions_git_repo_path
 
     monkeypatch.setenv("PYTHON_CI_ACTIONS_GIT_REPO_URL", str(repo_path))
-    monkeypatch.delenv("PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY", raising=False)
 
     return repo_path

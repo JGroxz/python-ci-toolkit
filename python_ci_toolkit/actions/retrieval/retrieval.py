@@ -40,7 +40,7 @@ def retrieve_ci_action_script(action_name: str, action_version: str = None) -> t
         action_display_name = get_action_display_name(action_name, action_version)
 
         # get remote actions repo configuration
-        action_repo_url, action_repo_ssh_private_key = require_remote_action_repo()
+        action_repo_url = require_remote_action_repo()
 
         if is_action_cache_fresh(action_repo_url, action_name, action_version):
             # from cache
@@ -64,7 +64,6 @@ def retrieve_ci_action_script(action_name: str, action_version: str = None) -> t
                     git_repo_url=action_repo_url,
                     action_name=action_name,
                     action_version=action_version,
-                    ssh_private_key=action_repo_ssh_private_key
                 )
 
                 action_source = f"'{action_version}' at '{action_repo_url}'"

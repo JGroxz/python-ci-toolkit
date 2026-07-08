@@ -34,6 +34,16 @@ remote_repository = "https://github.com/example/python-ci-actions.git"
 ```
 
 `PYTHON_CI_ACTIONS_GIT_REPO_URL` can be used as a CI-time override and takes
-precedence over `.ci/pyci.toml`. For SSH remote URLs, provide
-`PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY` or rely on the local default SSH key only
-after explicitly configuring an SSH action repository.
+precedence over `.ci/pyci.toml`.
+
+### Remote Repository Authentication
+
+| Remote URL type | PyCI behavior |
+| --- | --- |
+| HTTPS | No PyCI-managed credentials; Git uses public access or configured credential helpers. |
+| Local path/file URL | No PyCI-managed credentials; Git reads from the local repository. |
+| SSH | No PyCI-managed credentials; Git uses ambient SSH configuration such as an agent, deploy key, or user SSH config. |
+
+PyCI does not manage remote repository credentials directly. Configure Git or
+SSH authentication in the current environment before invoking PyCI; the
+configured remote action repository must already be fetchable by Git.

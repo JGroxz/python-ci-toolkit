@@ -83,8 +83,8 @@ def test_retrieve_action_repo(remote_actions_git_repo: Path):
 
     action_repo = get_remote_action_repo()
     assert action_repo is not None
-    action_repo_url, action_repo_ssh_private_key = action_repo
-    cloned_actions_directory: Path = retrieve_action_repo(action_repo_url, action_repo_ssh_private_key)
+    action_repo_url = action_repo
+    cloned_actions_directory: Path = retrieve_action_repo(action_repo_url)
 
     print(cloned_actions_directory)
 
@@ -93,7 +93,6 @@ def test_retrieve_action_repo(remote_actions_git_repo: Path):
     print(f"Cloned repo root: '{cloned_repo_root}'")
 
     assert action_repo_url == str(remote_actions_git_repo)
-    assert action_repo_ssh_private_key is None
     assert (cloned_repo_root / ".git").exists(), \
         "There is no '.git' file in the action repo directory. It means the repo was not cloned."
 
@@ -211,18 +210,16 @@ def test_retrieve_ci_action_script_from_git(remote_actions_git_repo: Path):
 
     action_repo = get_remote_action_repo()
     assert action_repo is not None
-    action_repo_url, action_repo_ssh_private_key = action_repo
+    action_repo_url = action_repo
     action_script_path = retrieve_ci_action_script_from_git(
         git_repo_url=action_repo_url,
         action_name=TEST_ACTION_NAME,
         action_version=TEST_ACTION_VERSION,
-        ssh_private_key=action_repo_ssh_private_key
     )
 
     action_script_directory = action_script_path.parent
 
     assert action_repo_url == str(remote_actions_git_repo)
-    assert action_repo_ssh_private_key is None
     result = run_shell_command(f'git status',
                                cwd=action_script_directory, silence_output=True, use_wsl_on_windows=False)
     assert TEST_ACTION_VERSION in result.output, \
@@ -469,7 +466,6 @@ def test_remote_action_cache_is_scoped_to_configured_repo(tmp_path: Path, monkey
 
     repo_a = _create_remote_actions_git_repo(tmp_path / "remote-actions-a", "Repo A hello world action.")
     repo_b = _create_remote_actions_git_repo(tmp_path / "remote-actions-b", "Repo B hello world action.")
-    monkeypatch.delenv("PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY", raising=False)
 
     monkeypatch.setenv("PYTHON_CI_ACTIONS_GIT_REPO_URL", str(repo_a))
     action_script_path, action_source = retrieve_ci_action_script("hello_world", "main")
@@ -566,7 +562,6 @@ def test_remote_action_repo_is_optional(tmp_path: Path, monkeypatch: pytest.Monk
 
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("PYTHON_CI_ACTIONS_GIT_REPO_URL", raising=False)
-    monkeypatch.delenv("PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY", raising=False)
 
     assert get_remote_action_repo() is None
 
@@ -581,7 +576,6 @@ def test_remote_action_repo_can_come_from_project_config(
 
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("PYTHON_CI_ACTIONS_GIT_REPO_URL", raising=False)
-    monkeypatch.delenv("PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY", raising=False)
     config_path = get_pyci_config_path()
     config_path.parent.mkdir(parents=True)
     config_path.write_text(
@@ -590,7 +584,7 @@ def test_remote_action_repo_can_come_from_project_config(
         encoding="utf-8"
     )
 
-    assert get_remote_action_repo() == (str(remote_actions_git_repo_path), None)
+    assert get_remote_action_repo() == str(remote_actions_git_repo_path)
 
 
 def test_remote_action_repo_env_var_overrides_project_config(
@@ -605,7 +599,6 @@ def test_remote_action_repo_env_var_overrides_project_config(
     configured_repo_path.mkdir()
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("PYTHON_CI_ACTIONS_GIT_REPO_URL", str(remote_actions_git_repo_path))
-    monkeypatch.delenv("PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY", raising=False)
     config_path = get_pyci_config_path()
     config_path.parent.mkdir(parents=True)
     config_path.write_text(
@@ -614,7 +607,18 @@ def test_remote_action_repo_env_var_overrides_project_config(
         encoding="utf-8"
     )
 
-    assert get_remote_action_repo() == (str(remote_actions_git_repo_path), None)
+    assert get_remote_action_repo() == str(remote_actions_git_repo_path)
+
+
+def test_remote_action_repo_ignores_legacy_ssh_key_env_var(monkeypatch: pytest.MonkeyPatch):
+    from python_ci_toolkit.actions.retrieval.sources.git.cloning import get_remote_action_repo
+
+    ssh_repo_url = "git@github.com:example/python-ci-actions.git"
+
+    monkeypatch.setenv("PYTHON_CI_ACTIONS_GIT_REPO_URL", ssh_repo_url)
+    monkeypatch.setenv("PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY", "legacy unused private key")
+
+    assert get_remote_action_repo() == ssh_repo_url
 
 
 def test_remote_action_without_config_fails_clearly(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -623,7 +627,6 @@ def test_remote_action_without_config_fails_clearly(tmp_path: Path, monkeypatch:
 
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("PYTHON_CI_ACTIONS_GIT_REPO_URL", raising=False)
-    monkeypatch.delenv("PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY", raising=False)
 
     with pytest.raises(RemoteActionRepoNotConfiguredError, match="Remote action repository is not configured"):
         retrieve_ci_action_script("hello_world", "main")

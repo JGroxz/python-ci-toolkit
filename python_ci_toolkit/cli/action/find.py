@@ -97,14 +97,11 @@ def list_available_actions(cache_timeout: float = _DEFAULT_LIST_AVAILABLE_ACTION
     timestamp_file_path = ci_temp_files_shared_directory / "cli_actions_last_autocomplete.timestamp"
     time_since_last_call = time_since_file_timestamp(timestamp_file_path)
 
-    action_repo_url, action_repo_ssh_private_key = action_repo
+    action_repo_url = action_repo
     cloned_repo_directory = get_clone_directory_from_action_repo_url(action_repo_url)
     cloned_actions_directory = get_actions_directory_in_project(cloned_repo_directory)
     if time_since_last_call >= cache_timeout:
-        cloned_actions_directory = retrieve_action_repo(
-            git_repo_url=action_repo_url,
-            ssh_private_key=action_repo_ssh_private_key
-        )
+        cloned_actions_directory = retrieve_action_repo(git_repo_url=action_repo_url)
     remote_action_script_paths = list_actions_in_directory(cloned_actions_directory, include_simple_actions=False)
     remote_actions_metadata = [ActionMetadata.from_action_file(p) for p in remote_action_script_paths]
     remote_actions_metadata = [ActionMetadata(f"{m.name}", f"[remote] {m.description}") for m in remote_actions_metadata]

@@ -238,9 +238,8 @@ def _reset_remote_action_cache_timestamp(runtime_context: _ActionRuntimeContext)
     if action_repo is None:
         return
 
-    action_repo_url, _ = action_repo
     reset_action_cache_timestamp(
-        action_repo_url,
+        action_repo,
         runtime_context.action_name,
         runtime_context.action_version,
     )
