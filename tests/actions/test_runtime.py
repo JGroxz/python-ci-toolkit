@@ -81,13 +81,6 @@ def test_run_ci_action_restores_runtime_state_after_success(
     assert sys.argv == original_argv
     assert action_runtime._running_actions_stack == []
 
-    action_file.write_text("def action():\n    return 'ok after failure'\n", encoding="utf-8")
-    output = action_runtime.run_ci_action(action_name, "local")
-
-    assert output.value == "ok after failure"
-    assert sys.argv == original_argv
-    assert action_runtime._running_actions_stack == []
-
 
 def test_run_ci_action_restores_runtime_state_after_action_failure(
     tmp_path: Path,
@@ -111,6 +104,122 @@ def test_run_ci_action_restores_runtime_state_after_action_failure(
     with pytest.raises(RuntimeError, match="action failed"):
         action_runtime.run_ci_action(action_name, "local")
 
+    assert sys.argv == original_argv
+    assert action_runtime._running_actions_stack == []
+
+    action_file.write_text("def action():\n    return 'ok after failure'\n", encoding="utf-8")
+    output = action_runtime.run_ci_action(action_name, "local")
+
+    assert output.value == "ok after failure"
+    assert sys.argv == original_argv
+    assert action_runtime._running_actions_stack == []
+
+
+def test_run_ci_action_restores_runtime_state_after_import_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    import python_ci_toolkit.actions.actions as action_runtime
+
+    action_name = "import_failing_action"
+    original_argv = ["pyci", action_name, "--flag"]
+    action_file = _write_action_script(
+        tmp_path,
+        action_name,
+        "import sys\n"
+        "sys.argv[:] = ['import-mutated-argv']\n"
+        "raise RuntimeError('import failed')\n"
+        "\n"
+        "def action():\n"
+        "    return 'unreachable'\n",
+    )
+    _patch_action_retrieval(monkeypatch, action_file)
+    _reset_runtime_state(monkeypatch, original_argv)
+
+    with pytest.raises(RuntimeError, match="import failed"):
+        action_runtime.run_ci_action(action_name, "local")
+
+    assert action_name not in sys.modules
+    assert sys.argv == original_argv
+    assert action_runtime._running_actions_stack == []
+
+    action_file.write_text("def action():\n    return 'ok after import failure'\n", encoding="utf-8")
+    output = action_runtime.run_ci_action(action_name, "local")
+
+    assert output.value == "ok after import failure"
+    assert sys.argv == original_argv
+    assert action_runtime._running_actions_stack == []
+
+
+def test_run_ci_action_restores_runtime_state_after_requirements_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    import python_ci_toolkit.actions.actions as action_runtime
+
+    action_name = "requirements_failing_action"
+    original_argv = ["pyci", action_name, "--flag"]
+    action_file = _write_action_script(
+        tmp_path,
+        action_name,
+        "def action():\n"
+        "    return 'ok after requirements failure'\n",
+    )
+    requirements_file = action_file.parent / "requirements.txt"
+    requirements_file.write_text("example-package==1.0.0\n", encoding="utf-8")
+
+    def fail_requirements_install(requirements_file_path: Path, quiet: bool = False):
+        assert requirements_file_path == requirements_file
+        raise RuntimeError("requirements failed")
+
+    monkeypatch.setattr(action_runtime, "ensure_requirements_installed", fail_requirements_install)
+    _patch_action_retrieval(monkeypatch, action_file)
+    _reset_runtime_state(monkeypatch, original_argv)
+
+    with pytest.raises(RuntimeError, match="requirements failed"):
+        action_runtime.run_ci_action(action_name, "local")
+
+    assert sys.argv == original_argv
+    assert action_runtime._running_actions_stack == []
+
+    monkeypatch.setattr(action_runtime, "ensure_requirements_installed", lambda requirements_file_path, quiet=False: None)
+    output = action_runtime.run_ci_action(action_name, "local")
+
+    assert output.value == "ok after requirements failure"
+    assert sys.argv == original_argv
+    assert action_runtime._running_actions_stack == []
+
+
+def test_run_ci_action_restores_runtime_state_after_missing_entrypoint(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    import python_ci_toolkit.actions.actions as action_runtime
+    from python_ci_toolkit.actions.exceptions import MissingActionEntrypointError
+
+    action_name = "missing_entrypoint_action"
+    original_argv = ["pyci", action_name, "--flag"]
+    action_file = _write_action_script(
+        tmp_path,
+        action_name,
+        "def helper():\n"
+        "    return 'not an action entrypoint'\n",
+    )
+    _patch_action_retrieval(monkeypatch, action_file)
+    _reset_runtime_state(monkeypatch, original_argv)
+
+    with pytest.raises(MissingActionEntrypointError) as error_info:
+        action_runtime.run_ci_action(action_name, "local")
+
+    assert error_info.value.exit_code == 1
+    assert "does not have a 'action()' function" in str(error_info.value)
+    assert sys.argv == original_argv
+    assert action_runtime._running_actions_stack == []
+
+    action_file.write_text("def action():\n    return 'ok after missing entrypoint'\n", encoding="utf-8")
+    output = action_runtime.run_ci_action(action_name, "local")
+
+    assert output.value == "ok after missing entrypoint"
     assert sys.argv == original_argv
     assert action_runtime._running_actions_stack == []
 

@@ -149,6 +149,7 @@ def action(ctx: Context, action_identifier: str, action_args: List[str], debug: 
 
     from ...actions import run_ci_action
     from ...actions.constants import ACTION_VERSION_SEPARATOR
+    from ...actions.exceptions import ActionRuntimeError
     from ...actions.retrieval.exceptions import ActionRetrievalError
 
     # version can be included in the first argument, separated from the action name by a semicolon
@@ -162,7 +163,7 @@ def action(ctx: Context, action_identifier: str, action_args: List[str], debug: 
 
     try:
         run_ci_action(action_name, action_version, action_args)
-    except ActionRetrievalError as error:
+    except (ActionRetrievalError, ActionRuntimeError) as error:
         click_error = click.ClickException(str(error))
         click_error.exit_code = error.exit_code
         raise click_error from error

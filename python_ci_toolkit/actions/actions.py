@@ -12,6 +12,7 @@ from typing import List
 
 from .datatypes import ActionRunResult, ActionOutput
 from .constants import ACTION_VERSION_DEFAULT_REMOTE_STRING, ACTION_VERSION_LOCAL_STRING
+from .exceptions import MissingActionEntrypointError
 from .retrieval import retrieve_ci_action_script
 from .retrieval.sources.git.cloning import get_remote_action_repo
 from .retrieval.sources.git.caching import reset_action_cache_timestamp
@@ -36,10 +37,10 @@ def execute_action_module(action_module: ModuleType,
 
     # check if the action module has the required entry point function
     if not hasattr(action_module, _ACTION_ENTRY_POINT_FUNCTION_NAME):
-        logger.critical(f"Action '{action_display_name}' does not have a '{_ACTION_ENTRY_POINT_FUNCTION_NAME}()' function, so it won't be executed.\n"
-                        f"Please make sure that the action module has a '{_ACTION_ENTRY_POINT_FUNCTION_NAME}()' "
-                        f"function which serves as an entry point for the action logic.")
-        sys.exit(1)
+        return ActionRunResult(
+            exception=MissingActionEntrypointError(action_display_name, _ACTION_ENTRY_POINT_FUNCTION_NAME),
+            output=ActionOutput(),
+        )
 
     # run the action
     action_exception = None
@@ -108,6 +109,14 @@ class _ActionRuntimeContext:
 
 @contextmanager
 def _action_runtime_context(action_name: str, action_version: str | None = None) -> Iterator[_ActionRuntimeContext]:
+    """
+    Tracks process-global action runtime state and restores it after every run.
+
+    Notes:
+        The runtime stack prevents recursive action calls by action name. The caller's
+        argv is restored even if retrieval, requirements installation, import, or
+        execution fails.
+    """
     action_version = action_version or ACTION_VERSION_DEFAULT_REMOTE_STRING
 
     action_stack_identifier = (action_name, action_version)
@@ -244,6 +253,12 @@ def run_ci_action(action_name: str, action_version: str = None, args: List[str] 
         action_name: Name of the action to run.
         action_version: Version of the action to run.
         args: Vector of command-line arguments to pass to the action.
+
+    Notes:
+        If action version is omitted, the action resolves to the default remote version.
+        Nested calls use the same version rule as top-level calls; parent action versions
+        are not inherited implicitly. Nested actions receive only the explicitly supplied
+        child arguments, and the parent argv is restored after the nested run.
     """
     with _action_runtime_context(action_name, action_version) as runtime_context:
         action_script_path, action_source = _retrieve_action_script(runtime_context)

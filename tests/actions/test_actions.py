@@ -648,6 +648,25 @@ def test_action_cli_renders_retrieval_errors_without_traceback(monkeypatch: pyte
     assert "Traceback" not in result.output
 
 
+def test_action_cli_renders_runtime_errors_without_traceback(monkeypatch: pytest.MonkeyPatch):
+    import python_ci_toolkit.actions as actions_module
+    from click.testing import CliRunner
+
+    from python_ci_toolkit.actions.exceptions import MissingActionEntrypointError
+    from python_ci_toolkit.cli.action.action import action
+
+    def fail_run_ci_action(action_name: str, action_version: str | None = None, args: list[str] | None = None) -> None:
+        raise MissingActionEntrypointError("hello_world@local", "action")
+
+    monkeypatch.setattr(actions_module, "run_ci_action", fail_run_ci_action)
+
+    result = CliRunner().invoke(action, ["hello_world@local"])
+
+    assert result.exit_code == MissingActionEntrypointError.exit_code
+    assert "Action 'hello_world@local' does not have a 'action()' function" in result.output
+    assert "Traceback" not in result.output
+
+
 def test_list_actions_in_directory():
     from python_ci_toolkit.actions.retrieval.sources.local import list_actions_in_directory, LOCAL_ACTIONS_DIRECTORY
 
