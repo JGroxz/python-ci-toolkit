@@ -8,6 +8,7 @@ from types import ModuleType
 from typing import List
 
 from .datatypes import ActionRunResult, ActionOutput
+from .constants import ACTION_VERSION_DEFAULT_REMOTE_STRING
 from .retrieval import retrieve_ci_action_script
 from .retrieval.sources.git.caching import reset_action_cache_timestamp
 from .utils import Stopwatch
@@ -100,7 +101,7 @@ def run_ci_action(action_name: str, action_version: str = None, args: List[str] 
     """
     # if no version is provided, use the one from the 'main' branch
     if action_version is None:
-        action_version = "main"
+        action_version = ACTION_VERSION_DEFAULT_REMOTE_STRING
 
     # add action to the stack
     action_stack_identifier = (action_name, action_version)

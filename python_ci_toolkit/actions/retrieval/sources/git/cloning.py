@@ -3,12 +3,16 @@ Functions for retrieving action repositories from Git.
 """
 
 import logging
+import shutil
 import sys
 from contextlib import nullcontext
+from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from urllib.parse import urlparse
 
 from .caching import create_action_cache_timestamp
+from ....constants import ACTION_VERSION_DEFAULT_REMOTE_STRING, ACTION_VERSION_LOCAL_STRING
 from ....retrieval.sources.local import list_actions_in_directory, _LOCAL_ACTIONS_DIRECTORY_RELATIVE, get_actions_directory_in_project
 from ....utils import log_execution_time, hash_string
 from ....utils.logging import get_action_display_name
@@ -30,6 +34,19 @@ class RemoteActionRepoNotConfiguredError(RuntimeError):
     """
     Raised when a remote action is requested without a configured action repository.
     """
+
+
+class GitActionRefType(Enum):
+    BRANCH = "branch"
+    TAG = "tag"
+    MISSING = "missing"
+    AMBIGUOUS = "ambiguous"
+
+
+@dataclass(frozen=True)
+class GitActionRef:
+    name: str
+    type: GitActionRefType
 
 
 def _git_repo_url_uses_ssh(git_repo_url: str) -> bool:
@@ -115,6 +132,130 @@ def get_clone_directory_from_action_repo_url(git_repo_url: str) -> Path:
     return cloned_repo_path
 
 
+def _is_git_work_tree(path: Path) -> bool:
+    if not path.is_dir():
+        return False
+
+    result = run_shell_command(
+        "git rev-parse --is-inside-work-tree",
+        cwd=path,
+        silence_output=True,
+        raise_on_error=False,
+        use_wsl_on_windows=False,
+    )
+    return result.is_successful and result.output_stripped == "true"
+
+
+def _get_git_origin_url(path: Path) -> str | None:
+    result = run_shell_command(
+        "git config --get remote.origin.url",
+        cwd=path,
+        silence_output=True,
+        raise_on_error=False,
+        use_wsl_on_windows=False,
+    )
+    return result.output_value
+
+
+def _git_ref_exists(repo_path: Path, ref: str) -> bool:
+    result = run_shell_command(
+        f'git show-ref --verify --quiet "{ref}"',
+        cwd=repo_path,
+        silence_output=True,
+        raise_on_error=False,
+        use_wsl_on_windows=False,
+    )
+    return result.is_successful
+
+
+def _remove_cached_action_repo(path: Path, reason: str) -> None:
+    logger.debug(f"Removing cached action repo at '{path}': {reason}")
+    if path.is_dir():
+        shutil.rmtree(path)
+    else:
+        path.unlink()
+
+
+def _ensure_cached_action_repo_is_usable(git_repo_url: str, cloned_repo_path: Path) -> None:
+    if not cloned_repo_path.exists():
+        return
+
+    if not _is_git_work_tree(cloned_repo_path):
+        _remove_cached_action_repo(cloned_repo_path, "path is not a Git worktree")
+        return
+
+    origin_url = _get_git_origin_url(cloned_repo_path)
+    if origin_url != git_repo_url:
+        _remove_cached_action_repo(
+            cloned_repo_path,
+            f"remote origin is '{origin_url}', expected '{git_repo_url}'"
+        )
+
+
+def normalize_git_action_version(action_version: str | None) -> str:
+    action_version = action_version or ACTION_VERSION_DEFAULT_REMOTE_STRING
+    if action_version == ACTION_VERSION_LOCAL_STRING:
+        raise ValueError(
+            f"'{ACTION_VERSION_LOCAL_STRING}' is reserved for local action retrieval and cannot be resolved as a Git ref."
+        )
+
+    return action_version
+
+
+def resolve_git_action_ref(repo_path: Path, action_version: str | None) -> GitActionRef:
+    action_version = normalize_git_action_version(action_version)
+    branch_exists = _git_ref_exists(repo_path, f"refs/remotes/origin/{action_version}")
+    tag_exists = _git_ref_exists(repo_path, f"refs/tags/{action_version}")
+
+    if branch_exists and tag_exists:
+        return GitActionRef(name=action_version, type=GitActionRefType.AMBIGUOUS)
+    if branch_exists:
+        return GitActionRef(name=action_version, type=GitActionRefType.BRANCH)
+    if tag_exists:
+        return GitActionRef(name=action_version, type=GitActionRefType.TAG)
+
+    return GitActionRef(name=action_version, type=GitActionRefType.MISSING)
+
+
+def checkout_git_action_ref(repo_path: Path, git_repo_url: str, action_name: str, action_version: str | None) -> str:
+    action_ref = resolve_git_action_ref(repo_path, action_version)
+    action_display_name = get_action_display_name(action_name, action_ref.name)
+
+    if action_ref.type == GitActionRefType.AMBIGUOUS:
+        logger.error(f"Both a branch and a tag named '{action_ref.name}' exist in remote repository '{git_repo_url}'.\n"
+                     f"The action '{action_display_name}' will not be pulled to avoid ambiguity.\n"
+                     f"Please remove the redundant branch or tag ('{action_ref.name}') from the repo before pulling this version again.")
+        sys.exit(2)
+
+    if action_ref.type == GitActionRefType.MISSING:
+        logger.error(f"Cannot pull action '{action_display_name}' from Git:\n"
+                     f"  Repository '{git_repo_url}' has neither a branch nor a tag named '{action_ref.name}'.\n"
+                     f"  Please make sure that the corresponding branch or tag ('{action_ref.name}') exists before pulling this version again.")
+        sys.exit(3)
+
+    run_shell_command("git reset --hard", cwd=repo_path, silence_output=True, use_wsl_on_windows=False)
+    run_shell_command("git clean -fdx", cwd=repo_path, silence_output=True, use_wsl_on_windows=False)
+
+    if action_ref.type == GitActionRefType.BRANCH:
+        logger.debug(f"'{action_ref.name}' is a branch in '{git_repo_url}'.")
+        run_shell_command(
+            f'git checkout -B "{action_ref.name}" "origin/{action_ref.name}"',
+            cwd=repo_path,
+            silence_output=True,
+            use_wsl_on_windows=False,
+        )
+    elif action_ref.type == GitActionRefType.TAG:
+        logger.debug(f"'{action_ref.name}' is a tag in '{git_repo_url}'.")
+        run_shell_command(
+            f'git checkout --detach "refs/tags/{action_ref.name}"',
+            cwd=repo_path,
+            silence_output=True,
+            use_wsl_on_windows=False,
+        )
+
+    return action_ref.name
+
+
 @log_execution_time
 def retrieve_action_repo(git_repo_url: str, ssh_private_key: str | None = None) -> Path:
     """
@@ -137,6 +278,7 @@ def retrieve_action_repo(git_repo_url: str, ssh_private_key: str | None = None) 
 
     # generate local repo path based on remote
     cloned_repo_path = get_clone_directory_from_action_repo_url(git_repo_url)
+    _ensure_cached_action_repo_is_usable(git_repo_url, cloned_repo_path)
 
     with _git_authentication_context(git_repo_url, ssh_private_key):
         if not cloned_repo_path.exists():
@@ -151,11 +293,11 @@ def retrieve_action_repo(git_repo_url: str, ssh_private_key: str | None = None) 
         def run_repo_command(c: str):
             return run_shell_command(c, cwd=cloned_repo_path, silence_output=True, use_wsl_on_windows=False)
 
-        # fetch all available remote branches and tags
-        run_repo_command("git fetch --tags")
-
-        # switch existing clone to main branch
-        run_repo_command("git checkout main")
+        run_repo_command("git reset --hard")
+        run_repo_command("git clean -fdx")
+        run_repo_command("git fetch --prune --tags")
+        run_repo_command("git checkout -B main origin/main")
+        run_repo_command("git clean -fdx")
 
     # check if actions directory is present before returning it
     actions_directory = get_actions_directory_in_project(cloned_repo_path)
@@ -190,57 +332,17 @@ def retrieve_ci_action_script_from_git(git_repo_url: str, action_name: str, acti
         Local path to the downloaded action file.
     """
 
+    action_version = normalize_git_action_version(action_version)
+
     # retrieve repo
     cloned_actions_directory = retrieve_action_repo(git_repo_url, ssh_private_key)
 
     # prepare paths
-    action_display_name = get_action_display_name(action_name, action_version)
     action_script_directory = cloned_actions_directory / f"{action_name}"
     action_script_path = action_script_directory / f"{action_name}.py"
 
-    # default settings for running shell commands
-    def run_repo_command(c: str):
-        return run_shell_command(c, cwd=cloned_actions_directory, silence_output=True, use_wsl_on_windows=False)
-
-    # clone the repo
     with _git_authentication_context(git_repo_url, ssh_private_key):
-        if action_version is None:
-            # if no version specified, use the main branch (it's checked out by default)
-            run_repo_command('git merge origin/main')
-        else:
-            # find branches or tags matching the given version
-            result = run_repo_command(f'git show-ref')
-            output = result.output
-            branch_exists = (f"refs/heads/{action_version}" in output) or (f"refs/remotes/origin/{action_version}" in output)
-            tag_exists = (f"refs/tags/{action_version}" in output)
-
-            if branch_exists:
-                logger.debug(f"'{action_version}' is a branch in '{git_repo_url}'.")
-            if tag_exists:
-                logger.debug(f"'{action_version}' is a tag in '{git_repo_url}'.")
-
-            # if both a branch and a tag exist with the same name, do not pull to avoid ambiguity
-            if tag_exists and branch_exists:
-                logger.error(f"Both a branch and a tag named '{action_version}' exist in remote repository '{git_repo_url}'.\n"
-                             f"The action '{action_display_name}' wil not be pulled to avoid ambiguity.\n"
-                             f"Please remove the redundant branch or tag ('{action_version}') from the repo before pulling this version again.")
-                sys.exit(2)
-
-            # if nothing matches the version, there is nothing we can do
-            if (not tag_exists) and (not branch_exists):
-                logger.error(f"Cannot pull action '{action_display_name}' from Git:\n"
-                             f"  Repository '{git_repo_url}' has neither a branch nor a tag named '{action_version}'.\n"
-                             f"  Please make sure that the corresponding branch or tag ('{action_version}') exists before pulling this version again.")
-                sys.exit(3)
-
-            # checkout required branch/tag
-            run_repo_command(f'git checkout "{action_version}"')
-
-            # if on a branch, pull updates
-            result = run_repo_command(f'git status')
-            is_on_a_branch = ("On branch" in result.output)
-            if is_on_a_branch:
-                run_repo_command(f'git merge "origin/{action_version}"')
+        checkout_git_action_ref(cloned_actions_directory, git_repo_url, action_name, action_version)
 
     # create cache entries for each complex action script in the cloned repo
     for action_path in list_actions_in_directory(cloned_actions_directory, include_simple_actions=False):

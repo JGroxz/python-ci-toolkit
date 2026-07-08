@@ -12,8 +12,6 @@ from ....utils.file_timestamps import time_since_file_timestamp, reset_file_time
 from ....utils.logging import get_action_display_name
 from ....logging.logging import LOG_WITH_MARKUP
 from .....environment.paths.internal import ci_temp_files_shared_directory
-from .....shell import run_shell_command
-
 logger = logging.getLogger(__name__)
 
 DOWNLOADED_ACTION_CACHE_TIMESTAMPS_DIRECTORY = ci_temp_files_shared_directory / "downloaded_action_cache_timestamps"
@@ -160,18 +158,14 @@ def retrieve_ci_action_script_from_cache(git_repo_url: str, action_name: str, ac
     """
     Retrieves the given CI action script from the local cache path.
     """
-    from .cloning import get_clone_directory_from_action_repo_url
+    from .cloning import checkout_git_action_ref, get_clone_directory_from_action_repo_url
 
     # prepare paths
     repo_directory = get_clone_directory_from_action_repo_url(git_repo_url)
     action_script_path = get_complex_action_path_in_directory(repo_directory / _LOCAL_ACTIONS_DIRECTORY_RELATIVE, action_name)
 
-    # default settings for running shell commands
-    def run_repo_command(c: str):
-        return run_shell_command(c, cwd=repo_directory, silence_output=True, use_wsl_on_windows=False)
-
     # switch to the desired version in the repo (it's assumed to exist because we have the cached timestamp for this version)
-    run_repo_command(f'git checkout "{action_version}"')
+    checkout_git_action_ref(repo_directory, git_repo_url, action_name, action_version)
 
     # check if the repo had the requested action script
     if not action_script_path.exists():
