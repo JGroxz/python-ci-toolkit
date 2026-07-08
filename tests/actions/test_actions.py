@@ -32,6 +32,18 @@ def _write_remote_hello_world_action(repo_path: Path, description: str) -> None:
     )
 
 
+def _create_remote_actions_git_repo(repo_path: Path, description: str) -> Path:
+    action_directory = repo_path / ".ci" / "actions" / "hello_world"
+    action_directory.mkdir(parents=True)
+    _write_remote_hello_world_action(repo_path, description)
+
+    run_shell_command("git init", cwd=repo_path, silence_output=True, use_wsl_on_windows=False)
+    run_shell_command("git symbolic-ref HEAD refs/heads/main", cwd=repo_path, silence_output=True, use_wsl_on_windows=False)
+    _commit_remote_action_repo(repo_path, "Add hello world action")
+
+    return repo_path
+
+
 def _commit_remote_action_repo(repo_path: Path, message: str) -> None:
     run_shell_command("git add .", cwd=repo_path, silence_output=True, use_wsl_on_windows=False)
     run_shell_command(
@@ -329,6 +341,76 @@ def test_remote_action_caching(remote_actions_git_repo: Path, caplog):
     # run the test to verify that caching works
     run_test_action_twice()
     run_test_action_twice()
+
+
+def test_remote_action_cache_is_scoped_to_configured_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    from python_ci_toolkit.actions.retrieval import retrieve_ci_action_script
+    from python_ci_toolkit.actions.retrieval.sources.git.caching import is_action_cache_fresh
+    from python_ci_toolkit.environment.paths import purge_temporary_files
+
+    purge_temporary_files()
+
+    repo_a = _create_remote_actions_git_repo(tmp_path / "remote-actions-a", "Repo A hello world action.")
+    repo_b = _create_remote_actions_git_repo(tmp_path / "remote-actions-b", "Repo B hello world action.")
+    monkeypatch.delenv("PYTHON_CI_ACTIONS_SSH_PRIVATE_KEY", raising=False)
+
+    monkeypatch.setenv("PYTHON_CI_ACTIONS_GIT_REPO_URL", str(repo_a))
+    action_script_path, action_source = retrieve_ci_action_script("hello_world", "main")
+
+    assert "Repo A hello world action." in action_script_path.read_text(encoding="utf-8")
+    assert action_source == f"'main' at '{repo_a}'"
+    assert is_action_cache_fresh(str(repo_a), "hello_world", "main")
+    assert not is_action_cache_fresh(str(repo_b), "hello_world", "main")
+
+    monkeypatch.setenv("PYTHON_CI_ACTIONS_GIT_REPO_URL", str(repo_b))
+    action_script_path, action_source = retrieve_ci_action_script("hello_world", "main")
+
+    assert "Repo B hello world action." in action_script_path.read_text(encoding="utf-8")
+    assert action_source == f"'main' at '{repo_b}'"
+
+
+def test_remote_action_cache_is_stale_when_cloned_repo_is_missing(remote_actions_git_repo: Path):
+    from python_ci_toolkit.actions.retrieval import retrieve_ci_action_script
+    from python_ci_toolkit.actions.retrieval.sources.git.caching import (
+        create_action_cache_timestamp,
+        is_action_cache_fresh,
+    )
+    from python_ci_toolkit.actions.retrieval.sources.git.cloning import get_clone_directory_from_action_repo_url
+    from python_ci_toolkit.environment.paths import purge_temporary_files
+
+    purge_temporary_files()
+
+    repo_url = str(remote_actions_git_repo)
+    create_action_cache_timestamp(repo_url, "hello_world", "main")
+
+    assert not get_clone_directory_from_action_repo_url(repo_url).exists()
+    assert not is_action_cache_fresh(repo_url, "hello_world", "main")
+
+    action_script_path, action_source = retrieve_ci_action_script("hello_world", "main")
+
+    assert action_script_path.exists()
+    assert action_source == f"'main' at '{remote_actions_git_repo}'"
+
+
+def test_remote_action_cache_is_stale_when_cached_action_script_is_missing(remote_actions_git_repo: Path):
+    from python_ci_toolkit.actions.retrieval import retrieve_ci_action_script
+    from python_ci_toolkit.actions.retrieval.sources.git.caching import is_action_cache_fresh
+    from python_ci_toolkit.environment.paths import purge_temporary_files
+
+    purge_temporary_files()
+
+    repo_url = str(remote_actions_git_repo)
+    action_script_path, action_source = retrieve_ci_action_script("hello_world", "main")
+    assert action_script_path.exists()
+    assert action_source == f"'main' at '{remote_actions_git_repo}'"
+
+    action_script_path.unlink()
+    assert not is_action_cache_fresh(repo_url, "hello_world", "main")
+
+    action_script_path, action_source = retrieve_ci_action_script("hello_world", "main")
+
+    assert "Remote hello world action." in action_script_path.read_text(encoding="utf-8")
+    assert action_source == f"'main' at '{remote_actions_git_repo}'"
 
 
 def test_remote_action_repo_is_optional(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

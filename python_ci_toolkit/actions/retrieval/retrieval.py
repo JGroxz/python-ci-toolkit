@@ -42,7 +42,7 @@ def retrieve_ci_action_script(action_name: str, action_version: str = None) -> t
         # get remote actions repo configuration
         action_repo_url, action_repo_ssh_private_key = require_remote_action_repo()
 
-        if is_action_cache_fresh(action_name, action_version):
+        if is_action_cache_fresh(action_repo_url, action_name, action_version):
             # from cache
             with Stopwatch() as sw, loading_animation(f"Retrieving action from cache..."):
                 action_script_path = retrieve_ci_action_script_from_cache(

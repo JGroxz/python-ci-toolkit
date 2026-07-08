@@ -8,8 +8,9 @@ from types import ModuleType
 from typing import List
 
 from .datatypes import ActionRunResult, ActionOutput
-from .constants import ACTION_VERSION_DEFAULT_REMOTE_STRING
+from .constants import ACTION_VERSION_DEFAULT_REMOTE_STRING, ACTION_VERSION_LOCAL_STRING
 from .retrieval import retrieve_ci_action_script
+from .retrieval.sources.git.cloning import get_remote_action_repo
 from .retrieval.sources.git.caching import reset_action_cache_timestamp
 from .utils import Stopwatch
 from .utils.logging import (loading_animation, print_action_run_start, get_action_display_name,
@@ -177,7 +178,11 @@ def run_ci_action(action_name: str, action_version: str = None, args: List[str] 
 
     # reset cache timestamps after each successful action run
     # to allow chaining actions from the same repo without re-downloading them
-    reset_action_cache_timestamp(action_name, action_version)
+    if action_version != ACTION_VERSION_LOCAL_STRING:
+        action_repo = get_remote_action_repo()
+        if action_repo is not None:
+            action_repo_url, _ = action_repo
+            reset_action_cache_timestamp(action_repo_url, action_name, action_version)
 
     # restore argv of the caller action
     if is_nested_action:
