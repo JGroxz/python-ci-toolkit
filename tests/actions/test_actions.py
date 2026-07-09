@@ -670,21 +670,148 @@ def test_action_cli_renders_runtime_errors_without_traceback(monkeypatch: pytest
     assert "Traceback" not in result.output
 
 
-def test_list_actions_in_directory():
-    from python_ci_toolkit.actions.retrieval.sources.local import list_actions_in_directory, LOCAL_ACTIONS_DIRECTORY
+def _write_local_action_script(action_script_path: Path) -> Path:
+    action_script_path.parent.mkdir(parents=True, exist_ok=True)
+    action_script_path.write_text(
+        "def action() -> None:\n"
+        "    pass\n",
+        encoding="utf-8"
+    )
+    return action_script_path
 
-    local_actions = list_actions_in_directory(LOCAL_ACTIONS_DIRECTORY)
 
-    EXPECTED_LOCAL_ACTION_NAMES = [
-        "complex_test_action"
-    ]
+def test_action_path_helpers_return_expected_local_paths(tmp_path: Path):
+    from python_ci_toolkit.actions.retrieval.sources.local import (
+        get_complex_action_path_in_directory,
+        get_simple_action_path_in_directory,
+    )
 
-    # verify the number
-    assert len(local_actions) == len(EXPECTED_LOCAL_ACTION_NAMES), \
-        f"Expected to find {len(EXPECTED_LOCAL_ACTION_NAMES)} local actions in '{LOCAL_ACTIONS_DIRECTORY}', but found {len(local_actions)}:\n{local_actions}"
+    actions_directory = tmp_path / "actions"
 
-    # verify the names
-    local_action_names = [p.stem for p in local_actions]
-    for name in EXPECTED_LOCAL_ACTION_NAMES:
-        assert name in local_action_names, \
-            f"Expected to find action '{name}' in '{LOCAL_ACTIONS_DIRECTORY}', but found only {local_action_names}."
+    assert (
+        get_simple_action_path_in_directory(actions_directory, "hello")
+        == actions_directory / "hello.py"
+    )
+    assert (
+        get_complex_action_path_in_directory(actions_directory, "hello")
+        == actions_directory / "hello" / "hello.py"
+    )
+
+
+def test_list_actions_in_directory_returns_empty_for_missing_directory(tmp_path: Path):
+    from python_ci_toolkit.actions.retrieval.sources.local import list_actions_in_directory
+
+    assert list_actions_in_directory(tmp_path / "missing-actions") == []
+
+
+def test_list_actions_in_directory_lists_simple_and_complex_actions(tmp_path: Path):
+    from python_ci_toolkit.actions.retrieval.sources.local import list_actions_in_directory
+
+    actions_directory = tmp_path / "actions"
+    simple_action = _write_local_action_script(actions_directory / "simple_action.py")
+    complex_action = _write_local_action_script(
+        actions_directory / "complex_action" / "complex_action.py"
+    )
+    _write_local_action_script(actions_directory / "misnamed_action" / "other.py")
+    (actions_directory / "not_an_action.txt").write_text("not python", encoding="utf-8")
+
+    local_actions = list_actions_in_directory(actions_directory)
+
+    assert set(local_actions) == {simple_action, complex_action}
+
+
+def test_list_actions_in_directory_can_filter_simple_actions(tmp_path: Path):
+    from python_ci_toolkit.actions.retrieval.sources.local import list_actions_in_directory
+
+    actions_directory = tmp_path / "actions"
+    simple_action = _write_local_action_script(actions_directory / "simple_action.py")
+    _write_local_action_script(actions_directory / "complex_action" / "complex_action.py")
+
+    assert (
+        list_actions_in_directory(actions_directory, include_complex_actions=False)
+        == [simple_action]
+    )
+
+
+def test_list_actions_in_directory_can_filter_complex_actions(tmp_path: Path):
+    from python_ci_toolkit.actions.retrieval.sources.local import list_actions_in_directory
+
+    actions_directory = tmp_path / "actions"
+    _write_local_action_script(actions_directory / "simple_action.py")
+    complex_action = _write_local_action_script(
+        actions_directory / "complex_action" / "complex_action.py"
+    )
+
+    assert (
+        list_actions_in_directory(actions_directory, include_simple_actions=False)
+        == [complex_action]
+    )
+
+
+def test_list_actions_in_directory_rejects_disabled_simple_and_complex_actions(tmp_path: Path):
+    from python_ci_toolkit.actions.retrieval.sources.local import list_actions_in_directory
+
+    actions_directory = tmp_path / "actions"
+    actions_directory.mkdir()
+
+    with pytest.raises(AssertionError, match="At least one"):
+        list_actions_in_directory(
+            actions_directory,
+            include_simple_actions=False,
+            include_complex_actions=False,
+        )
+
+
+def test_retrieve_ci_action_script_local_returns_simple_action(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    import python_ci_toolkit.actions.retrieval.sources.local as local_source
+
+    actions_directory = tmp_path / "actions"
+    simple_action = _write_local_action_script(actions_directory / "hello.py")
+    monkeypatch.setattr(local_source, "LOCAL_ACTIONS_DIRECTORY", actions_directory)
+
+    assert local_source.retrieve_ci_action_script_local("hello") == simple_action
+
+
+def test_retrieve_ci_action_script_local_returns_complex_action(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    import python_ci_toolkit.actions.retrieval.sources.local as local_source
+
+    actions_directory = tmp_path / "actions"
+    complex_action = _write_local_action_script(actions_directory / "hello" / "hello.py")
+    monkeypatch.setattr(local_source, "LOCAL_ACTIONS_DIRECTORY", actions_directory)
+
+    assert local_source.retrieve_ci_action_script_local("hello") == complex_action
+
+
+def test_retrieve_ci_action_script_local_rejects_ambiguous_action(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    import python_ci_toolkit.actions.retrieval.sources.local as local_source
+
+    actions_directory = tmp_path / "actions"
+    _write_local_action_script(actions_directory / "hello.py")
+    _write_local_action_script(actions_directory / "hello" / "hello.py")
+    monkeypatch.setattr(local_source, "LOCAL_ACTIONS_DIRECTORY", actions_directory)
+
+    with pytest.raises(ValueError, match="Found both simple and complex action scripts"):
+        local_source.retrieve_ci_action_script_local("hello")
+
+
+def test_retrieve_ci_action_script_local_rejects_missing_action(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    import python_ci_toolkit.actions.retrieval.sources.local as local_source
+
+    actions_directory = tmp_path / "actions"
+    actions_directory.mkdir()
+    monkeypatch.setattr(local_source, "LOCAL_ACTIONS_DIRECTORY", actions_directory)
+
+    with pytest.raises(FileNotFoundError, match="does not exist locally"):
+        local_source.retrieve_ci_action_script_local("hello")
