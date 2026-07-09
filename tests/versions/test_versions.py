@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from semver import VersionInfo
 
-from python_ci_toolkit.versions import read_project_version, get_latest_pypi_package_version, parse_semantic_version
+from python_ci_toolkit.versions import read_project_version, parse_semantic_version
 from python_ci_toolkit.versions.version_file_handlers import VERSION_FILE_HANDLERS, VersionFileHandler
 
 TEMPLATE_VERSION_FILES_DIRECTORY = Path(__file__).parent / "input/template_version_files"
@@ -17,13 +17,6 @@ def test_project_version():
     project_root = "../"
     version = read_project_version(project_root)
     print(f"Project version: {version}")
-
-
-@pytest.mark.skip(reason="Not implemented properly yet")
-def test_latest():
-    test_package = "pip"
-    latest_pip_version = get_latest_pypi_package_version(test_package)
-    print(f"Latest available version of {test_package}: {latest_pip_version}")
 
 
 def test_version_parsing():

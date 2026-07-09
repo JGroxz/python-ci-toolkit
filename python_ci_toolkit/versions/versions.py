@@ -10,7 +10,6 @@ from typing import List, Callable
 from semver import VersionInfo
 
 from .version_file_handlers import VERSION_FILE_HANDLERS, VersionFileHandler
-from ..shell import run_shell_command
 
 
 SUPPORTED_VERSION_FILES: List[str] = list(VERSION_FILE_HANDLERS.keys())
@@ -148,57 +147,3 @@ def write_project_version(project_root_folder_path: str | Path, version: Version
     else:
         updated_file_names = "\n".join([f"  - '{file_name}'" for file_name in updated_version_files])
         logging.info(f"Updated version to {version} in {len(updated_version_files)} files in the repository:\n{updated_file_names}")
-
-
-def get_latest_pypi_package_version(package_name: str) -> VersionInfo | None:
-    """
-    Returns the latest semantic version of the given PyPI package in currently configured repositories.
-
-    Args:
-        package_name: Name of the PyPI package to get the latest version of.
-
-    Returns:
-        The latest package version in semantic VersionInfo format.
-    """
-    all_versions = get_all_available_pypi_package_versions(package_name)
-
-    if len(all_versions) == 0:
-        return None
-
-    latest_version = all_versions[0]
-    return latest_version
-
-
-def get_all_available_pypi_package_versions(package_name: str) -> List[VersionInfo]:
-    """
-    Returns the list of all available semantic versions of the given PyPI package in currently configured repositories.
-
-    Notes:
-        Versions in the returned list are sorted in descending order, from the latest to the oldest.
-
-    Args:
-        package_name: Name of the PyPI package to get the versions of.
-
-    Returns:
-        List of package versions in semantic VersionInfo format.
-    """
-    result = run_shell_command(f"pip index versions {package_name}", raise_on_error=False, use_wsl_on_windows=False)
-
-    missing_package_log = f"No matching distribution found for {package_name}"
-    if missing_package_log in result.output:
-        # the package does not exist in the remote repository
-        return []
-
-    if result.is_failed:
-        # if the c
-        raise RuntimeError(f"Could not get available versions for package '{package_name}'.\n"
-                           f"  Executed command: {result.command}\n"
-                           f"  Exit code: {result.exit_code}\n",
-                           f"  Output: {result.output}")
-
-    versions_anchor_string = "Available versions: "
-    versions_start_index = result.output.find(versions_anchor_string) + len(versions_anchor_string)
-    versions_list = result.output[versions_start_index:].split("\n")[0].split(",")
-    available_versions = [parse_semantic_version(version_string.strip()) for version_string in versions_list]
-
-    return available_versions
