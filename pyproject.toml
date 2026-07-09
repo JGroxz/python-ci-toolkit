@@ -15,7 +15,7 @@ dependencies = [
     "rich>=1",
     "rich-click>=1.6.0,<2.0.0",
     "semver>=2",
-    "toml>=0.10",
+    "tomlkit>=0.13,<1",
 ]
 
 [project.scripts]

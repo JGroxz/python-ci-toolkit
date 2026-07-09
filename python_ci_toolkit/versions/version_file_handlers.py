@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Dict
 
-import toml
+import tomlkit
 from semver import VersionInfo
 
 
@@ -62,16 +62,16 @@ class PyProjectVersionFileHandler(VersionFileHandler):
 
     def _read_version_from_file_contents(self, file_contents: str) -> VersionInfo:
         from .versions import parse_semantic_version
-        project_config = toml.loads(file_contents)
+        project_config = tomlkit.parse(file_contents)
         version = self._get_nested_dict_key(project_config, self.PEP_621_VERSION_PATH)
         if version is None:
             version = self._get_nested_dict_key(project_config, self.POETRY_VERSION_PATH)
         if version is None:
             raise ValueError("Could not find project version in 'pyproject.toml'.")
-        return parse_semantic_version(version)
+        return parse_semantic_version(str(version))
 
     def _update_version_from_file_contents(self, file_contents: str, new_version: VersionInfo) -> str:
-        project_config = toml.loads(file_contents)
+        project_config = tomlkit.parse(file_contents)
         version_string = f"{new_version}"
         if self._get_nested_dict_key(project_config, self.PEP_621_VERSION_PATH) is not None:
             self._set_nested_dict_key(project_config, self.PEP_621_VERSION_PATH, version_string)
@@ -79,7 +79,7 @@ class PyProjectVersionFileHandler(VersionFileHandler):
             self._set_nested_dict_key(project_config, self.POETRY_VERSION_PATH, version_string)
         else:
             self._set_nested_dict_key(project_config, self.PEP_621_VERSION_PATH, version_string)
-        return toml.dumps(project_config)
+        return project_config.as_string()
 
     @staticmethod
     def _get_nested_dict_key(dictionary, keys):

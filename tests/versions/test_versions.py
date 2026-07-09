@@ -183,6 +183,58 @@ version = "1.2.3-test"
     assert version == VersionInfo(1, 2, 3, "test")
 
 
+def test_pyproject_version_write_preserves_formatting():
+    file_contents = """# Project metadata
+[project]
+name    = "format-sensitive-project"
+version = "1.2.3" # keep this comment
+dependencies = [
+    "requests>=2",
+]
+
+[tool.example]
+enabled = true
+"""
+    expected_contents = """# Project metadata
+[project]
+name    = "format-sensitive-project"
+version = "2.0.0" # keep this comment
+dependencies = [
+    "requests>=2",
+]
+
+[tool.example]
+enabled = true
+"""
+    handler = VERSION_FILE_HANDLERS["pyproject.toml"]
+
+    updated_contents = handler._update_version_from_file_contents(file_contents, VersionInfo(2, 0, 0))
+
+    assert updated_contents == expected_contents
+
+
+def test_legacy_poetry_pyproject_version_write_preserves_formatting():
+    file_contents = """[tool.poetry]
+name    = "legacy-poetry-project"
+version = "1.2.3-test" # keep this comment
+
+[tool.example]
+enabled = true
+"""
+    expected_contents = """[tool.poetry]
+name    = "legacy-poetry-project"
+version = "1.2.4" # keep this comment
+
+[tool.example]
+enabled = true
+"""
+    handler = VERSION_FILE_HANDLERS["pyproject.toml"]
+
+    updated_contents = handler._update_version_from_file_contents(file_contents, VersionInfo(1, 2, 4))
+
+    assert updated_contents == expected_contents
+
+
 def test_plain_text_version_handler_reads_first_line():
     handler = VERSION_FILE_HANDLERS["VERSION"]
 
