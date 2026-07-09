@@ -1,22 +1,14 @@
-import random
 import shutil
 from pathlib import Path
 
 import pytest
 from semver import VersionInfo
 
-from python_ci_toolkit.versions import read_project_version, parse_semantic_version
+from python_ci_toolkit.versions import read_project_version, parse_semantic_version, write_project_version
 from python_ci_toolkit.versions.version_file_handlers import VERSION_FILE_HANDLERS, VersionFileHandler
 
 TEMPLATE_VERSION_FILES_DIRECTORY = Path(__file__).parent / "input/template_version_files"
 TEMPLATE_VERSION = VersionInfo(1, 0, 0, "test")
-
-
-@pytest.mark.skip(reason="Not implemented properly yet")
-def test_project_version():
-    project_root = "../"
-    version = read_project_version(project_root)
-    print(f"Project version: {version}")
 
 
 def test_version_parsing():
@@ -43,7 +35,7 @@ def test_version_parsing():
             f"Version string '{version_string}' should be parsed as '{expected_version_info}', but it was '{version}'"
 
 
-def create_version_file_from_template(template_name: str) -> Path:
+def create_version_file_from_template(template_name: str, tmp_path: Path) -> Path:
     """
     Creates a version file from the given template.
 
@@ -52,6 +44,7 @@ def create_version_file_from_template(template_name: str) -> Path:
 
     Args:
         template_name: Name of the original version file.
+        tmp_path: Temporary directory to create the test file in.
 
     Returns:
         Path to the created temporary version file.
@@ -63,20 +56,81 @@ def create_version_file_from_template(template_name: str) -> Path:
         f"Template version file '{template_name}' does not exist in '{TEMPLATE_VERSION_FILES_DIRECTORY}'."
 
     # create a copy
-    random_index = random.randint(0, 1000000)
-    version_file_path = Path(__file__).parent / f"output/{random_index}/{template_name}"
-    version_file_path.parent.mkdir(parents=True, exist_ok=True)
+    version_file_path = tmp_path / template_name
     shutil.copyfile(template_path, version_file_path)
 
     return version_file_path
 
 
-def test_version_read():
+def test_read_project_version_reads_supported_files(tmp_path: Path):
+    for version_file_name in VERSION_FILE_HANDLERS:
+        project_root = tmp_path / version_file_name
+        project_root.mkdir()
+        create_version_file_from_template(version_file_name, project_root)
+
+        version = read_project_version(project_root)
+
+        assert version == TEMPLATE_VERSION
+
+
+def test_read_project_version_prefers_supported_file_order(tmp_path: Path):
+    (tmp_path / "pyproject.toml").write_text(
+        """
+[project]
+name = "test-project"
+version = "1.2.3"
+""",
+        encoding="utf-8",
+    )
+    (tmp_path / "package.json").write_text('{"version": "9.9.9"}', encoding="utf-8")
+
+    version = read_project_version(tmp_path)
+
+    assert version == VersionInfo(1, 2, 3)
+
+
+def test_read_project_version_rejects_missing_project_path(tmp_path: Path):
+    missing_project_path = tmp_path / "missing"
+
+    with pytest.raises(FileNotFoundError, match="provided project directory path does not exist"):
+        read_project_version(missing_project_path)
+
+
+def test_read_project_version_rejects_project_without_version_file(tmp_path: Path):
+    with pytest.raises(FileNotFoundError, match="Could not find a valid version file"):
+        read_project_version(tmp_path)
+
+
+def test_write_project_version_updates_all_supported_files(tmp_path: Path):
+    new_version = VersionInfo(4, 5, 6, "dev")
+    for version_file_name in VERSION_FILE_HANDLERS:
+        create_version_file_from_template(version_file_name, tmp_path)
+
+    write_project_version(tmp_path, new_version)
+
+    for version_file_name, version_file_handler in VERSION_FILE_HANDLERS.items():
+        version_file_path = tmp_path / version_file_name
+        assert version_file_handler.read_version(version_file_path) == new_version
+
+
+def test_write_project_version_rejects_missing_project_path(tmp_path: Path):
+    missing_project_path = tmp_path / "missing"
+
+    with pytest.raises(FileNotFoundError, match="provided project directory path does not exist"):
+        write_project_version(missing_project_path, VersionInfo(1, 2, 3))
+
+
+def test_write_project_version_rejects_project_without_version_file(tmp_path: Path):
+    with pytest.raises(FileNotFoundError, match="Could not find a valid version file"):
+        write_project_version(tmp_path, VersionInfo(1, 2, 3))
+
+
+def test_version_read(tmp_path: Path):
     for (version_file_name, version_file_handler) in VERSION_FILE_HANDLERS.items():
         version_file_handler_name = type(version_file_handler).__name__
         print(f"Testing reading with version file handler '{version_file_handler_name}'...")
 
-        version_file_path = create_version_file_from_template(version_file_name)
+        version_file_path = create_version_file_from_template(version_file_name, tmp_path)
 
         version_file_handler: VersionFileHandler = version_file_handler
         read_version = version_file_handler.read_version(version_file_path)
@@ -85,12 +139,12 @@ def test_version_read():
             f"Version read from '{version_file_name}' should be '{TEMPLATE_VERSION}', but it was '{read_version}'"
 
 
-def test_version_write():
+def test_version_write(tmp_path: Path):
     for (version_file_name, version_file_handler) in VERSION_FILE_HANDLERS.items():
         version_file_handler_name = type(version_file_handler).__name__
         print(f"Testing version file handler '{version_file_handler_name}'...")
 
-        version_file_path = create_version_file_from_template(version_file_name)
+        version_file_path = create_version_file_from_template(version_file_name, tmp_path)
 
         # read original version
         version_file_handler: VersionFileHandler = version_file_handler
@@ -127,6 +181,14 @@ version = "1.2.3-test"
     version = handler._read_version_from_file_contents(file_contents)
 
     assert version == VersionInfo(1, 2, 3, "test")
+
+
+def test_plain_text_version_handler_reads_first_line():
+    handler = VERSION_FILE_HANDLERS["VERSION"]
+
+    version = handler._read_version_from_file_contents("1.2.3\nignored metadata")
+
+    assert version == VersionInfo(1, 2, 3)
 
 
 def test_version_bump():

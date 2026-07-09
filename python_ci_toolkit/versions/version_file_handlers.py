@@ -26,9 +26,8 @@ class VersionFileHandler:
         Returns:
             VersionInfo read from the file.
         """
-        with file_path.open("r") as file:
-            contents = file.read()
-            return self._read_version_from_file_contents(contents)
+        contents = file_path.read_text(encoding="utf-8")
+        return self._read_version_from_file_contents(contents)
 
     def write_version(self, file_path: Path, new_version: VersionInfo) -> None:
         """
@@ -39,12 +38,9 @@ class VersionFileHandler:
             new_version: Version to write to the file.
         """
 
-        with file_path.open("r+") as file:
-            contents = file.read()
-            updated_contents = self._update_version_from_file_contents(contents, new_version)
-            file.seek(0)
-            file.truncate()
-            file.write(updated_contents)
+        contents = file_path.read_text(encoding="utf-8")
+        updated_contents = self._update_version_from_file_contents(contents, new_version)
+        file_path.write_text(updated_contents, encoding="utf-8")
 
     def _read_version_from_file_contents(self, file_contents: str) -> VersionInfo:
         raise NotImplementedError
@@ -129,7 +125,8 @@ class PlainTextVersionFileHandler(VersionFileHandler):
 
     def _read_version_from_file_contents(self, file_contents: str) -> VersionInfo:
         from .versions import parse_semantic_version
-        first_line = file_contents.strip("\n")
+        lines = file_contents.splitlines()
+        first_line = lines[0] if lines else ""
         return parse_semantic_version(first_line)
 
     def _update_version_from_file_contents(self, file_contents: str, new_version: VersionInfo) -> str:
