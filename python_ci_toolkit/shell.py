@@ -3,20 +3,15 @@ Convenience function for running shell commands from Python.
 """
 from __future__ import annotations
 
-import os
-import shlex
-import subprocess
-import threading
-from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
+from comrun import CommandRunner
+from comrun.datatypes import CommandResult as ComrunCommandResult
 import rich
 from rich.style import Style
 from rich.table import Table
 from rich.text import Text
-
-_IS_ON_WINDOWS = (os.name == "nt")
 
 SHELL_OUTPUT_PREFIX_WIDTH_MIN = 15
 SHELL_OUTPUT_PREFIX_WIDTH_MAX = 26
@@ -25,6 +20,7 @@ SHELL_OUTPUT_COMMAND_STYLE = Style(color="deep_sky_blue4", italic=True)
 SHELL_OUTPUT_STDERR_STYLE = Style(color="red")
 
 _output_console = None
+_UNSET = object()
 
 
 @dataclass
@@ -37,7 +33,7 @@ class ShellCommandResult:
     exit_code: int
     """Exit code of the command."""
     output: str
-    """Captured raw output of the command."""
+    """Captured output of the command."""
 
     @property
     def is_successful(self) -> bool:
@@ -56,14 +52,14 @@ class ShellCommandResult:
     @property
     def output_lines(self) -> list[str]:
         """
-        Captured output of the command split into lines.
+        Captured command output split into lines.
         """
         return self.output.splitlines()
 
     @property
     def output_stripped(self) -> str:
         """
-        Captured output of the command with leading and trailing whitespaces and newlines removed.
+        Captured command output with leading and trailing whitespaces and newlines removed.
         """
         return self.output.strip(" \n")
 
@@ -80,12 +76,92 @@ class ShellCommandResult:
         return stripped if (stripped != "") else None
 
 
-def run_shell_command(command: str,
-                      cwd: str | Path = os.getcwd(),
-                      raw_output: bool = False,
-                      silence_output: bool = False,
-                      raise_on_error: bool = True,
-                      use_wsl_on_windows: bool = True) -> ShellCommandResult:
+@dataclass(frozen=True)
+class ShellCommandRunner:
+    """
+    Preconfigured shell command runner that preserves PyCI's shell result contract.
+    """
+    cwd: str | Path | None = None
+    raw_output: bool = False
+    quiet: bool = False
+    check: bool = True
+    wsl: bool = True
+
+    def with_options(
+        self,
+        *,
+        cwd: str | Path | None | object = _UNSET,
+        raw_output: bool | object = _UNSET,
+        quiet: bool | object = _UNSET,
+        check: bool | object = _UNSET,
+        wsl: bool | object = _UNSET,
+    ) -> "ShellCommandRunner":
+        updates = {}
+        if cwd is not _UNSET:
+            updates["cwd"] = cwd
+        if raw_output is not _UNSET:
+            updates["raw_output"] = raw_output
+        if quiet is not _UNSET:
+            updates["quiet"] = quiet
+        if check is not _UNSET:
+            updates["check"] = check
+        if wsl is not _UNSET:
+            updates["wsl"] = wsl
+
+        return replace(self, **updates) if updates else self
+
+    def __call__(
+        self,
+        command: str,
+        *,
+        cwd: str | Path | None | object = _UNSET,
+        raw_output: bool | object = _UNSET,
+        quiet: bool | object = _UNSET,
+        check: bool | object = _UNSET,
+        wsl: bool | object = _UNSET,
+    ) -> ShellCommandResult:
+        return self.run(
+            command,
+            cwd=cwd,
+            raw_output=raw_output,
+            quiet=quiet,
+            check=check,
+            wsl=wsl,
+        )
+
+    def run(
+        self,
+        command: str,
+        *,
+        cwd: str | Path | None | object = _UNSET,
+        raw_output: bool | object = _UNSET,
+        quiet: bool | object = _UNSET,
+        check: bool | object = _UNSET,
+        wsl: bool | object = _UNSET,
+    ) -> ShellCommandResult:
+        return _run_shell_command(
+            command=command,
+            cwd=self.cwd if cwd is _UNSET else cwd,
+            raw_output=self.raw_output if raw_output is _UNSET else raw_output,
+            quiet=self.quiet if quiet is _UNSET else quiet,
+            check=self.check if check is _UNSET else check,
+            wsl=self.wsl if wsl is _UNSET else wsl,
+        )
+
+
+shell_command_runner = ShellCommandRunner()
+quiet_shell_command_runner = ShellCommandRunner(quiet=True, wsl=False)
+probe_shell_command_runner = ShellCommandRunner(quiet=True, check=False, wsl=False)
+
+
+def run_shell_command(
+    command: str,
+    cwd: str | Path | None = None,
+    raw_output: bool = False,
+    quiet: bool = False,
+    check: bool = True,
+    wsl: bool = True,
+) -> ShellCommandResult:
     """
     Executes the given command in a subprocess.
 
@@ -97,110 +173,105 @@ def run_shell_command(command: str,
         cwd: Working directory to execute the command in. Defaults to current working directory.
         raw_output: If set to True, the output from the executed command will be printed as is.
             If set to False, the output will be printed with pretty formatting through the global Rich Console.
-            Has effect only with 'silence_output' set to False.
-        silence_output: If set to True, command output will be suppressed.
-        raise_on_error: If set to True (default), an exception will be thrown if the executed command exits with a non-zero exit code.
-        use_wsl_on_windows: If set to True (default) and running on Windows, the provided command will be run in WSL.
+            Has effect only with 'quiet' set to False.
+        quiet: If set to True, command output will be suppressed.
+        check: If set to True (default), an exception will be thrown if the executed command exits with a non-zero exit code.
+        wsl: If set to True (default) and running on Windows, the provided command will be run in WSL.
 
     Returns:
-        Command exit code and captured output (list of lines).
+        Command result with exit code and captured output.
 
     Raises:
         RuntimeError:
             if the executed command completes with a non-zero exit code.
     """
+    return shell_command_runner(
+        command,
+        cwd=cwd,
+        raw_output=raw_output,
+        quiet=quiet,
+        check=check,
+        wsl=wsl,
+    )
 
+
+def _run_shell_command(
+    command: str,
+    cwd: str | Path | None,
+    raw_output: bool,
+    quiet: bool,
+    check: bool,
+    wsl: bool,
+) -> ShellCommandResult:
     # lazy-initialize CI console if using pretty output
     global _output_console
-    if (not silence_output) and (_output_console is None):
+    if (not quiet) and (_output_console is None):
         _output_console = rich.get_console()
 
-    # use WSL if required on Windows
-    if _IS_ON_WINDOWS and use_wsl_on_windows:
-        command = f"wsl {command}"
-
     # print header if using pretty output
-    if (not silence_output) and (not raw_output):
+    if (not quiet) and (not raw_output):
         header = Text("Running shell command:", style=SHELL_OUTPUT_PREFIX_STYLE) + " " + Text(f"{command}",
                                                                                               style=SHELL_OUTPUT_COMMAND_STYLE)
         _output_console.print(header)
 
-    # prepare command args
-    args = shlex.split(command)
-
-    captured_output = ""
-
-    # lock is required to prints from stdout- and stderr-reading threads from interfering with each other
-    # (if 'silence_output' is set to False)
-    lock = threading.Lock()
-
     # display only the first line of the command (for pretty output)
     command_display_string = command.splitlines()[0]
 
-    # helper function for handling the executed shell command's output
-    def capture_subprocess_output(pipe, stderr: bool = False):
-        for line in iter(pipe.readline, b''):  # b'\n'-separated lines
-            decoded_line = line.decode("utf-8")
+    def print_command_output_line(line: str, stream: str, _) -> None:
+        if raw_output:
+            _output_console.print(line, highlight=False)
+            return
 
-            # capture output
-            nonlocal captured_output
-            captured_output += decoded_line
+        grid = Table.grid()
+        grid.add_column(style=SHELL_OUTPUT_PREFIX_STYLE, min_width=SHELL_OUTPUT_PREFIX_WIDTH_MIN,
+                        max_width=SHELL_OUTPUT_PREFIX_WIDTH_MAX, overflow="ellipsis", no_wrap=True)
+        grid.add_column(style=SHELL_OUTPUT_PREFIX_STYLE)
+        grid.add_column(overflow="fold")
+        grid.add_row(
+            Text(f" > shell: ") + Text(command_display_string, style=SHELL_OUTPUT_COMMAND_STYLE), " │ ",
+            (line if stream == "stdout" else Text(line, style=SHELL_OUTPUT_STDERR_STYLE))
+        )
+        # noinspection PyUnresolvedReferences
+        _output_console.print(grid, end="")
 
-            # print to console if not silenced
-            if not silence_output:
-                lock.acquire()
-                decoded_line = decoded_line.rstrip(" \n")
-                if raw_output:
-                    _output_console.print(decoded_line, highlight=False)
-                else:
-                    grid = Table.grid()
-                    grid.add_column(style=SHELL_OUTPUT_PREFIX_STYLE, min_width=SHELL_OUTPUT_PREFIX_WIDTH_MIN,
-                                    max_width=SHELL_OUTPUT_PREFIX_WIDTH_MAX, overflow="ellipsis", no_wrap=True)
-                    grid.add_column(style=SHELL_OUTPUT_PREFIX_STYLE)
-                    grid.add_column(overflow="fold")
-                    grid.add_row(
-                        Text(f" > shell: ") + Text(command_display_string, style=SHELL_OUTPUT_COMMAND_STYLE), " │ ",
-                        (decoded_line if (not stderr) else Text(decoded_line, style=SHELL_OUTPUT_STDERR_STYLE))
-                    )
-                    # noinspection PyUnresolvedReferences
-                    _output_console.print(grid, end="")
-                lock.release()
+    runner = CommandRunner(
+        cwd=cwd,
+        quiet=quiet,
+        check=False,
+        wsl=wsl,
+        on_line=print_command_output_line,
+    )
+    result = _convert_comrun_result(runner(command))
 
-    # run the shell command and capture its output
-    process = subprocess.Popen(args, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    with process.stdout, process.stderr:
-        # we read stdout and stderr in threads to be able to print live logs from both streams concurrently
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            executor.submit(capture_subprocess_output, process.stdout, stderr=False)
-            executor.submit(capture_subprocess_output, process.stderr, stderr=True)
-            executor.shutdown(wait=True)
-    exit_code = process.wait()
-
-    if (exit_code != 0) and raise_on_error:
-        if silence_output:
+    if result.is_failed and check:
+        if quiet:
             output_string = (f"  Output:\n"
                              f"    ↓ ↓ ↓ Command output start ↓ ↓ ↓\n"
-                             f"{''.join(captured_output)}\n"
+                             f"{result.output}\n"
                              f"    ↑ ↑ ↑  Command output end  ↑ ↑ ↑\n")
         else:
             output_string = "  Output of the command can be seen before the stacktrace above."
 
-        raise RuntimeError(f"Error executing command (exit code {exit_code})\n"
+        raise RuntimeError(f"Error executing command (exit code {result.exit_code})\n"
                            f"  Command:\n"
                            f"    {command}\n"
                            f"{output_string}")
 
     # print header if using pretty output
-    if (not silence_output) and (not raw_output):
+    if (not quiet) and (not raw_output):
         header = (
                 Text(f"Shell command finished:", style=SHELL_OUTPUT_PREFIX_STYLE) + " "
                 + Text(f"{command}", style=SHELL_OUTPUT_COMMAND_STYLE) + " "
-                + Text(f"(exit code {exit_code})", style=SHELL_OUTPUT_PREFIX_STYLE)
+                + Text(f"(exit code {result.exit_code})", style=SHELL_OUTPUT_PREFIX_STYLE)
         )
         _output_console.print(header)
 
+    return result
+
+
+def _convert_comrun_result(result: ComrunCommandResult) -> ShellCommandResult:
     return ShellCommandResult(
-        command=command,
-        exit_code=exit_code,
-        output=captured_output
+        command=result.command,
+        exit_code=result.exit_code,
+        output=result.output.text,
     )

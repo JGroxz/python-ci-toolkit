@@ -1,11 +1,11 @@
 from pathlib import Path
 
-from python_ci_toolkit.shell import run_shell_command
+from python_ci_toolkit.shell import quiet_shell_command_runner
 
 
 def _init_git_repo(repo_path: Path) -> None:
     repo_path.mkdir()
-    run_shell_command("git init", cwd=repo_path, silence_output=True, use_wsl_on_windows=False)
+    quiet_shell_command_runner("git init", cwd=repo_path)
 
 
 def test_get_git_repo_root_returns_none_outside_git_repo(tmp_path: Path):
@@ -36,16 +36,13 @@ def test_add_git_safe_directory_configures_global_safe_directory(monkeypatch, tm
     def capture_shell_command(command: str, **kwargs):
         commands.append((command, kwargs))
 
-    monkeypatch.setattr(git_repo, "run_shell_command", capture_shell_command)
+    monkeypatch.setattr(git_repo, "quiet_shell_command_runner", capture_shell_command)
 
     git_repo.add_git_safe_directory(tmp_path)
 
     assert commands == [
         (
             f'git config --global --add safe.directory "{tmp_path}"',
-            {
-                "silence_output": True,
-                "use_wsl_on_windows": False,
-            },
+            {},
         )
     ]

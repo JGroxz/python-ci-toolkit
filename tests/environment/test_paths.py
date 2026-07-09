@@ -3,7 +3,7 @@ from pathlib import Path
 
 from rich import print
 
-from python_ci_toolkit.shell import ShellCommandResult, run_shell_command
+from python_ci_toolkit.shell import ShellCommandResult, quiet_shell_command_runner
 from python_ci_toolkit.environment.paths import ci_paths
 
 
@@ -20,7 +20,7 @@ def test_ci_paths_constructor_does_not_probe_git(monkeypatch):
     def fail_if_called(*args, **kwargs):
         raise AssertionError("CiPaths construction must not run shell commands.")
 
-    monkeypatch.setattr(core, "run_shell_command", fail_if_called)
+    monkeypatch.setattr(core, "probe_shell_command_runner", fail_if_called)
 
     core.CiPaths()
 
@@ -62,7 +62,7 @@ def test_temp_directory_uses_shared_directory_outside_git_repo(tmp_path: Path, m
     monkeypatch.setattr(core.ci_platform, "get_ci_project_root", lambda: project_root)
     monkeypatch.setattr(
         core,
-        "run_shell_command",
+        "probe_shell_command_runner",
         lambda command, **kwargs: ShellCommandResult(command, exit_code=1, output=""),
     )
 
@@ -76,21 +76,14 @@ def test_temp_directory_uses_first_commit_sha_for_git_repo(tmp_path: Path, monke
     project_root = tmp_path / "project"
     project_root.mkdir()
     (project_root / "README.md").write_text("test project\n", encoding="utf-8")
-    run_shell_command("git init", cwd=project_root, silence_output=True, use_wsl_on_windows=False)
-    run_shell_command("git symbolic-ref HEAD refs/heads/main", cwd=project_root, silence_output=True, use_wsl_on_windows=False)
-    run_shell_command("git add .", cwd=project_root, silence_output=True, use_wsl_on_windows=False)
-    run_shell_command(
+    project_command_runner = quiet_shell_command_runner.with_options(cwd=project_root)
+    project_command_runner("git init")
+    project_command_runner("git symbolic-ref HEAD refs/heads/main")
+    project_command_runner("git add .")
+    project_command_runner(
         'git -c user.name="Python CI Toolkit Tests" -c user.email="tests@example.invalid" commit -m "Initial commit"',
-        cwd=project_root,
-        silence_output=True,
-        use_wsl_on_windows=False,
     )
-    first_commit_sha = run_shell_command(
-        "git rev-list --max-parents=0 HEAD",
-        cwd=project_root,
-        silence_output=True,
-        use_wsl_on_windows=False,
-    ).output_stripped
+    first_commit_sha = project_command_runner("git rev-list --max-parents=0 HEAD").output_stripped
 
     monkeypatch.setattr(core.ci_platform, "get_ci_project_root", lambda: project_root)
 

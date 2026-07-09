@@ -23,7 +23,7 @@ from ....utils.logging import get_action_display_name
 from .....config import load_pyci_config
 from .....environment.paths.internal import ci_temp_files_shared_directory
 from .....environment.variables import is_environment_variable_set, retrieve_environment_variable
-from .....shell import run_shell_command
+from .....shell import probe_shell_command_runner, quiet_shell_command_runner
 
 logger = logging.getLogger(__name__)
 
@@ -94,34 +94,25 @@ def _is_git_work_tree(path: Path) -> bool:
     if not path.is_dir():
         return False
 
-    result = run_shell_command(
+    result = probe_shell_command_runner(
         "git rev-parse --is-inside-work-tree",
         cwd=path,
-        silence_output=True,
-        raise_on_error=False,
-        use_wsl_on_windows=False,
     )
     return result.is_successful and result.output_stripped == "true"
 
 
 def _get_git_origin_url(path: Path) -> str | None:
-    result = run_shell_command(
+    result = probe_shell_command_runner(
         "git config --get remote.origin.url",
         cwd=path,
-        silence_output=True,
-        raise_on_error=False,
-        use_wsl_on_windows=False,
     )
     return result.output_value
 
 
 def _git_ref_exists(repo_path: Path, ref: str) -> bool:
-    result = run_shell_command(
+    result = probe_shell_command_runner(
         f'git show-ref --verify --quiet "{ref}"',
         cwd=repo_path,
-        silence_output=True,
-        raise_on_error=False,
-        use_wsl_on_windows=False,
     )
     return result.is_successful
 
@@ -193,24 +184,19 @@ def checkout_git_action_ref(repo_path: Path, git_repo_url: str, action_name: str
             f"  Please make sure that the corresponding branch or tag ('{action_ref.name}') exists before pulling this version again."
         )
 
-    run_shell_command("git reset --hard", cwd=repo_path, silence_output=True, use_wsl_on_windows=False)
-    run_shell_command("git clean -fdx", cwd=repo_path, silence_output=True, use_wsl_on_windows=False)
+    repo_command_runner = quiet_shell_command_runner.with_options(cwd=repo_path)
+    repo_command_runner("git reset --hard")
+    repo_command_runner("git clean -fdx")
 
     if action_ref.type == GitActionRefType.BRANCH:
         logger.debug(f"'{action_ref.name}' is a branch in '{git_repo_url}'.")
-        run_shell_command(
+        repo_command_runner(
             f'git checkout -B "{action_ref.name}" "origin/{action_ref.name}"',
-            cwd=repo_path,
-            silence_output=True,
-            use_wsl_on_windows=False,
         )
     elif action_ref.type == GitActionRefType.TAG:
         logger.debug(f"'{action_ref.name}' is a tag in '{git_repo_url}'.")
-        run_shell_command(
+        repo_command_runner(
             f'git checkout --detach "refs/tags/{action_ref.name}"',
-            cwd=repo_path,
-            silence_output=True,
-            use_wsl_on_windows=False,
         )
 
     return action_ref.name
@@ -243,19 +229,16 @@ def retrieve_action_repo(git_repo_url: str) -> Path:
         logger.debug(f"Cloning action repo from '{git_repo_url}' to '{cloned_repo_path}'.")
 
         # execute a fresh pull
-        run_shell_command(f'git clone "{git_repo_url}" "{cloned_repo_path}"', silence_output=True, use_wsl_on_windows=False)
+        quiet_shell_command_runner(f'git clone "{git_repo_url}" "{cloned_repo_path}"')
     else:
         logger.debug(f"Using local clone of action repo '{git_repo_url}' at '{cloned_repo_path}'.")
 
-    # default settings for running shell commands inside the cloned repo
-    def run_repo_command(c: str):
-        return run_shell_command(c, cwd=cloned_repo_path, silence_output=True, use_wsl_on_windows=False)
-
-    run_repo_command("git reset --hard")
-    run_repo_command("git clean -fdx")
-    run_repo_command("git fetch --prune --tags")
-    run_repo_command("git checkout -B main origin/main")
-    run_repo_command("git clean -fdx")
+    repo_command_runner = quiet_shell_command_runner.with_options(cwd=cloned_repo_path)
+    repo_command_runner("git reset --hard")
+    repo_command_runner("git clean -fdx")
+    repo_command_runner("git fetch --prune --tags")
+    repo_command_runner("git checkout -B main origin/main")
+    repo_command_runner("git clean -fdx")
 
     # check if actions directory is present before returning it
     actions_directory = get_actions_directory_in_project(cloned_repo_path)

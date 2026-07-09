@@ -26,7 +26,7 @@ def run():
     print()
 
     print(f"Running '{test_command}' silently:", style="italic light_goldenrod1")
-    result = run_shell_command(test_command, test_cwd, silence_output=True)
+    result = run_shell_command(test_command, test_cwd, quiet=True)
     print_run_result(result)
 
 

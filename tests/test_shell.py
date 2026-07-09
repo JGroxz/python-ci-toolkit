@@ -1,9 +1,11 @@
 import os
+import shlex
+import sys
 from pathlib import Path
 
 import pytest
 
-from python_ci_toolkit.shell import run_shell_command
+from python_ci_toolkit.shell import ShellCommandRunner, run_shell_command
 
 IS_ON_WINDOWS = (os.name == "nt")
 
@@ -14,24 +16,24 @@ def test_exit_codes():
 
     # test a valid command with zero exit code
     command = "true" if (not IS_ON_WINDOWS) else "exit /b 0"
-    result = run_shell_command(command, raise_on_error=False)
+    result = run_shell_command(command, check=False)
 
     assert result.is_successful, \
         f"Command '{command}' must successfully execute with exit code 0."
 
-    # test a valid command with non-zero exit code (without raising an exception
+    # test a valid command with non-zero exit code (without checking)
     command = "false" if not IS_ON_WINDOWS else "exit /b 42"
     excepted_exit_code = 1
-    result = run_shell_command(command, raise_on_error=False)
+    result = run_shell_command(command, check=False)
 
     assert result.is_failed, \
         f"Command '{command}' must fail with non-zero exit code."
     assert result.exit_code == excepted_exit_code, \
         f"Command '{command}' must fail with exit code {excepted_exit_code}."
 
-    # test a valid command with non-zero exit code (with raise_on_error)
+    # test a valid command with non-zero exit code (with checking)
     with pytest.raises(RuntimeError):
-        run_shell_command(command, raise_on_error=True)
+        run_shell_command(command, check=True)
 
 
 def test_cwd():
@@ -66,7 +68,7 @@ def test_output():
     test_echo_message = "\n".join(test_echo_message_lines)
 
     command = f"echo '{test_echo_message}'"
-    result = run_shell_command(command, use_wsl_on_windows=True)
+    result = run_shell_command(command, wsl=True)
 
     assert result.is_successful, \
         f"Command '{command}' must successfully execute."
@@ -76,8 +78,78 @@ def test_output():
         f"Captured output of the command split into lines is not correct."
 
 
+def test_output_includes_stdout_and_stderr():
+    script = "import sys; print('stdout message'); print('stderr message', file=sys.stderr)"
+    command = f"{shlex.quote(sys.executable)} -c {shlex.quote(script)}"
+
+    result = run_shell_command(command, quiet=True)
+
+    assert result.is_successful
+    assert "stdout message" in result.output_lines
+    assert "stderr message" in result.output_lines
+
+
+def test_silenced_failure_includes_captured_output():
+    script = "import sys; print('failure details'); sys.exit(3)"
+    command = f"{shlex.quote(sys.executable)} -c {shlex.quote(script)}"
+
+    with pytest.raises(RuntimeError) as error:
+        run_shell_command(command, quiet=True)
+
+    error_message = str(error.value)
+    assert "exit code 3" in error_message
+    assert "failure details" in error_message
+
+
+def test_raw_output_is_printed_without_shell_prefix(capsys):
+    script = "print('raw output')"
+    command = f"{shlex.quote(sys.executable)} -c {shlex.quote(script)}"
+
+    result = run_shell_command(command, raw_output=True)
+
+    assert result.is_successful
+    captured = capsys.readouterr()
+    assert "raw output" in captured.out
+    assert " > shell: " not in captured.out
+
+
+def test_preconfigured_runner_defaults(capsys):
+    script = "print('quiet by default')"
+    command = f"{shlex.quote(sys.executable)} -c {shlex.quote(script)}"
+    runner = ShellCommandRunner(quiet=True, wsl=False)
+
+    result = runner(command)
+
+    assert result.is_successful
+    assert result.output_stripped == "quiet by default"
+    captured = capsys.readouterr()
+    assert "quiet by default" not in captured.out
+
+
+def test_preconfigured_runner_options_can_be_overridden(capsys):
+    script = "print('visible override')"
+    command = f"{shlex.quote(sys.executable)} -c {shlex.quote(script)}"
+    runner = ShellCommandRunner(quiet=True, wsl=False)
+
+    result = runner(command, raw_output=True, quiet=False)
+
+    assert result.is_successful
+    captured = capsys.readouterr()
+    assert "visible override" in captured.out
+    assert " > shell: " not in captured.out
+
+
+def test_preconfigured_runner_can_set_default_cwd(tmp_path: Path):
+    runner = ShellCommandRunner(cwd=tmp_path, quiet=True, wsl=False)
+
+    result = runner("pwd")
+
+    assert result.is_successful
+    assert result.output_stripped == str(tmp_path)
+
+
 def test_invalid_command():
-    # test an invalid command (it must raise an exception even if raise_on_error is False)
+    # test an invalid command (it must raise an exception even if check is False)
     invalid_command = "invalid_command_that_doesnt_exist --with-invalid-option and-invalid-argument"
     with pytest.raises(FileNotFoundError):
-        run_shell_command(invalid_command, raise_on_error=False)
+        run_shell_command(invalid_command, check=False)

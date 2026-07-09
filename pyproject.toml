@@ -12,6 +12,7 @@ authors = [
     { name = "PyCI", email = "hello@pyci.dev" },
 ]
 dependencies = [
+    "comrun>=0.3.2,<1",
     "rich>=1",
     "rich-click>=1.6.0,<2.0.0",
     "semver>=2",
