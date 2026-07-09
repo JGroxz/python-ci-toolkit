@@ -233,7 +233,7 @@ wheels = [
 
 [[package]]
 name = "python-ci-toolkit"
-version = "0.32.0.dev0"
+version = "0.32.1.dev0"
 source = { editable = "." }
 dependencies = [
     { name = "rich" },
