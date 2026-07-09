@@ -1,4 +1,6 @@
 import os
+import shlex
+import sys
 from pathlib import Path
 
 import pytest
@@ -74,6 +76,41 @@ def test_output():
         f"Stripped captured output of the command is not correct."
     assert result.output_lines == test_echo_message_lines, \
         f"Captured output of the command split into lines is not correct."
+
+
+def test_output_includes_stdout_and_stderr():
+    script = "import sys; print('stdout message'); print('stderr message', file=sys.stderr)"
+    command = f"{shlex.quote(sys.executable)} -c {shlex.quote(script)}"
+
+    result = run_shell_command(command, silence_output=True)
+
+    assert result.is_successful
+    assert "stdout message" in result.output_lines
+    assert "stderr message" in result.output_lines
+
+
+def test_silenced_failure_includes_captured_output():
+    script = "import sys; print('failure details'); sys.exit(3)"
+    command = f"{shlex.quote(sys.executable)} -c {shlex.quote(script)}"
+
+    with pytest.raises(RuntimeError) as error:
+        run_shell_command(command, silence_output=True)
+
+    error_message = str(error.value)
+    assert "exit code 3" in error_message
+    assert "failure details" in error_message
+
+
+def test_raw_output_is_printed_without_shell_prefix(capsys):
+    script = "print('raw output')"
+    command = f"{shlex.quote(sys.executable)} -c {shlex.quote(script)}"
+
+    result = run_shell_command(command, raw_output=True)
+
+    assert result.is_successful
+    captured = capsys.readouterr()
+    assert "raw output" in captured.out
+    assert " > shell: " not in captured.out
 
 
 def test_invalid_command():

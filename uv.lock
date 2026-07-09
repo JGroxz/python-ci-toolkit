@@ -24,6 +24,18 @@ wheels = [
 ]
 
 [[package]]
+name = "comrun"
+version = "0.3.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "rich" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/36/9e/bf024b675a02fbbff05745e6d5bea01401b2e223a99c66ced1af8e304843/comrun-0.3.2.tar.gz", hash = "sha256:381a1877008104a589f9d02eddb11ef389a1b0f85e1356c988aaa704b0e20044", size = 5555, upload_time = "2025-12-06T01:59:28.245Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d3/be/8cfb0d995217b646a8b84ffae129abf5c6e5f5855d2150c6d0cd4c6fc49b/comrun-0.3.2-py3-none-any.whl", hash = "sha256:9b4213ec7ff782d728930cda7efa40ab837d4023d6ff7ed124fa7d4af1b30837", size = 6835, upload_time = "2025-12-06T01:59:27.44Z" },
+]
+
+[[package]]
 name = "coverage"
 version = "7.15.0"
 source = { registry = "https://pypi.org/simple" }
@@ -236,6 +248,7 @@ name = "python-ci-toolkit"
 version = "0.32.1.dev0"
 source = { editable = "." }
 dependencies = [
+    { name = "comrun" },
     { name = "rich" },
     { name = "rich-click" },
     { name = "semver" },
@@ -252,6 +265,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "comrun", specifier = ">=0.3.2,<1" },
     { name = "rich", specifier = ">=1" },
     { name = "rich-click", specifier = ">=1.6.0,<2.0.0" },
     { name = "semver", specifier = ">=2" },
