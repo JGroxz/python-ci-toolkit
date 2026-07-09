@@ -1,15 +1,10 @@
 from pathlib import Path
 
-from python_ci_toolkit.environment.platform import ci_platform
-from python_ci_toolkit.shell import run_shell_command
+from ..platform import ci_platform
+from ...shell import run_shell_command
 
 
 class CiPaths:
-
-    def __init__(self):
-        # determine if we're inside a Git repo
-        result = run_shell_command("git rev-parse --show-toplevel", use_wsl_on_windows=False, silence_output=True)
-        self._git_repo_root = Path(result.output_stripped) if result.is_successful else None
 
     @property
     def project_root(self) -> Path:
@@ -23,6 +18,39 @@ class CiPaths:
             if no Git repo is found, current working directory will be assumed to be the project's root.
         """
         return ci_platform.get_ci_project_root()
+
+    def _get_git_repo_root(self) -> Path | None:
+        project_root = self.project_root
+        if not project_root.exists():
+            return None
+
+        try:
+            result = run_shell_command(
+                "git rev-parse --show-toplevel",
+                cwd=project_root,
+                silence_output=True,
+                raise_on_error=False,
+                use_wsl_on_windows=False,
+            )
+        except OSError:
+            return None
+
+        return Path(result.output_stripped) if result.is_successful else None
+
+    def _get_first_commit_short_sha(self, git_repo_root: Path) -> str | None:
+        try:
+            result = run_shell_command(
+                "git rev-list --max-parents=0 HEAD",
+                cwd=git_repo_root,
+                silence_output=True,
+                raise_on_error=False,
+                use_wsl_on_windows=False,
+            )
+        except OSError:
+            return None
+
+        first_commit_sha = result.output_value if result.is_successful else None
+        return first_commit_sha[:7] if first_commit_sha else None
 
     @property
     def ci_files_directory(self) -> Path:
@@ -50,10 +78,10 @@ class CiPaths:
         """
         from .internal import ci_temp_files_projects_root_directory, ci_temp_files_shared_directory
 
-        if self._git_repo_root:
+        git_repo_root = self._get_git_repo_root()
+        first_commit_sha_short = self._get_first_commit_short_sha(git_repo_root) if git_repo_root else None
+        if first_commit_sha_short:
             # when inside a CI project repo, generate the path based on the initial commit's short SHA
-            first_commit_sha = run_shell_command("git rev-list --max-parents=0 HEAD", cwd=self.project_root).output_stripped
-            first_commit_sha_short = first_commit_sha[:7]
             directory = ci_temp_files_projects_root_directory / first_commit_sha_short
         else:
             # when outside any repo, point to the shared temp directory

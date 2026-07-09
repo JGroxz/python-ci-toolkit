@@ -3,18 +3,25 @@ Provides functions to retrieve and run CI actions based on Python scripts.
 """
 
 import sys
-import time
+from collections.abc import Iterator
+from contextlib import contextmanager
+from dataclasses import dataclass
+from pathlib import Path
 from types import ModuleType
 from typing import List
 
 from .datatypes import ActionRunResult, ActionOutput
+from .constants import ACTION_VERSION_DEFAULT_REMOTE_STRING, ACTION_VERSION_LOCAL_STRING
+from .exceptions import MissingActionEntrypointError
 from .retrieval import retrieve_ci_action_script
+from .retrieval.sources.git.cloning import get_remote_action_repo
 from .retrieval.sources.git.caching import reset_action_cache_timestamp
 from .utils import Stopwatch
 from .utils.logging import (loading_animation, print_action_run_start, get_action_display_name,
                             print_action_run_end_success, print_action_run_end_failure, get_action_progress_message)
-from ..logging import get_logger
-from ..logging.logging import LOG_WITH_MARKUP
+from .logging import get_logger
+from .logging.logging import LOG_WITH_MARKUP
+from ..environment.bootstrap import prepare_ci_project_runtime
 from ..pip import ensure_requirements_installed
 from ..python import import_module_from_file
 
@@ -31,10 +38,10 @@ def execute_action_module(action_module: ModuleType,
 
     # check if the action module has the required entry point function
     if not hasattr(action_module, _ACTION_ENTRY_POINT_FUNCTION_NAME):
-        logger.critical(f"Action '{action_display_name}' does not have a '{_ACTION_ENTRY_POINT_FUNCTION_NAME}()' function, so it won't be executed.\n"
-                        f"Please make sure that the action module has a '{_ACTION_ENTRY_POINT_FUNCTION_NAME}()' "
-                        f"function which serves as an entry point for the action logic.")
-        sys.exit(1)
+        return ActionRunResult(
+            exception=MissingActionEntrypointError(action_display_name, _ACTION_ENTRY_POINT_FUNCTION_NAME),
+            output=ActionOutput(),
+        )
 
     # run the action
     action_exception = None
@@ -89,6 +96,155 @@ _running_actions_stack: list[tuple[str, str]] = [
 ]
 
 
+def _is_action_running(action_name: str) -> bool:
+    return any(running_action_name == action_name for running_action_name, _ in _running_actions_stack)
+
+
+@dataclass(frozen=True)
+class _ActionRuntimeContext:
+    action_name: str
+    action_version: str
+    action_display_name: str
+    is_nested: bool
+
+
+@contextmanager
+def _action_runtime_context(action_name: str, action_version: str | None = None) -> Iterator[_ActionRuntimeContext]:
+    """
+    Tracks process-global action runtime state and restores it after every run.
+
+    Notes:
+        The runtime stack prevents recursive action calls by action name. The caller's
+        argv is restored even if retrieval, requirements installation, import, or
+        execution fails.
+    """
+    action_version = action_version or ACTION_VERSION_DEFAULT_REMOTE_STRING
+
+    action_stack_identifier = (action_name, action_version)
+    if _is_action_running(action_name):
+        raise RuntimeError(f"Action '{action_name}' is already running. Recursive action calls are not allowed.")
+
+    original_argv = sys.argv.copy()
+    _running_actions_stack.append(action_stack_identifier)
+
+    try:
+        yield _ActionRuntimeContext(
+            action_name=action_name,
+            action_version=action_version,
+            action_display_name=get_action_display_name(action_name, action_version),
+            is_nested=(len(_running_actions_stack) > 1),
+        )
+    finally:
+        sys.argv = original_argv
+        logger.debug(f"Restored sys.argv after action run: {sys.argv}")
+
+        if action_stack_identifier in _running_actions_stack:
+            _running_actions_stack.remove(action_stack_identifier)
+
+
+def _retrieve_action_script(runtime_context: _ActionRuntimeContext) -> tuple[Path, str]:
+    logger.debug(f"Locating action '{runtime_context.action_display_name}'...")
+    action_script_path, action_source = retrieve_ci_action_script(
+        runtime_context.action_name,
+        runtime_context.action_version,
+    )
+    logger.debug(f"Located action '{runtime_context.action_display_name}' at {action_source}.")
+    return action_script_path, action_source
+
+
+def _install_action_requirements(action_script_path: Path, runtime_context: _ActionRuntimeContext) -> None:
+    action_requirements_path = action_script_path.parent / "requirements.txt"
+    if not action_requirements_path.exists():
+        return
+
+    logger.debug(f"Action [pyci.action]'{runtime_context.action_name}'[/] has requirements file supplied with it. Installing requirements...", **LOG_WITH_MARKUP)
+
+    with (
+        loading_animation(get_action_progress_message(runtime_context.action_display_name, "Installing action's dependencies")),
+        Stopwatch() as requirements_installation_stopwatch
+    ):
+        ensure_requirements_installed(action_requirements_path, quiet=True)
+
+    logger.debug(f"Requirements installation complete in {requirements_installation_stopwatch.elapsed_time_pretty}.")
+
+
+def _prepare_argv_before_action_run(runtime_context: _ActionRuntimeContext, args: List[str] | None = None) -> None:
+    if not runtime_context.is_nested:
+        rearrange_argv_before_action_run(runtime_context.action_name)
+        return
+
+    if args is None:
+        args = []
+    sys.argv = [runtime_context.action_name, *args]
+    logger.debug(f"Updated sys.argv with provided values before nested action run: {sys.argv}")
+
+
+def _import_action_module(action_script_path: Path, action_source: str, runtime_context: _ActionRuntimeContext) -> ModuleType:
+    logger.debug(f"Importing Python module of the action [pyci.action]'{runtime_context.action_name}'[/]...", **LOG_WITH_MARKUP)
+
+    with (
+        loading_animation(get_action_progress_message(runtime_context.action_display_name, "Importing action's Python module")),
+        Stopwatch() as import_stopwatch
+    ):
+        try:
+            action_module = import_module_from_file(f"{runtime_context.action_name}", action_script_path, True)
+        except Exception:
+            logger.error(
+                f"Error when importing Python module from action script '{action_script_path}' "
+                f"(action '{runtime_context.action_display_name}' from {action_source})."
+            )
+            raise
+
+    logger.debug(f"Import completed in {import_stopwatch.elapsed_time_pretty}.")
+    return action_module
+
+
+def _run_action_module(action_module: ModuleType, runtime_context: _ActionRuntimeContext) -> ActionOutput:
+    with(
+        loading_animation(get_action_progress_message(runtime_context.action_display_name, "Running")),
+        Stopwatch() as run_stopwatch
+    ):
+        run_result = execute_action_module(
+            action_module,
+            runtime_context.action_name,
+            runtime_context.action_version,
+        )
+
+    if not run_result.is_successful:
+        try:
+            raise run_result.exception
+        finally:
+            print_action_run_end_failure(
+                runtime_context.action_display_name,
+                run_stopwatch,
+                run_result.exception,
+                runtime_context.is_nested,
+            )
+
+    print_action_run_end_success(
+        runtime_context.action_display_name,
+        run_stopwatch,
+        runtime_context.is_nested,
+    )
+
+    return run_result.output
+
+
+def _reset_remote_action_cache_timestamp(runtime_context: _ActionRuntimeContext) -> None:
+    if runtime_context.action_version == ACTION_VERSION_LOCAL_STRING:
+        return
+
+    action_repo = get_remote_action_repo()
+    if action_repo is None:
+        return
+
+    reset_action_cache_timestamp(
+        action_repo,
+        runtime_context.action_name,
+        runtime_context.action_version,
+    )
+
+
 def run_ci_action(action_name: str, action_version: str = None, args: List[str] = None) -> ActionOutput:
     """
     Executes CI action by the given action name and version.
@@ -97,93 +253,31 @@ def run_ci_action(action_name: str, action_version: str = None, args: List[str] 
         action_name: Name of the action to run.
         action_version: Version of the action to run.
         args: Vector of command-line arguments to pass to the action.
+
+    Notes:
+        If action version is omitted, the action resolves to the default remote version.
+        Nested calls use the same version rule as top-level calls; parent action versions
+        are not inherited implicitly. Nested actions receive only the explicitly supplied
+        child arguments, and the parent argv is restored after the nested run.
     """
-    # if no version is provided, use the one from the 'main' branch
-    if action_version is None:
-        action_version = "main"
+    prepare_ci_project_runtime()
 
-    # add action to the stack
-    action_stack_identifier = (action_name, action_version)
-    if action_stack_identifier in _running_actions_stack:
-        raise RuntimeError(f"Action '{action_name}' is already running. Recursive action calls are not allowed.")
-    _running_actions_stack.append(action_stack_identifier)
+    with _action_runtime_context(action_name, action_version) as runtime_context:
+        action_script_path, action_source = _retrieve_action_script(runtime_context)
 
-    is_nested_action = len(_running_actions_stack) > 1
+        print_action_run_start(
+            runtime_context.action_name,
+            runtime_context.action_version,
+            action_source,
+            runtime_context.is_nested,
+        )
 
-    # craft action name for logs
-    action_display_name = get_action_display_name(action_name, action_version)
+        _install_action_requirements(action_script_path, runtime_context)
+        _prepare_argv_before_action_run(runtime_context, args)
 
-    # locate action script
-    logger.debug(f"Locating action '{action_display_name}'...")
-    action_script_path, action_source = retrieve_ci_action_script(action_name, action_version)
-    logger.debug(f"Located action '{action_display_name}' at {action_source}.")
+        action_module = _import_action_module(action_script_path, action_source, runtime_context)
+        action_output = _run_action_module(action_module, runtime_context)
 
-    # announce action run start
-    print_action_run_start(action_name, action_version, action_source, is_nested_action)
+        _reset_remote_action_cache_timestamp(runtime_context)
 
-    # install action's requirements if present
-    action_requirements_path = action_script_path.parent / "requirements.txt"
-    if action_requirements_path.exists():
-        logger.debug(f"Action [pyci.action]'{action_name}'[/] has requirements file supplied with it. Installing requirements...", **LOG_WITH_MARKUP)
-
-        with (
-            loading_animation(get_action_progress_message(action_display_name, "Installing action's dependencies")),
-            Stopwatch() as requirements_installation_stopwatch
-        ):
-            ensure_requirements_installed(action_requirements_path, quiet=True)
-
-        logger.debug(f"Requirements installation complete in {requirements_installation_stopwatch.elapsed_time_pretty}.")
-
-    # prepare action's CLI arguments
-    original_argv = sys.argv.copy()
-    if not is_nested_action:
-        rearrange_argv_before_action_run(action_name)
-    else:
-        if args is None:
-            args = []
-        sys.argv = [action_name, *args]
-        logger.debug(f"Updated sys.argv with provided values before nested action run: {sys.argv}")
-
-    # import action's Python module
-    logger.debug(f"Importing Python module of the action [pyci.action]'{action_name}'[/]...", **LOG_WITH_MARKUP)
-    with (
-        loading_animation(get_action_progress_message(action_display_name, "Importing action's Python module")),
-        Stopwatch() as import_stopwatch
-    ):
-        try:
-            action_module = import_module_from_file(f"{action_name}", action_script_path, True)
-        except Exception:
-            logger.error(f"Error when importing Python module from action script '{action_script_path}' (action '{action_display_name}' from {action_source}).")
-            raise
-    logger.debug(f"Import completed in {import_stopwatch.elapsed_time_pretty}.")
-
-    # run CI action module with the given arguments
-    with(
-        loading_animation(get_action_progress_message(action_display_name, "Running")),
-        Stopwatch() as run_stopwatch
-    ):
-        run_result = execute_action_module(action_module, action_name, action_version)
-
-    if not run_result.is_successful:
-        # action failed, raise the exception
-        try:
-            raise run_result.exception
-        finally:
-            print_action_run_end_failure(action_display_name, run_stopwatch, run_result.exception, is_nested_action)
-
-    # action completed successfully
-    print_action_run_end_success(action_display_name, run_stopwatch, is_nested_action)
-
-    # reset cache timestamps after each successful action run
-    # to allow chaining actions from the same repo without re-downloading them
-    reset_action_cache_timestamp(action_name, action_version)
-
-    # restore argv of the caller action
-    if is_nested_action:
-        sys.argv = original_argv
-        logger.debug(f"Restored sys.argv after nested action run: {sys.argv}")
-
-    # remove action from the stack
-    _running_actions_stack.remove(action_stack_identifier)
-
-    return run_result.output
+        return action_output

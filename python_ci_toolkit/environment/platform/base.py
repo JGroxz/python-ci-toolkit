@@ -8,6 +8,15 @@ from rich.theme import Theme
 class CiPlatform(ABC):
     """
     Base class for CI platform integrations.
+
+    A platform integration owns provider-specific environment facts: detecting
+    whether the current process runs on the provider, resolving the project
+    root, describing environment-variable limitations, and adapting console
+    output for provider terminal behavior.
+
+    It does not own action source policy, remote action authentication mode,
+    Git clone/cache behavior, dependency installation, or action runtime
+    semantics. Those decisions live in retrieval, Git, and runtime modules.
     """
 
     @classmethod

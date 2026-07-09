@@ -5,12 +5,11 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import List, Callable
+from typing import List
 
 from semver import VersionInfo
 
 from .version_file_handlers import VERSION_FILE_HANDLERS, VersionFileHandler
-from ..shell import run_shell_command
 
 
 SUPPORTED_VERSION_FILES: List[str] = list(VERSION_FILE_HANDLERS.keys())
@@ -69,11 +68,12 @@ def read_project_version(project_root_folder_path: str | Path) -> VersionInfo:
     Raises:
         FileNotFoundError if the version could not be determined (no version file).
     """
-    if project_root_folder_path is not Path:
-        project_root_folder_path = Path(project_root_folder_path)
+    project_root_folder_path = Path(project_root_folder_path)
 
     if not project_root_folder_path.exists():
-        raise FileNotFoundError(f"Cannot read project version: provided project directory path does not exist ('{project_root_folder_path}').")
+        raise FileNotFoundError(
+            f"Cannot read project version: provided project directory path does not exist ('{project_root_folder_path}')."
+        )
 
     def get_file_in_project_root(file_name: str) -> Path:
         return Path(project_root_folder_path, file_name)
@@ -103,32 +103,12 @@ def write_project_version(project_root_folder_path: str | Path, version: Version
     Raises:
         FileNotFoundError if the version file to write to could not be found.
     """
-    if project_root_folder_path is not Path:
-        project_root_folder_path = Path(project_root_folder_path)
+    project_root_folder_path = Path(project_root_folder_path)
 
     if not project_root_folder_path.exists():
-        raise FileNotFoundError(f"Cannot write project version: provided project directory path does not exist ('{project_root_folder_path}').")
-
-    # Helper functions
-    def update_file_contents_in_project_root(file_name: str, write_callback: Callable[[str], str]) -> None:
-        """
-        Wrapper function which opens the given file in the project's root folder,
-        reads its contents, updates them using the given callback, and writes them back.
-
-        Notes:
-            Does nothing if the file does not exist.
-
-        Args:
-            file_name: Name of the file to find and update the contents of.
-            write_callback: Function which will return the new file contents.
-        """
-        # find full path to the file
-        file_path = Path(project_root_folder_path, file_name)
-        if file_path.exists():
-            with open(file_path, "r+") as file:
-                contents = file.read()
-                updated_contents = write_callback(contents)
-                file.write(updated_contents)
+        raise FileNotFoundError(
+            f"Cannot write project version: provided project directory path does not exist ('{project_root_folder_path}')."
+        )
 
     # Update version in every supported version file in the project root folder
     updated_version_files: List[str] = []
@@ -148,57 +128,3 @@ def write_project_version(project_root_folder_path: str | Path, version: Version
     else:
         updated_file_names = "\n".join([f"  - '{file_name}'" for file_name in updated_version_files])
         logging.info(f"Updated version to {version} in {len(updated_version_files)} files in the repository:\n{updated_file_names}")
-
-
-def get_latest_pypi_package_version(package_name: str) -> VersionInfo | None:
-    """
-    Returns the latest semantic version of the given PyPI package in currently configured repositories.
-
-    Args:
-        package_name: Name of the PyPI package to get the latest version of.
-
-    Returns:
-        The latest package version in semantic VersionInfo format.
-    """
-    all_versions = get_all_available_pypi_package_versions(package_name)
-
-    if len(all_versions) == 0:
-        return None
-
-    latest_version = all_versions[0]
-    return latest_version
-
-
-def get_all_available_pypi_package_versions(package_name: str) -> List[VersionInfo]:
-    """
-    Returns the list of all available semantic versions of the given PyPI package in currently configured repositories.
-
-    Notes:
-        Versions in the returned list are sorted in descending order, from the latest to the oldest.
-
-    Args:
-        package_name: Name of the PyPI package to get the versions of.
-
-    Returns:
-        List of package versions in semantic VersionInfo format.
-    """
-    result = run_shell_command(f"pip index versions {package_name}", raise_on_error=False, use_wsl_on_windows=False)
-
-    missing_package_log = f"No matching distribution found for {package_name}"
-    if missing_package_log in result.output:
-        # the package does not exist in the remote repository
-        return []
-
-    if result.is_failed:
-        # if the c
-        raise RuntimeError(f"Could not get available versions for package '{package_name}'.\n"
-                           f"  Executed command: {result.command}\n"
-                           f"  Exit code: {result.exit_code}\n",
-                           f"  Output: {result.output}")
-
-    versions_anchor_string = "Available versions: "
-    versions_start_index = result.output.find(versions_anchor_string) + len(versions_anchor_string)
-    versions_list = result.output[versions_start_index:].split("\n")[0].split(",")
-    available_versions = [parse_semantic_version(version_string.strip()) for version_string in versions_list]
-
-    return available_versions

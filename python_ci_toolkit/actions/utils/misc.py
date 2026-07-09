@@ -3,8 +3,8 @@ Miscellaneous utility functions of the actions package.
 """
 import hashlib
 
+from ..logging import get_logger
 from ..utils.stopwatch import Stopwatch
-from ...logging import get_logger
 
 logger = get_logger(__name__)
 

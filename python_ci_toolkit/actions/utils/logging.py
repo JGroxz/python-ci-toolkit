@@ -13,8 +13,8 @@ from rich.progress import Progress, Task, TimeRemainingColumn, TaskProgressColum
 
 from . import Stopwatch
 from ..constants import ACTION_VERSION_SEPARATOR
-from ...environment import ci_paths, ci_platform, platforms
-from ...logging import get_logger
+from ..logging import get_logger
+from ...environment import Local, ci_paths, ci_platform
 
 logger = get_logger(__name__)
 
@@ -90,7 +90,7 @@ def loading_animation(description: str) -> None:  # TODO: rework loading animati
     Args:
         description: Info message describing what's happening. Will be displayed next to the animation.
     """
-    if ci_platform != platforms.Local:
+    if ci_platform is not Local:
         # cloud environments normally don't support erasing terminal output,
         # so progress bars get messed up; in this case we don't display them
         yield

@@ -1,18 +1,17 @@
 [build-system]
-requires = [ "poetry-core>=1.0.0",]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
 
-[tool.poetry]
+[project]
 name = "epic-dummy-pyproject-file-to-test-version-parsing"
 version = "1.0.0-test"
 description = "A collection of tools for building CI Python scripts used by PyCI"
-authors = [ "PyCI <hello@pyci.dev>",]
-
-[tool.poetry.dependencies]
-python = "^3.8"
-hopes = ">=2.0"
-prayers = ">=9.1"
-pure-determination = "1.0.0-dev"
-
-[tool.poetry.dev-dependencies]
-fuck = "ass"
+requires-python = ">=3.10"
+authors = [
+    { name = "PyCI", email = "hello@pyci.dev" },
+]
+dependencies = [
+    "hopes>=2.0",
+    "prayers>=9.1",
+    "pure-determination==1.0.0-dev",
+]

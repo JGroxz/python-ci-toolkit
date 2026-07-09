@@ -1,9 +1,20 @@
-from enum import Enum
+"""
+CI platform detection and platform identity exports.
+
+The selected ``ci_platform`` value is the platform class itself, not an enum
+wrapper or instance. Compare it with identity checks such as
+``ci_platform is Local`` or ``ci_platform is GitHubActions``.
+"""
 
 from .base import CiPlatform
 from .bitbucket import BitbucketPipelines
 from .github import GitHubActions
 from .local import Local
+
+SUPPORTED_CI_PLATFORMS = (
+    BitbucketPipelines,
+    GitHubActions,
+)
 
 
 def _get_ci_platform() -> type[CiPlatform]:
@@ -11,12 +22,11 @@ def _get_ci_platform() -> type[CiPlatform]:
     Tries to detect current CI environment type.
 
     Returns:
-        CiEnvironmentType enum value corresponding to the CI environment this script is being run at.
+        Platform class corresponding to the CI environment this script is being run at.
     """
-    if BitbucketPipelines.is_current():
-        return BitbucketPipelines
-    elif GitHubActions.is_current():
-        return GitHubActions
+    for platform in SUPPORTED_CI_PLATFORMS:
+        if platform.is_current():
+            return platform
 
     return Local
 
@@ -27,18 +37,11 @@ Object containing the info about the current CI platform (Bitbucket Pipelines, G
 """
 
 
-class Platforms(Enum):
-    Local = Local
-    BitbucketPipelines = BitbucketPipelines
-    GitHubActions = GitHubActions
-
-
-platforms = Platforms
-"""
-Enum containing all supported CI platforms.
-"""
-
 __all__ = [
+    "BitbucketPipelines",
+    "CiPlatform",
+    "GitHubActions",
+    "Local",
+    "SUPPORTED_CI_PLATFORMS",
     "ci_platform",
-    "platforms"
 ]

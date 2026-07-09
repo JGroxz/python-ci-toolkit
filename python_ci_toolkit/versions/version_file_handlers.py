@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Dict
 
-import toml
+import tomlkit
 from semver import VersionInfo
 
 
@@ -26,9 +26,8 @@ class VersionFileHandler:
         Returns:
             VersionInfo read from the file.
         """
-        with file_path.open("r") as file:
-            contents = file.read()
-            return self._read_version_from_file_contents(contents)
+        contents = file_path.read_text(encoding="utf-8")
+        return self._read_version_from_file_contents(contents)
 
     def write_version(self, file_path: Path, new_version: VersionInfo) -> None:
         """
@@ -39,12 +38,9 @@ class VersionFileHandler:
             new_version: Version to write to the file.
         """
 
-        with file_path.open("r+") as file:
-            contents = file.read()
-            updated_contents = self._update_version_from_file_contents(contents, new_version)
-            file.seek(0)
-            file.truncate()
-            file.write(updated_contents)
+        contents = file_path.read_text(encoding="utf-8")
+        updated_contents = self._update_version_from_file_contents(contents, new_version)
+        file_path.write_text(updated_contents, encoding="utf-8")
 
     def _read_version_from_file_contents(self, file_contents: str) -> VersionInfo:
         raise NotImplementedError
@@ -56,20 +52,44 @@ class VersionFileHandler:
 @dataclasses.dataclass
 class PyProjectVersionFileHandler(VersionFileHandler):
     """
-    Handler for pyproject.toml used in Poetry projects.
+    Handler for pyproject.toml files.
+
+    PEP 621 project metadata is preferred. Legacy Poetry metadata is still
+    supported so PyCI can inspect older repositories during migration.
     """
+    PEP_621_VERSION_PATH = ("project", "version")
+    POETRY_VERSION_PATH = ("tool", "poetry", "version")
 
     def _read_version_from_file_contents(self, file_contents: str) -> VersionInfo:
         from .versions import parse_semantic_version
-        project_config = toml.loads(file_contents)
-        version = project_config.get("tool").get("poetry").get("version")
-        return parse_semantic_version(version)
+        project_config = tomlkit.parse(file_contents)
+        version = self._get_nested_dict_key(project_config, self.PEP_621_VERSION_PATH)
+        if version is None:
+            version = self._get_nested_dict_key(project_config, self.POETRY_VERSION_PATH)
+        if version is None:
+            raise ValueError("Could not find project version in 'pyproject.toml'.")
+        return parse_semantic_version(str(version))
 
     def _update_version_from_file_contents(self, file_contents: str, new_version: VersionInfo) -> str:
-        project_config = toml.loads(file_contents)
+        project_config = tomlkit.parse(file_contents)
         version_string = f"{new_version}"
-        self._set_nested_dict_key(project_config, ["tool", "poetry", "version"], version_string)
-        return toml.dumps(project_config)
+        if self._get_nested_dict_key(project_config, self.PEP_621_VERSION_PATH) is not None:
+            self._set_nested_dict_key(project_config, self.PEP_621_VERSION_PATH, version_string)
+        elif self._get_nested_dict_key(project_config, self.POETRY_VERSION_PATH) is not None:
+            self._set_nested_dict_key(project_config, self.POETRY_VERSION_PATH, version_string)
+        else:
+            self._set_nested_dict_key(project_config, self.PEP_621_VERSION_PATH, version_string)
+        return project_config.as_string()
+
+    @staticmethod
+    def _get_nested_dict_key(dictionary, keys):
+        for key in keys:
+            if not isinstance(dictionary, dict):
+                return None
+            dictionary = dictionary.get(key)
+            if dictionary is None:
+                return None
+        return dictionary
 
     @staticmethod
     def _set_nested_dict_key(dictionary, keys, value):
@@ -105,7 +125,8 @@ class PlainTextVersionFileHandler(VersionFileHandler):
 
     def _read_version_from_file_contents(self, file_contents: str) -> VersionInfo:
         from .versions import parse_semantic_version
-        first_line = file_contents.strip("\n")
+        lines = file_contents.splitlines()
+        first_line = lines[0] if lines else ""
         return parse_semantic_version(first_line)
 
     def _update_version_from_file_contents(self, file_contents: str, new_version: VersionInfo) -> str:
