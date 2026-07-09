@@ -5,7 +5,7 @@ import pkgutil
 import sys
 from pathlib import Path
 
-from .shell import run_shell_command
+from .shell import quiet_shell_command_runner
 
 
 def check_package_installed(package_name: str) -> bool:
@@ -35,8 +35,10 @@ def install_package(package_name: str, quiet: bool = False) -> None:
         RuntimeError if package installation fails.
     """
     current_python_executable = Path(sys.executable)
-    result = run_shell_command(f"'{current_python_executable}' -m pip install {package_name}",
-                               silence_output=quiet, use_wsl_on_windows=False)
+    result = quiet_shell_command_runner(
+        f"'{current_python_executable}' -m pip install {package_name}",
+        quiet=quiet,
+    )
     if result.is_failed:
         raise RuntimeError(f"Failed to install PIP package '{package_name}'.")
 

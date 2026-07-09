@@ -11,7 +11,7 @@ from ....utils import hash_string
 from ....utils.file_timestamps import time_since_file_timestamp, reset_file_timestamp
 from ....utils.logging import get_action_display_name
 from .....environment.paths.internal import ci_temp_files_shared_directory
-from .....shell import run_shell_command
+from .....shell import probe_shell_command_runner
 logger = logging.getLogger(__name__)
 
 DOWNLOADED_ACTION_CACHE_TIMESTAMPS_DIRECTORY = ci_temp_files_shared_directory / "downloaded_action_cache_timestamps"
@@ -59,23 +59,17 @@ def _is_cached_repo_git_worktree(repo_directory: Path) -> bool:
     if not repo_directory.is_dir():
         return False
 
-    result = run_shell_command(
+    result = probe_shell_command_runner(
         "git rev-parse --is-inside-work-tree",
         cwd=repo_directory,
-        silence_output=True,
-        raise_on_error=False,
-        use_wsl_on_windows=False,
     )
     return result.is_successful and result.output_stripped == "true"
 
 
 def _get_cached_repo_origin_url(repo_directory: Path) -> str | None:
-    result = run_shell_command(
+    result = probe_shell_command_runner(
         "git config --get remote.origin.url",
         cwd=repo_directory,
-        silence_output=True,
-        raise_on_error=False,
-        use_wsl_on_windows=False,
     )
     return result.output_value
 

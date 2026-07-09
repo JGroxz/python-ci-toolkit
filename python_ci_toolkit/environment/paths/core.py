@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from ..platform import ci_platform
-from ...shell import run_shell_command
+from ...shell import probe_shell_command_runner
 
 
 class CiPaths:
@@ -25,12 +25,9 @@ class CiPaths:
             return None
 
         try:
-            result = run_shell_command(
+            result = probe_shell_command_runner(
                 "git rev-parse --show-toplevel",
                 cwd=project_root,
-                silence_output=True,
-                raise_on_error=False,
-                use_wsl_on_windows=False,
             )
         except OSError:
             return None
@@ -39,12 +36,9 @@ class CiPaths:
 
     def _get_first_commit_short_sha(self, git_repo_root: Path) -> str | None:
         try:
-            result = run_shell_command(
+            result = probe_shell_command_runner(
                 "git rev-list --max-parents=0 HEAD",
                 cwd=git_repo_root,
-                silence_output=True,
-                raise_on_error=False,
-                use_wsl_on_windows=False,
             )
         except OSError:
             return None

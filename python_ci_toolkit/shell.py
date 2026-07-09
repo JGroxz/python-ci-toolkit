@@ -3,8 +3,7 @@ Convenience function for running shell commands from Python.
 """
 from __future__ import annotations
 
-import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from comrun import CommandRunner
@@ -21,6 +20,7 @@ SHELL_OUTPUT_COMMAND_STYLE = Style(color="deep_sky_blue4", italic=True)
 SHELL_OUTPUT_STDERR_STYLE = Style(color="red")
 
 _output_console = None
+_UNSET = object()
 
 
 @dataclass
@@ -76,12 +76,92 @@ class ShellCommandResult:
         return stripped if (stripped != "") else None
 
 
-def run_shell_command(command: str,
-                      cwd: str | Path = os.getcwd(),
-                      raw_output: bool = False,
-                      silence_output: bool = False,
-                      raise_on_error: bool = True,
-                      use_wsl_on_windows: bool = True) -> ShellCommandResult:
+@dataclass(frozen=True)
+class ShellCommandRunner:
+    """
+    Preconfigured shell command runner that preserves PyCI's shell result contract.
+    """
+    cwd: str | Path | None = None
+    raw_output: bool = False
+    quiet: bool = False
+    check: bool = True
+    wsl: bool = True
+
+    def with_options(
+        self,
+        *,
+        cwd: str | Path | None | object = _UNSET,
+        raw_output: bool | object = _UNSET,
+        quiet: bool | object = _UNSET,
+        check: bool | object = _UNSET,
+        wsl: bool | object = _UNSET,
+    ) -> "ShellCommandRunner":
+        updates = {}
+        if cwd is not _UNSET:
+            updates["cwd"] = cwd
+        if raw_output is not _UNSET:
+            updates["raw_output"] = raw_output
+        if quiet is not _UNSET:
+            updates["quiet"] = quiet
+        if check is not _UNSET:
+            updates["check"] = check
+        if wsl is not _UNSET:
+            updates["wsl"] = wsl
+
+        return replace(self, **updates) if updates else self
+
+    def __call__(
+        self,
+        command: str,
+        *,
+        cwd: str | Path | None | object = _UNSET,
+        raw_output: bool | object = _UNSET,
+        quiet: bool | object = _UNSET,
+        check: bool | object = _UNSET,
+        wsl: bool | object = _UNSET,
+    ) -> ShellCommandResult:
+        return self.run(
+            command,
+            cwd=cwd,
+            raw_output=raw_output,
+            quiet=quiet,
+            check=check,
+            wsl=wsl,
+        )
+
+    def run(
+        self,
+        command: str,
+        *,
+        cwd: str | Path | None | object = _UNSET,
+        raw_output: bool | object = _UNSET,
+        quiet: bool | object = _UNSET,
+        check: bool | object = _UNSET,
+        wsl: bool | object = _UNSET,
+    ) -> ShellCommandResult:
+        return _run_shell_command(
+            command=command,
+            cwd=self.cwd if cwd is _UNSET else cwd,
+            raw_output=self.raw_output if raw_output is _UNSET else raw_output,
+            quiet=self.quiet if quiet is _UNSET else quiet,
+            check=self.check if check is _UNSET else check,
+            wsl=self.wsl if wsl is _UNSET else wsl,
+        )
+
+
+shell_command_runner = ShellCommandRunner()
+quiet_shell_command_runner = ShellCommandRunner(quiet=True, wsl=False)
+probe_shell_command_runner = ShellCommandRunner(quiet=True, check=False, wsl=False)
+
+
+def run_shell_command(
+    command: str,
+    cwd: str | Path | None = None,
+    raw_output: bool = False,
+    quiet: bool = False,
+    check: bool = True,
+    wsl: bool = True,
+) -> ShellCommandResult:
     """
     Executes the given command in a subprocess.
 
@@ -93,10 +173,10 @@ def run_shell_command(command: str,
         cwd: Working directory to execute the command in. Defaults to current working directory.
         raw_output: If set to True, the output from the executed command will be printed as is.
             If set to False, the output will be printed with pretty formatting through the global Rich Console.
-            Has effect only with 'silence_output' set to False.
-        silence_output: If set to True, command output will be suppressed.
-        raise_on_error: If set to True (default), an exception will be thrown if the executed command exits with a non-zero exit code.
-        use_wsl_on_windows: If set to True (default) and running on Windows, the provided command will be run in WSL.
+            Has effect only with 'quiet' set to False.
+        quiet: If set to True, command output will be suppressed.
+        check: If set to True (default), an exception will be thrown if the executed command exits with a non-zero exit code.
+        wsl: If set to True (default) and running on Windows, the provided command will be run in WSL.
 
     Returns:
         Command result with exit code and captured output.
@@ -105,14 +185,31 @@ def run_shell_command(command: str,
         RuntimeError:
             if the executed command completes with a non-zero exit code.
     """
+    return shell_command_runner(
+        command,
+        cwd=cwd,
+        raw_output=raw_output,
+        quiet=quiet,
+        check=check,
+        wsl=wsl,
+    )
 
+
+def _run_shell_command(
+    command: str,
+    cwd: str | Path | None,
+    raw_output: bool,
+    quiet: bool,
+    check: bool,
+    wsl: bool,
+) -> ShellCommandResult:
     # lazy-initialize CI console if using pretty output
     global _output_console
-    if (not silence_output) and (_output_console is None):
+    if (not quiet) and (_output_console is None):
         _output_console = rich.get_console()
 
     # print header if using pretty output
-    if (not silence_output) and (not raw_output):
+    if (not quiet) and (not raw_output):
         header = Text("Running shell command:", style=SHELL_OUTPUT_PREFIX_STYLE) + " " + Text(f"{command}",
                                                                                               style=SHELL_OUTPUT_COMMAND_STYLE)
         _output_console.print(header)
@@ -139,15 +236,15 @@ def run_shell_command(command: str,
 
     runner = CommandRunner(
         cwd=cwd,
-        quiet=silence_output,
+        quiet=quiet,
         check=False,
-        wsl=use_wsl_on_windows,
+        wsl=wsl,
         on_line=print_command_output_line,
     )
     result = _convert_comrun_result(runner(command))
 
-    if result.is_failed and raise_on_error:
-        if silence_output:
+    if result.is_failed and check:
+        if quiet:
             output_string = (f"  Output:\n"
                              f"    ↓ ↓ ↓ Command output start ↓ ↓ ↓\n"
                              f"{result.output}\n"
@@ -161,7 +258,7 @@ def run_shell_command(command: str,
                            f"{output_string}")
 
     # print header if using pretty output
-    if (not silence_output) and (not raw_output):
+    if (not quiet) and (not raw_output):
         header = (
                 Text(f"Shell command finished:", style=SHELL_OUTPUT_PREFIX_STYLE) + " "
                 + Text(f"{command}", style=SHELL_OUTPUT_COMMAND_STYLE) + " "

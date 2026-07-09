@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from python_ci_toolkit.shell import run_shell_command
+from python_ci_toolkit.shell import quiet_shell_command_runner
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -39,14 +39,12 @@ def remote_actions_git_repo_path(tmp_path: Path) -> Path:
         encoding="utf-8"
     )
 
-    run_shell_command("git init", cwd=repo_path, silence_output=True, use_wsl_on_windows=False)
-    run_shell_command("git symbolic-ref HEAD refs/heads/main", cwd=repo_path, silence_output=True, use_wsl_on_windows=False)
-    run_shell_command("git add .", cwd=repo_path, silence_output=True, use_wsl_on_windows=False)
-    run_shell_command(
+    repo_command_runner = quiet_shell_command_runner.with_options(cwd=repo_path)
+    repo_command_runner("git init")
+    repo_command_runner("git symbolic-ref HEAD refs/heads/main")
+    repo_command_runner("git add .")
+    repo_command_runner(
         'git -c user.name="Python CI Toolkit Tests" -c user.email="tests@example.invalid" commit -m "Add hello world action"',
-        cwd=repo_path,
-        silence_output=True,
-        use_wsl_on_windows=False
     )
 
     return repo_path

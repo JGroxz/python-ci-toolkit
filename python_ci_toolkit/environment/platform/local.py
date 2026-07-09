@@ -6,7 +6,7 @@ from rich.console import Console
 from rich.theme import Theme
 
 from .base import CiPlatform
-from ...shell import run_shell_command
+from ...shell import probe_shell_command_runner
 
 logger = logging.getLogger(__name__)
 
@@ -31,9 +31,10 @@ class Local(CiPlatform):
     @classmethod
     def get_ci_project_root(cls) -> Path:
         # general case: find the root of the enclosing Git repository
-        result = run_shell_command("git rev-parse --show-toplevel", use_wsl_on_windows=False,
-                                   raise_on_error=False, silence_output=True,
-                                   cwd=os.getcwd())
+        result = probe_shell_command_runner(
+            "git rev-parse --show-toplevel",
+            cwd=os.getcwd(),
+        )
 
         if result.is_successful:
             git_repo_root = result.output_stripped

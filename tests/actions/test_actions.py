@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from python_ci_toolkit.shell import run_shell_command
+from python_ci_toolkit.shell import probe_shell_command_runner, quiet_shell_command_runner
 
 
 def _get_cloned_repo_root(cloned_actions_directory: Path) -> Path:
@@ -37,8 +37,9 @@ def _create_remote_actions_git_repo(repo_path: Path, description: str) -> Path:
     action_directory.mkdir(parents=True)
     _write_remote_hello_world_action(repo_path, description)
 
-    run_shell_command("git init", cwd=repo_path, silence_output=True, use_wsl_on_windows=False)
-    run_shell_command("git symbolic-ref HEAD refs/heads/main", cwd=repo_path, silence_output=True, use_wsl_on_windows=False)
+    repo_command_runner = quiet_shell_command_runner.with_options(cwd=repo_path)
+    repo_command_runner("git init")
+    repo_command_runner("git symbolic-ref HEAD refs/heads/main")
     _commit_remote_action_repo(repo_path, "Add hello world action")
 
     return repo_path
@@ -48,34 +49,34 @@ def _create_git_repo_without_actions(repo_path: Path) -> Path:
     repo_path.mkdir(parents=True)
     (repo_path / "README.md").write_text("No CI actions here.\n", encoding="utf-8")
 
-    run_shell_command("git init", cwd=repo_path, silence_output=True, use_wsl_on_windows=False)
-    run_shell_command("git symbolic-ref HEAD refs/heads/main", cwd=repo_path, silence_output=True, use_wsl_on_windows=False)
+    repo_command_runner = quiet_shell_command_runner.with_options(cwd=repo_path)
+    repo_command_runner("git init")
+    repo_command_runner("git symbolic-ref HEAD refs/heads/main")
     _commit_remote_action_repo(repo_path, "Add readme")
 
     return repo_path
 
 
 def _commit_remote_action_repo(repo_path: Path, message: str) -> None:
-    run_shell_command("git add .", cwd=repo_path, silence_output=True, use_wsl_on_windows=False)
-    run_shell_command(
+    repo_command_runner = quiet_shell_command_runner.with_options(cwd=repo_path)
+    repo_command_runner("git add .")
+    repo_command_runner(
         f'git -c user.name="Python CI Toolkit Tests" -c user.email="tests@example.invalid" commit -m "{message}"',
-        cwd=repo_path,
-        silence_output=True,
-        use_wsl_on_windows=False
     )
 
 
 def _create_remote_action_branch(repo_path: Path, branch_name: str, description: str) -> None:
-    run_shell_command(f'git checkout -b "{branch_name}"', cwd=repo_path, silence_output=True, use_wsl_on_windows=False)
+    repo_command_runner = quiet_shell_command_runner.with_options(cwd=repo_path)
+    repo_command_runner(f'git checkout -b "{branch_name}"')
     _write_remote_hello_world_action(repo_path, description)
     _commit_remote_action_repo(repo_path, f"Update hello world action on {branch_name}")
-    run_shell_command("git checkout main", cwd=repo_path, silence_output=True, use_wsl_on_windows=False)
+    repo_command_runner("git checkout main")
 
 
 def _create_remote_action_tag(repo_path: Path, tag_name: str, description: str) -> None:
     _write_remote_hello_world_action(repo_path, description)
     _commit_remote_action_repo(repo_path, f"Update hello world action for {tag_name}")
-    run_shell_command(f'git tag "{tag_name}"', cwd=repo_path, silence_output=True, use_wsl_on_windows=False)
+    quiet_shell_command_runner(f'git tag "{tag_name}"', cwd=repo_path)
 
 
 def test_retrieve_action_repo(remote_actions_git_repo: Path):
@@ -130,19 +131,15 @@ def test_retrieve_action_repo_reclones_cached_clone_with_wrong_origin(
     cloned_repo_root = get_clone_directory_from_action_repo_url(repo_a_url)
     cloned_repo_root.parent.mkdir(parents=True, exist_ok=True)
 
-    run_shell_command(
+    quiet_shell_command_runner(
         f'git clone "{repo_b}" "{cloned_repo_root}"',
-        silence_output=True,
-        use_wsl_on_windows=False,
     )
 
     cloned_actions_directory = retrieve_action_repo(repo_a_url)
 
-    origin = run_shell_command(
+    origin = quiet_shell_command_runner(
         "git config --get remote.origin.url",
         cwd=cloned_repo_root,
-        silence_output=True,
-        use_wsl_on_windows=False,
     )
     cloned_action_file = cloned_actions_directory / "hello_world" / "hello_world.py"
 
@@ -166,11 +163,9 @@ def test_retrieve_action_repo_resets_dirty_cached_clone(remote_actions_git_repo:
 
     assert "Remote hello world action." in cloned_action_file.read_text(encoding="utf-8")
     assert not untracked_file.exists()
-    status = run_shell_command(
+    status = quiet_shell_command_runner(
         "git status --short",
         cwd=cloned_repo_root,
-        silence_output=True,
-        use_wsl_on_windows=False,
     )
     assert status.output_stripped == ""
 
@@ -220,8 +215,7 @@ def test_retrieve_ci_action_script_from_git(remote_actions_git_repo: Path):
     action_script_directory = action_script_path.parent
 
     assert action_repo_url == str(remote_actions_git_repo)
-    result = run_shell_command(f'git status',
-                               cwd=action_script_directory, silence_output=True, use_wsl_on_windows=False)
+    result = quiet_shell_command_runner("git status", cwd=action_script_directory)
     assert TEST_ACTION_VERSION in result.output, \
         f"Action repo must be checked out at branch/tag '{TEST_ACTION_VERSION}', but it's not:\n{result.output}"
 
@@ -243,11 +237,9 @@ def test_retrieve_ci_action_script_from_git_checks_out_branch(remote_actions_git
         action_version=TEST_ACTION_VERSION,
     )
     cloned_repo_root = _get_cloned_repo_root(action_script_path.parent.parent)
-    current_branch = run_shell_command(
+    current_branch = quiet_shell_command_runner(
         "git branch --show-current",
         cwd=cloned_repo_root,
-        silence_output=True,
-        use_wsl_on_windows=False,
     )
 
     assert "Feature branch hello world action." in action_script_path.read_text(encoding="utf-8")
@@ -267,15 +259,12 @@ def test_retrieve_ci_action_script_from_git_checks_out_tag(remote_actions_git_re
         action_version=TEST_ACTION_VERSION,
     )
     cloned_repo_root = _get_cloned_repo_root(action_script_path.parent.parent)
-    current_branch = run_shell_command(
+    current_branch = probe_shell_command_runner(
         "git symbolic-ref -q --short HEAD",
         cwd=cloned_repo_root,
-        silence_output=True,
-        raise_on_error=False,
-        use_wsl_on_windows=False,
     )
-    cloned_head = run_shell_command("git rev-parse HEAD", cwd=cloned_repo_root, silence_output=True, use_wsl_on_windows=False)
-    tag_head = run_shell_command(f'git rev-list -n 1 "{TEST_ACTION_VERSION}"', cwd=remote_actions_git_repo, silence_output=True, use_wsl_on_windows=False)
+    cloned_head = quiet_shell_command_runner("git rev-parse HEAD", cwd=cloned_repo_root)
+    tag_head = quiet_shell_command_runner(f'git rev-list -n 1 "{TEST_ACTION_VERSION}"', cwd=remote_actions_git_repo)
 
     assert "Tagged hello world action." in action_script_path.read_text(encoding="utf-8")
     assert current_branch.is_failed
@@ -288,7 +277,7 @@ def test_retrieve_ci_action_script_from_git_rejects_ambiguous_branch_and_tag(rem
 
     TEST_ACTION_VERSION = "release"
     _create_remote_action_branch(remote_actions_git_repo, TEST_ACTION_VERSION, "Release branch hello world action.")
-    run_shell_command(f'git tag "{TEST_ACTION_VERSION}"', cwd=remote_actions_git_repo, silence_output=True, use_wsl_on_windows=False)
+    quiet_shell_command_runner(f'git tag "{TEST_ACTION_VERSION}"', cwd=remote_actions_git_repo)
 
     with pytest.raises(AmbiguousGitActionRefError) as error:
         retrieve_ci_action_script_from_git(
@@ -398,15 +387,12 @@ def test_remote_tag_action_cache_uses_explicit_detached_checkout(remote_actions_
 
     action_script_path, action_source = retrieve_ci_action_script("hello_world", TEST_ACTION_VERSION)
     cloned_repo_root = _get_cloned_repo_root(action_script_path.parent.parent)
-    current_branch = run_shell_command(
+    current_branch = probe_shell_command_runner(
         "git symbolic-ref -q --short HEAD",
         cwd=cloned_repo_root,
-        silence_output=True,
-        raise_on_error=False,
-        use_wsl_on_windows=False,
     )
-    cloned_head = run_shell_command("git rev-parse HEAD", cwd=cloned_repo_root, silence_output=True, use_wsl_on_windows=False)
-    tag_head = run_shell_command(f'git rev-list -n 1 "{TEST_ACTION_VERSION}"', cwd=remote_actions_git_repo, silence_output=True, use_wsl_on_windows=False)
+    cloned_head = quiet_shell_command_runner("git rev-parse HEAD", cwd=cloned_repo_root)
+    tag_head = quiet_shell_command_runner(f'git rev-list -n 1 "{TEST_ACTION_VERSION}"', cwd=remote_actions_git_repo)
 
     assert "Cached tag hello world action." in action_script_path.read_text(encoding="utf-8")
     assert action_source == f"'{TEST_ACTION_VERSION}' at '{remote_actions_git_repo}' (cached)"
