@@ -2,15 +2,6 @@ from pathlib import Path
 
 from ..shell import run_shell_command
 
-ci_repo: Path | None = None
-"""
-Path to the local Git repository of the current CI project.
-
-Notes:
-    This legacy value is no longer resolved at import time. Use get_git_repo_root()
-    with an explicit project path for current Git repository detection.
-"""
-
 
 def add_git_safe_directory(project_root: Path) -> None:
     run_shell_command(
