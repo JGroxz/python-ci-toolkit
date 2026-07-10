@@ -3,6 +3,18 @@ revision = 2
 requires-python = ">=3.11"
 
 [[package]]
+name = "charming-traceback"
+version = "0.1.10"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "rich" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b3/5d/490c8cc9facbdd56e1d701d9541276631ed2ca16b48c520e2c970e2e3914/charming_traceback-0.1.10.tar.gz", hash = "sha256:252b063b17bd7213b90eb78ed51846f838953f0369eb2329940b2ebc95d918c9", size = 8504, upload_time = "2026-03-02T18:57:47.86Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fd/8f/758f1b0f4133b7c7b420490ccf7b484fc760f55bb154dc7a07db93fc65d3/charming_traceback-0.1.10-py3-none-any.whl", hash = "sha256:5ec177e855e79d072465f69390ff61d90907e4bcf104191a07a32862b42d0a57", size = 10545, upload_time = "2026-03-02T18:57:46.098Z" },
+]
+
+[[package]]
 name = "click"
 version = "8.4.2"
 source = { registry = "https://pypi.org/simple" }
@@ -248,6 +260,7 @@ name = "python-ci-toolkit"
 version = "0.33.0.dev0"
 source = { editable = "." }
 dependencies = [
+    { name = "charming-traceback" },
     { name = "comrun" },
     { name = "rich" },
     { name = "rich-click" },
@@ -265,6 +278,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "charming-traceback", specifier = ">=0.1.10,<1" },
     { name = "comrun", specifier = ">=0.3.2,<1" },
     { name = "rich", specifier = ">=1" },
     { name = "rich-click", specifier = ">=1.6.0,<2.0.0" },
