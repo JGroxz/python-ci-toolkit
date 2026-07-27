@@ -34,6 +34,7 @@ def _reset_runtime_state() -> None:
     import python_ci_toolkit.actions.actions as action_runtime
 
     action_runtime._running_actions_stack.clear()
+    action_runtime._running_action_run_ids.clear()
 
 
 @pytest.fixture(autouse=True)
@@ -74,15 +75,16 @@ def test_run_ci_action_passes_retrieved_action_to_process_runner(
     output = action_runtime.run_ci_action("successful_action", "local", ["--flag"])
 
     assert output.values == {"status": "ok"}
-    assert process_calls == [
-        {
-            "action_script_path": action_file,
-            "action_name": "successful_action",
-            "action_version": "local",
-            "args": ["--flag"],
-            "action_stack": [("successful_action", "local")],
-        }
-    ]
+    assert len(process_calls) == 1
+    process_call = process_calls[0]
+    assert len(process_call.pop("run_id")) == 24
+    assert process_call == {
+        "action_script_path": action_file,
+        "action_name": "successful_action",
+        "action_version": "local",
+        "args": ["--flag"],
+        "action_stack": [("successful_action", "local")],
+    }
     assert action_runtime._running_actions_stack == []
 
 
@@ -483,6 +485,81 @@ def test_nested_action_uses_its_own_json_output(
             "argv": ["child_action", "--child-flag"],
         }
     }
+
+
+def test_nested_action_output_is_rendered_by_root_without_private_frames(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+):
+    import python_ci_toolkit.actions.actions as action_runtime
+
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    parent_action = _write_local_project_action(
+        project_root,
+        "rendering_parent",
+        "from python_ci_toolkit.actions import get_action_logger, run_ci_action\n"
+        "\n"
+        "logger = get_action_logger(__name__)\n"
+        "\n"
+        "def action():\n"
+        "    print('parent raw output')\n"
+        "    logger.info('parent semantic log')\n"
+        "    run_ci_action('rendering_child', 'local')\n",
+    )
+    _write_local_project_action(
+        project_root,
+        "rendering_child",
+        "from python_ci_toolkit.actions import get_action_logger\n"
+        "\n"
+        "logger = get_action_logger(__name__)\n"
+        "\n"
+        "def action():\n"
+        "    print('child raw output')\n"
+        "    logger.warning('child semantic log')\n",
+    )
+    monkeypatch.chdir(project_root)
+    _patch_action_retrieval(monkeypatch, parent_action)
+
+    output = action_runtime.run_ci_action("rendering_parent", "local")
+
+    rendered_output = capsys.readouterr().out
+    assert "parent raw output" in rendered_output
+    assert "parent semantic log" in rendered_output
+    assert "Running nested action 'rendering_child@local'" in rendered_output
+    assert "child raw output" in rendered_output
+    assert "child semantic log" in rendered_output
+    assert "::pyci-action-event-v1::" not in rendered_output
+    assert "::pyci-action-event-v1::" not in output.stdout
+
+
+def test_action_process_receives_reduced_standard_terminal_dimensions(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    import python_ci_toolkit.actions.actions as action_runtime
+
+    action_file = _write_action_script(
+        tmp_path,
+        "terminal_action",
+        "import os\n"
+        "import shutil\n"
+        "from python_ci_toolkit.actions import set_action_output\n"
+        "\n"
+        "def action():\n"
+        "    set_action_output('columns_env', int(os.environ['COLUMNS']))\n"
+        "    set_action_output('columns_detected', shutil.get_terminal_size().columns)\n"
+        "    set_action_output('lines_env', int(os.environ['LINES']))\n"
+        "    set_action_output('lines_detected', shutil.get_terminal_size().lines)\n",
+    )
+    _patch_action_retrieval(monkeypatch, action_file)
+
+    output = action_runtime.run_ci_action("terminal_action", "local")
+
+    assert output.values["columns_env"] == output.values["columns_detected"]
+    assert output.values["lines_env"] == output.values["lines_detected"]
+    assert output.values["columns_env"] >= 20
 
 
 def test_nested_action_recursion_is_blocked_across_processes(

@@ -50,7 +50,8 @@ class Local(CiPlatform):
     @classmethod
     def on_patch_rich_console(cls, console: Console, default_theme: Theme) -> Console:
         # for local console output we respect the user's terminal width, if any
-        terminal_width = int(os.getenv("TERMINAL_WIDTH")) if os.getenv("TERMINAL_WIDTH") else None
+        terminal_width_value = os.getenv("COLUMNS") or os.getenv("TERMINAL_WIDTH")
+        terminal_width = int(terminal_width_value) if terminal_width_value else None
 
         return Console(
             theme=default_theme,

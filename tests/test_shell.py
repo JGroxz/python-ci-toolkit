@@ -127,6 +127,26 @@ def test_raw_output_is_printed_without_shell_prefix(capsys):
     assert " > shell: " not in captured.out
 
 
+def test_output_line_callback_intercepts_both_streams(capsys):
+    script = "import sys; print('stdout line'); print('stderr line', file=sys.stderr)"
+    observed_lines = []
+
+    result = run_shell_command(
+        [sys.executable, "-c", script],
+        raw_output=True,
+        on_output_line=lambda line, stream: observed_lines.append((stream, line)),
+    )
+
+    assert result.is_successful
+    assert set(observed_lines) == {
+        ("stdout", "stdout line"),
+        ("stderr", "stderr line"),
+    }
+    captured = capsys.readouterr()
+    assert "stdout line" not in captured.out
+    assert "stderr line" not in captured.err
+
+
 def test_preconfigured_runner_defaults(capsys):
     script = "print('quiet by default')"
     command = f"{shlex.quote(sys.executable)} -c {shlex.quote(script)}"

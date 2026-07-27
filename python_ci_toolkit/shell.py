@@ -7,6 +7,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 import shlex
 import sys
+from typing import Callable
 
 from comrun import CommandRunner
 from comrun.datatypes import CommandResult as ComrunCommandResult
@@ -23,6 +24,7 @@ SHELL_OUTPUT_STDERR_STYLE = Style(color="red")
 
 _output_console = None
 _UNSET = object()
+ShellOutputLineCallback = Callable[[str, str], None]
 
 
 @dataclass
@@ -93,6 +95,7 @@ class ShellCommandRunner:
     check: bool = True
     wsl: bool = True
     env: dict[str, str] | None = None
+    on_output_line: ShellOutputLineCallback | None = None
 
     def with_options(
         self,
@@ -103,6 +106,7 @@ class ShellCommandRunner:
         check: bool | object = _UNSET,
         wsl: bool | object = _UNSET,
         env: dict[str, str] | None | object = _UNSET,
+        on_output_line: ShellOutputLineCallback | None | object = _UNSET,
     ) -> "ShellCommandRunner":
         updates = {}
         if cwd is not _UNSET:
@@ -117,6 +121,8 @@ class ShellCommandRunner:
             updates["wsl"] = wsl
         if env is not _UNSET:
             updates["env"] = env
+        if on_output_line is not _UNSET:
+            updates["on_output_line"] = on_output_line
 
         return replace(self, **updates) if updates else self
 
@@ -130,6 +136,7 @@ class ShellCommandRunner:
         check: bool | object = _UNSET,
         wsl: bool | object = _UNSET,
         env: dict[str, str] | None | object = _UNSET,
+        on_output_line: ShellOutputLineCallback | None | object = _UNSET,
     ) -> ShellCommandResult:
         return self.run(
             command,
@@ -139,6 +146,7 @@ class ShellCommandRunner:
             check=check,
             wsl=wsl,
             env=env,
+            on_output_line=on_output_line,
         )
 
     def run(
@@ -151,6 +159,7 @@ class ShellCommandRunner:
         check: bool | object = _UNSET,
         wsl: bool | object = _UNSET,
         env: dict[str, str] | None | object = _UNSET,
+        on_output_line: ShellOutputLineCallback | None | object = _UNSET,
     ) -> ShellCommandResult:
         return _run_shell_command(
             command=command,
@@ -160,6 +169,11 @@ class ShellCommandRunner:
             check=self.check if check is _UNSET else check,
             wsl=self.wsl if wsl is _UNSET else wsl,
             env=self.env if env is _UNSET else env,
+            on_output_line=(
+                self.on_output_line
+                if on_output_line is _UNSET
+                else on_output_line
+            ),
         )
 
 
@@ -176,6 +190,7 @@ def run_shell_command(
     check: bool = True,
     wsl: bool = True,
     env: dict[str, str] | None = None,
+    on_output_line: ShellOutputLineCallback | None = None,
 ) -> ShellCommandResult:
     """
     Executes the given command in a subprocess.
@@ -193,6 +208,7 @@ def run_shell_command(
         check: If set to True (default), an exception will be thrown if the executed command exits with a non-zero exit code.
         wsl: If set to True (default) and running on Windows, the provided command will be run in WSL.
         env: Environment variables for the subprocess. Defaults to the current environment.
+        on_output_line: Optional callback receiving each output line and its stream name.
 
     Returns:
         Command result with exit code and captured output.
@@ -209,6 +225,7 @@ def run_shell_command(
         check=check,
         wsl=wsl,
         env=env,
+        on_output_line=on_output_line,
     )
 
 
@@ -220,6 +237,7 @@ def _run_shell_command(
     check: bool,
     wsl: bool,
     env: dict[str, str] | None,
+    on_output_line: ShellOutputLineCallback | None,
 ) -> ShellCommandResult:
     # lazy-initialize CI console if using pretty output
     global _output_console
@@ -241,6 +259,10 @@ def _run_shell_command(
     command_first_line = command_display_string.splitlines()[0]
 
     def print_command_output_line(line: str, stream: str, _) -> None:
+        if on_output_line is not None:
+            on_output_line(line, stream)
+            return
+
         if raw_output:
             output_stream = sys.stderr if stream == "stderr" else sys.stdout
             print(line, file=output_stream, flush=True)

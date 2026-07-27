@@ -4,6 +4,7 @@ Functions for managing logging in CI environments.
 from __future__ import annotations
 
 import logging
+import os
 import warnings
 from logging import LogRecord
 
@@ -16,6 +17,11 @@ from rich._null_file import NullFile
 from rich.logging import RichHandler
 
 from .console import _logging_console
+from ..events import ActionEventLogHandler
+from ..protocol import (
+    PYCI_INTERNAL_ACTION_RUN_ID_ENV_VAR,
+    PYCI_INTERNAL_EVENT_TOKEN_ENV_VAR,
+)
 
 LOG_WITH_MARKUP = dict(
     extra=dict(
@@ -108,6 +114,17 @@ def configure_ci_logging(level: str | int = None) -> None:
     # ensure that level is an int
     if type(level) is str:
         level = getattr(logging, level.upper())
+
+    event_token = os.environ.get(PYCI_INTERNAL_EVENT_TOKEN_ENV_VAR)
+    action_run_id = os.environ.get(PYCI_INTERNAL_ACTION_RUN_ID_ENV_VAR)
+    if event_token and action_run_id:
+        logging.basicConfig(
+            level=level,
+            format="%(message)s",
+            handlers=[ActionEventLogHandler(event_token, action_run_id)],
+        )
+        logging.getLogger().setLevel(level)
+        return
 
     # compile suppress list
     suppress_list = [click, rich_click, rich]

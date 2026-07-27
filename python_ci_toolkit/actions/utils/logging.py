@@ -46,6 +46,17 @@ def get_action_display_name(action_name: str, action_version: str) -> str:
     return f"{action_name}{ACTION_VERSION_SEPARATOR}{action_version}"
 
 
+def get_ci_toolkit_version() -> str:
+    from importlib.metadata import PackageNotFoundError, distribution
+
+    try:
+        return distribution("python-ci-toolkit").version
+    except PackageNotFoundError:
+        from ...versions import read_project_version
+
+        return str(read_project_version(ci_paths.project_root))
+
+
 def _get_new_progress_instance() -> Progress:
     """
     Returns a new instance of the Rich Progress class.
@@ -212,7 +223,10 @@ def get_action_progress_message(action_name: str, status: str) -> str:
 def print_action_run_start(action_name: str,
                            action_version: str,
                            action_source: str,
-                           is_nested: bool) -> None:
+                           is_nested: bool,
+                           nesting_depth: int = 0,
+                           toolkit_version: str | None = None,
+                           ci_environment: str | None = None) -> None:
     """
     Prints a message to the console to indicate that the action run has started.
 
@@ -222,21 +236,16 @@ def print_action_run_start(action_name: str,
         action_source: Source of the action (local directory, Git repo etc.).
         is_nested: Whether the action was called from another action.
     """
-    # noinspection PyBroadException
-    from importlib.metadata import distribution, PackageNotFoundError
-    try:
-        version = distribution('python-ci-toolkit').version
-    except PackageNotFoundError:
-        from ...versions import read_project_version
-        version = read_project_version(ci_paths.project_root)
+    toolkit_version = toolkit_version or get_ci_toolkit_version()
+    ci_environment = ci_environment or ci_platform.name()
 
     action_display_name = get_action_display_name(action_name, action_version)
 
     if not is_nested:
         title = f"[pyci.flair] Running CI action [pyci.action]'{action_display_name}'[/]...[/]"
         info_lines = [
-            f"CI toolkit version: [pyci.info]{version}[/]",
-            f"CI environment: [pyci.info]{ci_platform.name()}[/]",
+            f"CI toolkit version: [pyci.info]{toolkit_version}[/]",
+            f"CI environment: [pyci.info]{ci_environment}[/]",
             f"Action version: [pyci.info]{action_version}[/]",
             f"Action source: [pyci.info]{action_source}[/]",
         ]
@@ -246,10 +255,16 @@ def print_action_run_start(action_name: str,
         print(f"[pyci.flair_dark]{_get_action_run_border_tip_element(True)}[/]")
     else:
         title = f"[pyci.flair]Running nested action [pyci.action]'{action_display_name}'[/]...[/]"
-        print(f"{' ' * (_ACTION_VISUAL_THREAD_OFFSET + 1)}[pyci.flair_dark]├─▶[/] {title}")
+        indentation = _ACTION_VISUAL_THREAD_OFFSET + 1 + max(nesting_depth - 1, 0)
+        print(f"{' ' * indentation}[pyci.flair_dark]├─▶[/] {title}")
 
 
-def print_action_run_end_success(action_name: str, stopwatch: Stopwatch, is_nested: bool) -> None:
+def print_action_run_end_success(
+    action_name: str,
+    stopwatch: Stopwatch | float,
+    is_nested: bool,
+    nesting_depth: int = 0,
+) -> None:
     """
     Prints a message to the console to indicate that the action run has completed successfully.
 
@@ -258,19 +273,26 @@ def print_action_run_end_success(action_name: str, stopwatch: Stopwatch, is_nest
         stopwatch: Stopwatch used to measure the action run time.
         is_nested: Whether the action was called from another action.
     """
+    elapsed_time_pretty = (
+        Stopwatch.format_time_pretty(stopwatch)
+        if isinstance(stopwatch, float)
+        else stopwatch.elapsed_time_pretty
+    )
     if not is_nested:
-        message = f"Action run completed in {stopwatch.elapsed_time_pretty} ('{action_name}')."
+        message = f"Action run completed in {elapsed_time_pretty} ('{action_name}')."
         print(f"[pyci.flair_dark]{_get_action_run_border_tip_element(False)}[/]")
         print(f"[pyci.flair_dark]╰─[/] [pyci.success]{message}[/]")
     else:
-        message = f"Nested action '{action_name}' completed in {stopwatch.elapsed_time_pretty}."
-        print(f"{' ' * (_ACTION_VISUAL_THREAD_OFFSET + 1)}[pyci.flair_dark]├─◀[/] [pyci.success]{message}[/]")
+        message = f"Nested action '{action_name}' completed in {elapsed_time_pretty}."
+        indentation = _ACTION_VISUAL_THREAD_OFFSET + 1 + max(nesting_depth - 1, 0)
+        print(f"{' ' * indentation}[pyci.flair_dark]├─◀[/] [pyci.success]{message}[/]")
 
 
 def print_action_run_end_failure(action_name: str,
-                                 stopwatch: Stopwatch,
-                                 exception: BaseException,
-                                 is_nested: bool) -> None:
+                                 stopwatch: Stopwatch | float,
+                                 exception: BaseException | str,
+                                 is_nested: bool,
+                                 nesting_depth: int = 0) -> None:
     """
     Prints a message to the console to indicate that the action run has failed.
 
@@ -280,16 +302,25 @@ def print_action_run_end_failure(action_name: str,
         exception: Exception that caused the action run to fail.
         is_nested: Whether the action was called from another action.
     """
-    exception_type = type(exception)
-    exception_string = exception_type.__name__
-    if isinstance(exception, SystemExit):
-        exception_string += f' with code "{exception.code}"'
+    elapsed_time_pretty = (
+        Stopwatch.format_time_pretty(stopwatch)
+        if isinstance(stopwatch, float)
+        else stopwatch.elapsed_time_pretty
+    )
+    if isinstance(exception, str):
+        exception_string = exception
+    else:
+        exception_type = type(exception)
+        exception_string = exception_type.__name__
+        if isinstance(exception, SystemExit):
+            exception_string += f' with code "{exception.code}"'
 
     if not is_nested:
-        message = f"Action run failed in {stopwatch.elapsed_time_pretty} ({exception_string}, '{action_name}')."
+        message = f"Action run failed in {elapsed_time_pretty} ({exception_string}, '{action_name}')."
         print(f"[pyci.error]{_get_action_run_border_tip_element(False)}[/]")
         print(f"[pyci.error]╰─[/][pyci.critical] {message} [/]")
     else:
-        message = f"Nested action '{action_name}' failed in {stopwatch.elapsed_time_pretty}."
-        print(f"{' ' * (_ACTION_VISUAL_THREAD_OFFSET + 1)}[pyci.error]├─◀[/][pyci.critical] {message} [/]\n"
-              f"{' ' * (_ACTION_VISUAL_THREAD_OFFSET + 1)}[pyci.error]│  [/][pyci.critical] ({exception_string}) [/]")
+        message = f"Nested action '{action_name}' failed in {elapsed_time_pretty}."
+        indentation = _ACTION_VISUAL_THREAD_OFFSET + 1 + max(nesting_depth - 1, 0)
+        print(f"{' ' * indentation}[pyci.error]├─◀[/][pyci.critical] {message} [/]\n"
+              f"{' ' * indentation}[pyci.error]│  [/][pyci.critical] ({exception_string}) [/]")
