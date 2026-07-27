@@ -24,7 +24,7 @@ from .utils.logging import (
     get_ci_toolkit_version,
     loading_animation,
 )
-from ..environment import ci_platform
+from ..environment import Local, ci_paths, ci_platform
 from ..environment.bootstrap import prepare_ci_project_runtime
 
 logger = get_logger(__name__)
@@ -87,6 +87,20 @@ def _retrieve_action_script(runtime_context: _ActionRuntimeContext) -> tuple[Pat
     )
     logger.debug(f"Located action '{runtime_context.action_display_name}' at {action_source}.")
     return action_script_path, action_source
+
+
+def _get_action_source_for_display(
+    action_script_path: Path,
+    action_source: str,
+    action_version: str,
+) -> str:
+    if action_version != ACTION_VERSION_LOCAL_STRING:
+        return action_source
+
+    try:
+        return action_script_path.relative_to(ci_paths.project_root).as_posix()
+    except ValueError:
+        return action_source
 
 
 def _run_action_script(
@@ -182,9 +196,17 @@ def run_ci_action(
                 action_name=runtime_context.action_name,
                 action_version=runtime_context.action_version,
                 action_display_name=runtime_context.action_display_name,
-                action_source=action_source,
+                action_source=_get_action_source_for_display(
+                    action_script_path,
+                    action_source,
+                    runtime_context.action_version,
+                ),
                 toolkit_version=get_ci_toolkit_version(),
-                ci_environment=ci_platform.name(),
+                ci_environment=(
+                    None
+                    if ci_platform is Local
+                    else ci_platform.name()
+                ),
             )
         )
 

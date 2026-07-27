@@ -14,7 +14,9 @@ import click
 import rich
 import rich_click
 from rich._null_file import NullFile
+from rich.highlighter import Highlighter
 from rich.logging import RichHandler
+from rich.text import Text
 
 from .console import _logging_console
 from ..events import ActionEventLogHandler
@@ -37,6 +39,13 @@ LOG_WITH_MARKUP_NO_HIGHLIGHTER = dict(
     )
 )
 """Append this to a log call to enable Rich markup in the log message, but disable Rich highlighting."""
+
+
+class _NoopHighlighter(Highlighter):
+    """Leaves ordinary log messages untouched unless they contain explicit markup."""
+
+    def highlight(self, text: Text) -> None:
+        pass
 
 
 class CharmingTracebackRichHandler(RichHandler):
@@ -157,6 +166,8 @@ def configure_ci_logging(level: str | int = None) -> None:
                 # disable Rich markup by default to avoid character clashes when printing logs;
                 # markup can still be processed on demand by explicitly adding 'extra={"markup": True}' to the log call
                 markup=False,
+                highlighter=_NoopHighlighter(),
+                keywords=[],
                 tracebacks_suppress=suppress_list,
             )
         ],

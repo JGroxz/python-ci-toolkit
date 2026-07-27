@@ -108,6 +108,32 @@ def test_run_ci_action_restores_stack_after_process_failure(
     assert action_runtime._running_actions_stack == []
 
 
+def test_local_action_source_is_displayed_relative_to_project_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    import python_ci_toolkit.actions.actions as action_runtime
+
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    action_file = (
+        project_root
+        / ".ci"
+        / "actions"
+        / "example_action"
+        / "example_action.py"
+    )
+    monkeypatch.chdir(project_root)
+
+    action_source = action_runtime._get_action_source_for_display(
+        action_file,
+        f"'{action_file}'",
+        "local",
+    )
+
+    assert action_source == ".ci/actions/example_action/example_action.py"
+
+
 def test_run_ci_action_restores_stack_after_retrieval_failure(monkeypatch: pytest.MonkeyPatch):
     import python_ci_toolkit.actions.actions as action_runtime
 
@@ -338,6 +364,10 @@ def test_isolated_action_exception_crosses_boundary_as_process_error(
     assert error.value.exit_code == 1
     assert "ValueError" in str(error.value)
     assert "action failed" in str(error.value)
+    assert (
+        captured.out.count("Failed action 'failing_action@local'")
+        == 1
+    )
     assert "Action raised an exception" not in captured.out
     assert "Traceback" not in captured.err
     assert action_runtime._running_actions_stack == []
@@ -364,6 +394,10 @@ def test_isolated_action_exception_includes_traceback_at_debug_level(
         action_runtime.run_ci_action("debug_failing_action", "local")
 
     captured = capsys.readouterr()
+    assert (
+        captured.out.count("Failed action 'debug_failing_action@local'")
+        == 1
+    )
     assert "Action raised an exception" in captured.out
     assert "ValueError" in captured.out
     assert "debug action failed" in captured.out
@@ -487,7 +521,7 @@ def test_nested_action_uses_its_own_json_output(
     }
 
 
-def test_nested_action_output_is_rendered_by_root_without_private_frames(
+def test_multilevel_nested_action_output_is_rendered_by_root_without_private_frames(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -511,13 +545,25 @@ def test_nested_action_output_is_rendered_by_root_without_private_frames(
     _write_local_project_action(
         project_root,
         "rendering_child",
-        "from python_ci_toolkit.actions import get_action_logger\n"
+        "from python_ci_toolkit.actions import get_action_logger, run_ci_action\n"
         "\n"
         "logger = get_action_logger(__name__)\n"
         "\n"
         "def action():\n"
         "    print('child raw output')\n"
-        "    logger.warning('child semantic log')\n",
+        "    logger.warning('child semantic log')\n"
+        "    run_ci_action('rendering_grandchild', 'local')\n",
+    )
+    _write_local_project_action(
+        project_root,
+        "rendering_grandchild",
+        "from python_ci_toolkit.actions import get_action_logger\n"
+        "\n"
+        "logger = get_action_logger(__name__)\n"
+        "\n"
+        "def action():\n"
+        "    print('grandchild raw output')\n"
+        "    logger.error('grandchild semantic log')\n",
     )
     monkeypatch.chdir(project_root)
     _patch_action_retrieval(monkeypatch, parent_action)
@@ -525,11 +571,31 @@ def test_nested_action_output_is_rendered_by_root_without_private_frames(
     output = action_runtime.run_ci_action("rendering_parent", "local")
 
     rendered_output = capsys.readouterr().out
+    assert "│ PyCI v" in rendered_output
+    assert " with no CI platform detected" in rendered_output
+    assert "│ CI toolkit version:" not in rendered_output
+    assert "│ CI environment:" not in rendered_output
+    assert "│ Action version:" not in rendered_output
     assert "parent raw output" in rendered_output
     assert "parent semantic log" in rendered_output
     assert "Running nested action 'rendering_child@local'" in rendered_output
+    assert (
+        "Running nested action 'rendering_grandchild@local'"
+        in rendered_output
+    )
+    assert rendered_output.count("Running nested action") == 2
+    assert rendered_output.count("Completed nested action") == 2
+    assert "╰╮ Running nested action" in rendered_output
+    assert "│╰╮ Running nested action" in rendered_output
+    assert "╭╯" in rendered_output
+    assert "├─▶" not in rendered_output
+    assert "├─◀" not in rendered_output
     assert "child raw output" in rendered_output
     assert "child semantic log" in rendered_output
+    assert "││ child semantic log" in rendered_output
+    assert "grandchild raw output" in rendered_output
+    assert "grandchild semantic log" in rendered_output
+    assert "│││ grandchild semantic log" in rendered_output
     assert "::pyci-action-event-v1::" not in rendered_output
     assert "::pyci-action-event-v1::" not in output.stdout
 

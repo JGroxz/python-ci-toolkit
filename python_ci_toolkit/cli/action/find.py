@@ -156,7 +156,7 @@ def print_search_results(search_query: str, actions_metadata: list[ActionMetadat
 
         # prepare display grid
         grid = Table.grid(expand=True, padding=(0, 2))
-        grid.add_column(header="Name", style="green")
+        grid.add_column(header="Name", style="color(40)")
         grid.add_column(header="Description")
 
         # prepare a highlighter
@@ -178,7 +178,7 @@ def print_search_results(search_query: str, actions_metadata: list[ActionMetadat
     # print panel
     panel = Panel(
         panel_content,
-        box=box.ROUNDED, border_style="blue",
+        box=box.ROUNDED, border_style="color(75)",
         title=title, title_align="left",
         expand=False, highlight=False
     )

@@ -19,9 +19,9 @@ CURRENT_SHELL_PATH = Path(os.environ.get("SHELL", ""))
 CURRENT_SHELL_NAME = CURRENT_SHELL_PATH.name.lower()
 
 RICH_THEME = Theme({
-    "shell": "cyan",
-    "command": "yellow",
-    "path": "green",
+    "shell": "color(44)",
+    "command": "color(184)",
+    "path": "color(40)",
 })
 
 

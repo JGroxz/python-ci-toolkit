@@ -15,7 +15,7 @@ def print_available_actions(actions_metadata: list[ActionMetadata]) -> None:
 
     # prepare display grid
     grid = Table.grid(expand=True, padding=(0, 2))
-    grid.add_column(header="Name", style="green")
+    grid.add_column(header="Name", style="color(40)")
     grid.add_column(header="Description")
 
     for metadata in actions_metadata:
@@ -28,7 +28,7 @@ def print_available_actions(actions_metadata: list[ActionMetadata]) -> None:
     # print panel
     panel = Panel(
         panel_content,
-        box=box.ROUNDED, border_style="blue",
+        box=box.ROUNDED, border_style="color(75)",
         title=title, title_align="left",
         expand=False, highlight=False
     )
@@ -56,7 +56,7 @@ def list_actions_command(ctx: Context, param: Argument, value: str) -> None:
         title = "💡Tip"
         panel = Panel(
             panel_content,
-            box=box.ROUNDED, border_style="yellow",
+            box=box.ROUNDED, border_style="color(184)",
             title=title, title_align="left",
             expand=True, width=80, highlight=False
         )

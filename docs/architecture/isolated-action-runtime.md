@@ -150,6 +150,17 @@ other terminal-aware tools wrap for the space that remains after the root
 renderer adds its prefix and execution thread. `TERMINAL_WIDTH` mirrors the
 reduced width for compatibility with older PyCI behavior.
 
+Each rendered output line carries root-relative elapsed time, a semantic
+log-level or stream marker, and the active execution thread. Nested action
+threads shift one column per level while retaining dimmed ancestor columns,
+with lifecycle bends showing entry to and return from each child.
+
+Raw stdout and stderr retain ANSI styling through a stateful decoder dedicated
+to each action run and stream. Carriage-return progress updates are coalesced
+to their latest value before rendering. Explicit Rich markup in a semantic log
+message remains authoritative for that message, while its level marker keeps
+the standard severity style.
+
 ## Nested Actions
 
 `run_ci_action(...)` remains available inside an action because the exact PyCI

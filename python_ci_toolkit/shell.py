@@ -18,9 +18,8 @@ from rich.text import Text
 
 SHELL_OUTPUT_PREFIX_WIDTH_MIN = 15
 SHELL_OUTPUT_PREFIX_WIDTH_MAX = 26
-SHELL_OUTPUT_PREFIX_STYLE = Style(color="blue")
-SHELL_OUTPUT_COMMAND_STYLE = Style(color="deep_sky_blue4", italic=True)
-SHELL_OUTPUT_STDERR_STYLE = Style(color="red")
+SHELL_OUTPUT_PREFIX_STYLE = Style(color="color(75)")
+SHELL_OUTPUT_COMMAND_STYLE = Style(color="color(25)", italic=True)
 
 _output_console = None
 _UNSET = object()
@@ -275,7 +274,7 @@ def _run_shell_command(
         grid.add_column(overflow="fold")
         grid.add_row(
             Text(f" > shell: ") + Text(command_first_line, style=SHELL_OUTPUT_COMMAND_STYLE), " │ ",
-            (line if stream == "stdout" else Text(line, style=SHELL_OUTPUT_STDERR_STYLE))
+            Text.from_ansi(line),
         )
         # noinspection PyUnresolvedReferences
         _output_console.print(grid, end="")

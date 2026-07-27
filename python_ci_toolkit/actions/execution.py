@@ -4,7 +4,6 @@ Central coordination and rendering for action execution events.
 
 from __future__ import annotations
 
-from datetime import datetime
 import logging
 import os
 import secrets
@@ -12,6 +11,7 @@ import shutil
 from threading import Lock
 
 import rich
+from rich.ansi import AnsiDecoder
 from rich.text import Text
 
 from .events import (
@@ -56,6 +56,8 @@ class ExecutionFlowRenderer:
 
     def __init__(self) -> None:
         self._run_depths: dict[str, int] = {}
+        self._stream_decoders: dict[tuple[str, str], AnsiDecoder] = {}
+        self._root_started_at: float | None = None
         self._console = rich.get_console()
 
     def render(self, event: ActionEvent) -> None:
@@ -71,6 +73,9 @@ class ExecutionFlowRenderer:
         parent_depth = self._run_depths.get(parent_run_id, -1)
         depth = parent_depth + 1
         self._run_depths[event.run_id] = depth
+        if depth == 0:
+            self._root_started_at = event.timestamp
+        ci_environment = event.data.get("ci_environment")
 
         print_action_run_start(
             str(event.data["action_name"]),
@@ -79,7 +84,11 @@ class ExecutionFlowRenderer:
             is_nested=(depth > 0),
             nesting_depth=depth,
             toolkit_version=str(event.data["toolkit_version"]),
-            ci_environment=str(event.data["ci_environment"]),
+            ci_environment=(
+                ci_environment
+                if isinstance(ci_environment, str)
+                else None
+            ),
         )
 
     def _render_action_finished(self, event: ActionEvent) -> None:
@@ -103,14 +112,18 @@ class ExecutionFlowRenderer:
                 is_nested=(depth > 0),
                 nesting_depth=depth,
             )
+        for decoder_key in [
+            key for key in self._stream_decoders if key[0] == event.run_id
+        ]:
+            self._stream_decoders.pop(decoder_key)
         self._run_depths.pop(event.run_id, None)
+        if depth == 0:
+            self._root_started_at = None
 
     def _render_output(self, event: ActionEvent) -> None:
         depth = self._run_depths.get(event.run_id, 0)
         if event.kind == "log":
-            level_name = str(event.data.get("level_name") or logging.getLevelName(
-                int(event.data.get("level", logging.INFO))
-            ))
+            level = int(event.data.get("level", logging.INFO))
             message = str(event.data.get("message", ""))
             if event.data.get("markup"):
                 try:
@@ -124,42 +137,81 @@ class ExecutionFlowRenderer:
             if isinstance(exception, dict) and exception.get("traceback"):
                 message_text.append("\n")
                 message_text.append(str(exception["traceback"]), style="dim")
-            style = self._level_style(int(event.data.get("level", logging.INFO)))
+            style = self._level_style(level)
+            marker, marker_style, marker_padding_style = self._level_marker(level)
         else:
             stream = str(event.data.get("stream", "stdout"))
-            level_name = stream.upper()
-            message_text = Text.from_ansi(str(event.data.get("text", "")))
-            style = "red" if stream == "stderr" else None
+            message_text = self._decode_stream_text(
+                event.run_id,
+                stream,
+                str(event.data.get("text", "")),
+            )
+            style = None
+            marker, marker_style, marker_padding_style = (
+                ("»", "pyci.log.stderr", None)
+                if stream == "stderr"
+                else ("›", "pyci.log.stdout", None)
+            )
 
         self._print_threaded_text(
-            timestamp=event.timestamp,
-            level_name=level_name,
+            elapsed=max(
+                event.timestamp - (
+                    self._root_started_at
+                    if self._root_started_at is not None
+                    else event.timestamp
+                ),
+                0.0,
+            ),
             message=message_text,
             depth=depth,
             message_style=style,
+            marker=marker,
+            marker_style=marker_style,
+            marker_padding_style=marker_padding_style,
         )
+
+    def _decode_stream_text(
+        self,
+        run_id: str,
+        stream: str,
+        text: str,
+    ) -> Text:
+        decoder = self._stream_decoders.setdefault(
+            (run_id, stream),
+            AnsiDecoder(),
+        )
+        decoded_text = Text()
+        for carriage_return_segment in text.split("\r"):
+            decoded_text = decoder.decode_line(carriage_return_segment)
+        return decoded_text
 
     def _print_threaded_text(
         self,
         *,
-        timestamp: float,
-        level_name: str,
+        elapsed: float,
         message: Text,
         depth: int,
         message_style: str | None,
+        marker: str,
+        marker_style: str,
+        marker_padding_style: str | None,
     ) -> None:
-        thread_column = (
-            _ACTION_VISUAL_THREAD_OFFSET
-            + 1
-            + (depth * _NESTED_THREAD_INDENT)
+        thread_column = _ACTION_VISUAL_THREAD_OFFSET + 1
+        elapsed_text = self._format_elapsed_time(elapsed)
+        prefix = self._build_output_prefix(
+            elapsed_text,
+            marker,
+            marker_style,
+            marker_padding_style,
         )
-        timestamp_text = datetime.fromtimestamp(timestamp).strftime("%H:%M:%S")
-        prefix_value = f"{timestamp_text} {level_name[:8]:<8}"
-        if len(prefix_value) > thread_column:
-            prefix_value = prefix_value[:thread_column]
-        prefix_value = prefix_value.ljust(thread_column)
 
-        available_width = max(self._console.width - thread_column - 2, 1)
+        available_width = max(
+            self._console.width
+            - thread_column
+            - (depth * _NESTED_THREAD_INDENT)
+            - 2,
+            1,
+        )
         wrapped_lines = message.wrap(
             self._console,
             available_width,
@@ -170,27 +222,104 @@ class ExecutionFlowRenderer:
             wrapped_lines.append(Text())
 
         for line in wrapped_lines:
-            rendered_line = Text(prefix_value, style="dim")
-            rendered_line.append("│", style="pyci.flair_dark")
-            rendered_line.append(" ")
-            rendered_line.append_text(line)
+            rendered_line = self._assemble_threaded_line(
+                prefix,
+                line,
+                message_style,
+                depth,
+            )
             self._console.print(
                 rendered_line,
-                style=message_style,
                 overflow="crop",
                 no_wrap=True,
                 highlight=False,
             )
 
     @staticmethod
+    def _format_elapsed_time(elapsed: float) -> str:
+        total_tenths = max(int(elapsed * 10), 0)
+        total_seconds = total_tenths // 10
+        if total_seconds < 3600:
+            minutes, second_tenths = divmod(total_tenths, 600)
+            seconds, tenths = divmod(second_tenths, 10)
+            elapsed_text = f"{minutes:02d}:{seconds:02d}.{tenths}"
+        elif total_seconds < 100 * 3600:
+            hours, remaining_seconds = divmod(total_seconds, 3600)
+            minutes, seconds = divmod(remaining_seconds, 60)
+            elapsed_text = f"{hours}:{minutes:02d}:{seconds:02d}"
+        else:
+            days, remaining_seconds = divmod(total_seconds, 24 * 3600)
+            hours, remaining_seconds = divmod(remaining_seconds, 3600)
+            minutes = remaining_seconds // 60
+            if days < 100:
+                elapsed_text = f"{days}d{hours:02d}:{minutes:02d}"
+            elif days <= 9999:
+                elapsed_text = f"{days}d{hours:02d}h"
+            else:
+                elapsed_text = ">9999d"
+        return elapsed_text.rjust(8)
+
+    @staticmethod
+    def _build_output_prefix(
+        elapsed_time: str,
+        marker: str,
+        marker_style: str,
+        marker_padding_style: str | None,
+    ) -> Text:
+        prefix = Text()
+        prefix.append(elapsed_time, style="dim")
+        if marker_padding_style is None:
+            prefix.append(" ")
+            prefix.append(marker, style=marker_style)
+            prefix.append(" ")
+        else:
+            prefix.append("▐", style=marker_padding_style)
+            prefix.append(marker, style=marker_style)
+            prefix.append("▌", style=marker_padding_style)
+        return prefix
+
+    @staticmethod
+    def _assemble_threaded_line(
+        prefix: Text,
+        message: Text,
+        message_style: str | None,
+        nesting_depth: int = 0,
+    ) -> Text:
+        rendered_line = Text()
+        rendered_line.append_text(prefix)
+        rendered_line.append(
+            "│" * nesting_depth,
+            style="pyci.flair_dark_dim",
+        )
+        rendered_line.append("│", style="pyci.flair_dark")
+        rendered_line.append(" ")
+        message_start = len(rendered_line)
+        rendered_line.append_text(message)
+        if message_style is not None:
+            rendered_line.stylize_before(message_style, message_start)
+        return rendered_line
+
+    @staticmethod
     def _level_style(level: int) -> str | None:
         if level >= logging.CRITICAL:
-            return "pyci.critical"
+            return "pyci.status.failure"
         if level >= logging.ERROR:
-            return "red"
+            return "pyci.error"
         if level >= logging.WARNING:
-            return "yellow"
+            return "pyci.log.warning"
         return None
+
+    @staticmethod
+    def _level_marker(level: int) -> tuple[str, str, str | None]:
+        if level >= logging.CRITICAL:
+            return "×", "pyci.log.critical", "pyci.log.critical_padding"
+        if level >= logging.ERROR:
+            return "×", "pyci.log.error", None
+        if level >= logging.WARNING:
+            return "!", "pyci.log.warning", None
+        if level >= logging.INFO:
+            return "i", "pyci.log.info", None
+        return "·", "pyci.log.debug", None
 
 
 class ActionEventManager:
