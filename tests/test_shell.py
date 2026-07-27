@@ -87,6 +87,20 @@ def test_output_includes_stdout_and_stderr():
     assert result.is_successful
     assert "stdout message" in result.output_lines
     assert "stderr message" in result.output_lines
+    assert result.stdout == "stdout message"
+    assert result.stderr == "stderr message"
+
+
+def test_command_argument_lists_preserve_values_with_spaces():
+    script = "import sys; print(sys.argv[1])"
+
+    result = run_shell_command(
+        [sys.executable, "-c", script, "value with spaces"],
+        quiet=True,
+    )
+
+    assert result.is_successful
+    assert result.stdout == "value with spaces"
 
 
 def test_silenced_failure_includes_captured_output():
