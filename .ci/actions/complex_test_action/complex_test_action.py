@@ -10,7 +10,7 @@ from python_ci_toolkit.actions.datatypes import ActionOutput
 def action():
     output: ActionOutput = run_ci_action("sleep", "local", args=shlex.split("--duration 10"))
 
-    print(f"Output value of sleep action: {output.value}")
+    print(f"Output values of sleep action: {output.values}")
     return
 
 

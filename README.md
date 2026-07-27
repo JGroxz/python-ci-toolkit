@@ -47,3 +47,28 @@ precedence over `.ci/pyci.toml`.
 PyCI does not manage remote repository credentials directly. Configure Git or
 SSH authentication in the current environment before invoking PyCI; the
 configured remote action repository must already be fetchable by Git.
+
+## Action Runtime
+
+Actions run in isolated uv subprocesses. An action can declare dependencies in
+an adjacent `requirements.txt`; those packages are available to that action
+without being installed into PyCI's environment or the caller's project.
+
+Action entrypoints continue to use an `action()` function. Return values do not
+cross the subprocess boundary. Write small structured outputs as JSON through
+the `set_action_output` helper:
+
+```python
+from python_ci_toolkit.actions import set_action_output
+
+
+def action() -> None:
+    set_action_output("artifact_path", "dist/package.whl")
+    set_action_output("metadata", {"publish": True})
+```
+
+Callers receive those values through `ActionOutput.values`. Each invocation
+also exposes the JSON output file path as `PYCI_ACTION_OUTPUT`.
+
+See [`docs/architecture/isolated-action-runtime.md`](docs/architecture/isolated-action-runtime.md)
+for the process, failure, nesting, and cache contracts.
