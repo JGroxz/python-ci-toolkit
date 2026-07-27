@@ -5,6 +5,7 @@ Isolated subprocess execution for CI actions.
 from __future__ import annotations
 
 import json
+import logging
 import os
 from importlib.metadata import distribution
 from pathlib import Path
@@ -22,11 +23,13 @@ from .exceptions import (
     InvalidActionResultError,
     MissingActionEntrypointError,
 )
+from .execution import get_action_event_manager, get_event_output
 from .outputs import read_action_output_file
 from .protocol import (
     PYCI_ACTION_OUTPUT_ENV_VAR,
     PYCI_ACTION_STACK_ENV_VAR,
     PYCI_INTERNAL_ACTION_RESULT_ENV_VAR,
+    PYCI_INTERNAL_LOG_LEVEL_ENV_VAR,
     PYCI_INTERNAL_UV_RUNTIME_ARGUMENTS_ENV_VAR,
 )
 from ..environment import ci_paths
@@ -228,6 +231,7 @@ def run_action_process(
     action_version: str,
     args: list[str],
     action_stack: list[tuple[str, str]],
+    run_id: str,
 ) -> ActionOutput:
     action_display_name = f"{action_name}@{action_version}"
 
@@ -241,8 +245,33 @@ def run_action_process(
         child_environment[PYCI_ACTION_OUTPUT_ENV_VAR] = str(output_path)
         child_environment[PYCI_INTERNAL_ACTION_RESULT_ENV_VAR] = str(result_path)
         child_environment[PYCI_ACTION_STACK_ENV_VAR] = json.dumps(action_stack)
+        child_environment[PYCI_INTERNAL_LOG_LEVEL_ENV_VAR] = str(
+            logging.getLogger().getEffectiveLevel()
+        )
         pyci_runtime_arguments = _get_pyci_runtime_arguments()
         child_environment[PYCI_INTERNAL_UV_RUNTIME_ARGUMENTS_ENV_VAR] = json.dumps(pyci_runtime_arguments)
+        event_manager = get_action_event_manager()
+        child_environment.update(
+            event_manager.child_environment(
+                run_id,
+                depth=max(len(action_stack) - 1, 0),
+            )
+        )
+
+        captured_stdout: list[str] = []
+        captured_stderr: list[str] = []
+
+        def handle_action_output_line(line: str, stream: str) -> None:
+            event = event_manager.accept_child_line(line, stream, run_id)
+            event_output = get_event_output(event)
+            if event_output is None:
+                return
+
+            output_stream, text = event_output
+            if output_stream == "stderr":
+                captured_stderr.append(text)
+            else:
+                captured_stdout.append(text)
 
         command = _build_uv_command(
             action_script_path,
@@ -258,6 +287,7 @@ def run_action_process(
             check=False,
             wsl=False,
             env=child_environment,
+            on_output_line=handle_action_output_line,
         )
 
         try:
@@ -265,7 +295,7 @@ def run_action_process(
         except InvalidActionResultError as error:
             if process_result.is_successful:
                 raise
-            details = process_result.stderr.strip() or str(error)
+            details = "\n".join(captured_stderr).strip() or str(error)
             raise ActionRuntimeStartupError(action_display_name, process_result.exit_code, details) from error
 
         if process_result.is_failed:
@@ -281,6 +311,6 @@ def run_action_process(
         return ActionOutput(
             values=output_values,
             exit_code=process_result.exit_code,
-            stdout=process_result.stdout,
-            stderr=process_result.stderr,
+            stdout="\n".join(captured_stdout),
+            stderr="\n".join(captured_stderr),
         )

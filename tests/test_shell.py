@@ -1,9 +1,11 @@
 import os
+import io
 import shlex
 import sys
 from pathlib import Path
 
 import pytest
+from rich.console import Console
 
 from python_ci_toolkit.shell import ShellCommandRunner, run_shell_command
 
@@ -125,6 +127,73 @@ def test_raw_output_is_printed_without_shell_prefix(capsys):
     captured = capsys.readouterr()
     assert "raw output" in captured.out
     assert " > shell: " not in captured.out
+
+
+def test_output_line_callback_intercepts_both_streams(capsys):
+    script = "import sys; print('stdout line'); print('stderr line', file=sys.stderr)"
+    observed_lines = []
+
+    result = run_shell_command(
+        [sys.executable, "-c", script],
+        raw_output=True,
+        on_output_line=lambda line, stream: observed_lines.append((stream, line)),
+    )
+
+    assert result.is_successful
+    assert set(observed_lines) == {
+        ("stdout", "stdout line"),
+        ("stderr", "stderr line"),
+    }
+    captured = capsys.readouterr()
+    assert "stdout line" not in captured.out
+    assert "stderr line" not in captured.err
+
+
+def test_output_line_callback_preserves_carriage_return_updates():
+    script = "import sys; sys.stdout.write('10%\\r20%\\r30%\\n'); sys.stdout.flush()"
+    observed_lines = []
+
+    result = run_shell_command(
+        [sys.executable, "-c", script],
+        raw_output=True,
+        on_output_line=lambda line, stream: observed_lines.append((stream, line)),
+    )
+
+    assert result.is_successful
+    assert observed_lines == [("stdout", "10%\r20%\r30%")]
+
+
+def test_pretty_stderr_is_neutral_and_preserves_emitted_ansi(monkeypatch):
+    import python_ci_toolkit.shell as shell_module
+
+    output = io.StringIO()
+    console = Console(
+        file=output,
+        force_terminal=True,
+        color_system="256",
+        no_color=False,
+        width=160,
+    )
+    monkeypatch.setattr(shell_module, "_output_console", console)
+    script = (
+        "import sys; "
+        "print('plain stderr', file=sys.stderr); "
+        "print('\\x1b[38;5;184mstyled stderr\\x1b[0m', file=sys.stderr)"
+    )
+
+    result = run_shell_command(
+        [sys.executable, "-c", script],
+        check=False,
+    )
+
+    assert result.is_successful
+    rendered_output = output.getvalue()
+    plain_stderr_prefix = rendered_output[
+        max(rendered_output.index("plain stderr") - 20, 0):
+        rendered_output.index("plain stderr")
+    ]
+    assert "\x1b[38;5;160m" not in plain_stderr_prefix
+    assert "\x1b[38;5;184mstyled stderr" in rendered_output
 
 
 def test_preconfigured_runner_defaults(capsys):

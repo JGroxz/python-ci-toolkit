@@ -118,6 +118,49 @@ an isolated runtime startup error. Child exception types are not reconstructed
 in the parent; action failures become structured `ActionProcessError`
 instances.
 
+## Execution Event Stream
+
+Terminal presentation belongs to the root PyCI process. Action subprocesses do
+not render timestamps, levels, execution-thread borders, or nested-action
+decoration themselves.
+
+The existing stdout pipe also carries private single-line JSON frames. Each
+root execution tree receives a random token, and only lines with both the
+private frame prefix and that token are decoded as events. The initial event
+set is:
+
+- `action_started`
+- `log`
+- `stream`
+- `action_finished`
+
+The caller of `run_action_process()` emits the lifecycle events. Child logging
+handlers emit semantic log events containing the original timestamp and
+numeric level. Ordinary stdout and stderr lines are promoted to stream events
+by the parent runtime. An intermediate action process relays all of those
+events unchanged, allowing the root renderer to derive nesting from run and
+parent-run identifiers.
+
+The result file remains authoritative for action status and structured output;
+the event stream is presentation transport. Private frames are removed when
+constructing `ActionOutput.stdout` and `ActionOutput.stderr`.
+
+Children receive reduced `COLUMNS` and inherited `LINES` values so Rich and
+other terminal-aware tools wrap for the space that remains after the root
+renderer adds its prefix and execution thread. `TERMINAL_WIDTH` mirrors the
+reduced width for compatibility with older PyCI behavior.
+
+Each rendered output line carries root-relative elapsed time, a semantic
+log-level or stream marker, and the active execution thread. Nested action
+threads shift one column per level while retaining dimmed ancestor columns,
+with lifecycle bends showing entry to and return from each child.
+
+Raw stdout and stderr retain ANSI styling through a stateful decoder dedicated
+to each action run and stream. Carriage-return progress updates are coalesced
+to their latest value before rendering. Explicit Rich markup in a semantic log
+message remains authoritative for that message, while its level marker keeps
+the standard severity style.
+
 ## Nested Actions
 
 `run_ci_action(...)` remains available inside an action because the exact PyCI
