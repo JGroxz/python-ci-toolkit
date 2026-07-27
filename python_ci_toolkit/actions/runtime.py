@@ -5,6 +5,7 @@ Isolated subprocess execution for CI actions.
 from __future__ import annotations
 
 import json
+import logging
 import os
 from importlib.metadata import distribution
 from pathlib import Path
@@ -27,6 +28,7 @@ from .protocol import (
     PYCI_ACTION_OUTPUT_ENV_VAR,
     PYCI_ACTION_STACK_ENV_VAR,
     PYCI_INTERNAL_ACTION_RESULT_ENV_VAR,
+    PYCI_INTERNAL_LOG_LEVEL_ENV_VAR,
     PYCI_INTERNAL_UV_RUNTIME_ARGUMENTS_ENV_VAR,
 )
 from ..environment import ci_paths
@@ -241,6 +243,9 @@ def run_action_process(
         child_environment[PYCI_ACTION_OUTPUT_ENV_VAR] = str(output_path)
         child_environment[PYCI_INTERNAL_ACTION_RESULT_ENV_VAR] = str(result_path)
         child_environment[PYCI_ACTION_STACK_ENV_VAR] = json.dumps(action_stack)
+        child_environment[PYCI_INTERNAL_LOG_LEVEL_ENV_VAR] = str(
+            logging.getLogger().getEffectiveLevel()
+        )
         pyci_runtime_arguments = _get_pyci_runtime_arguments()
         child_environment[PYCI_INTERNAL_UV_RUNTIME_ARGUMENTS_ENV_VAR] = json.dumps(pyci_runtime_arguments)
 

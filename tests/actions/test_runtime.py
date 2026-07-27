@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import logging
 import os
 import sys
 from pathlib import Path
@@ -237,6 +238,58 @@ def test_isolated_action_returns_json_outputs_and_process_streams(
     assert action_runtime._running_actions_stack == []
 
 
+def test_isolated_action_inherits_parent_log_level(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+):
+    import python_ci_toolkit.actions.actions as action_runtime
+
+    action_file = _write_action_script(
+        tmp_path,
+        "logging_action",
+        "from python_ci_toolkit.actions import get_action_logger\n"
+        "\n"
+        "logger = get_action_logger(__name__)\n"
+        "\n"
+        "def action():\n"
+        "    logger.info('action info log')\n"
+        "    logger.debug('action debug log')\n",
+    )
+    _patch_action_retrieval(monkeypatch, action_file)
+    caplog.set_level(logging.INFO)
+
+    output = action_runtime.run_ci_action("logging_action", "local")
+
+    assert "action info log" in output.stdout
+    assert "action debug log" not in output.stdout
+
+
+def test_isolated_action_inherits_parent_debug_level(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+):
+    import python_ci_toolkit.actions.actions as action_runtime
+
+    action_file = _write_action_script(
+        tmp_path,
+        "debug_logging_action",
+        "from python_ci_toolkit.actions import get_action_logger\n"
+        "\n"
+        "logger = get_action_logger(__name__)\n"
+        "\n"
+        "def action():\n"
+        "    logger.debug('action debug log')\n",
+    )
+    _patch_action_retrieval(monkeypatch, action_file)
+    caplog.set_level(logging.DEBUG)
+
+    output = action_runtime.run_ci_action("debug_logging_action", "local")
+
+    assert "action debug log" in output.stdout
+
+
 def test_isolated_action_missing_entrypoint_is_structured_runtime_error(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -262,6 +315,8 @@ def test_isolated_action_missing_entrypoint_is_structured_runtime_error(
 def test_isolated_action_exception_crosses_boundary_as_process_error(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    capsys: pytest.CaptureFixture[str],
 ):
     import python_ci_toolkit.actions.actions as action_runtime
     from python_ci_toolkit.actions.exceptions import ActionProcessError
@@ -272,14 +327,44 @@ def test_isolated_action_exception_crosses_boundary_as_process_error(
         "def action():\n    raise ValueError('action failed')\n",
     )
     _patch_action_retrieval(monkeypatch, action_file)
+    caplog.set_level(logging.INFO)
 
     with pytest.raises(ActionProcessError) as error:
         action_runtime.run_ci_action("failing_action", "local")
 
+    captured = capsys.readouterr()
     assert error.value.exit_code == 1
     assert "ValueError" in str(error.value)
     assert "action failed" in str(error.value)
+    assert "Action raised an exception" not in captured.out
+    assert "Traceback" not in captured.err
     assert action_runtime._running_actions_stack == []
+
+
+def test_isolated_action_exception_includes_traceback_at_debug_level(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    capsys: pytest.CaptureFixture[str],
+):
+    import python_ci_toolkit.actions.actions as action_runtime
+    from python_ci_toolkit.actions.exceptions import ActionProcessError
+
+    action_file = _write_action_script(
+        tmp_path,
+        "debug_failing_action",
+        "def action():\n    raise ValueError('debug action failed')\n",
+    )
+    _patch_action_retrieval(monkeypatch, action_file)
+    caplog.set_level(logging.DEBUG)
+
+    with pytest.raises(ActionProcessError):
+        action_runtime.run_ci_action("debug_failing_action", "local")
+
+    captured = capsys.readouterr()
+    assert "Action raised an exception" in captured.out
+    assert "ValueError" in captured.out
+    assert "debug action failed" in captured.out
 
 
 def test_isolated_action_rejects_invalid_json_output(

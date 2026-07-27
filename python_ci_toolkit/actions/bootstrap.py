@@ -5,17 +5,37 @@ Child-process entrypoint for executing one CI action.
 from __future__ import annotations
 
 import json
+import logging
 import os
 from pathlib import Path
 import sys
-import traceback
 from typing import Any
 
 from .exceptions import MissingActionEntrypointError
-from .protocol import PYCI_INTERNAL_ACTION_RESULT_ENV_VAR
+from .logging import configure_ci_logging
+from .protocol import (
+    PYCI_INTERNAL_ACTION_RESULT_ENV_VAR,
+    PYCI_INTERNAL_LOG_LEVEL_ENV_VAR,
+)
 from ..python import import_module_from_file
 
 _ACTION_ENTRY_POINT_FUNCTION_NAME = "action"
+logger = logging.getLogger(__name__)
+
+
+def _configure_logging_from_environment() -> None:
+    log_level_value = os.environ.get(PYCI_INTERNAL_LOG_LEVEL_ENV_VAR)
+    if log_level_value is None:
+        return
+
+    try:
+        log_level = int(log_level_value)
+    except ValueError as error:
+        raise RuntimeError(
+            f"{PYCI_INTERNAL_LOG_LEVEL_ENV_VAR} must contain a numeric logging level."
+        ) from error
+
+    configure_ci_logging(log_level)
 
 
 def _write_result(result: dict[str, Any]) -> None:
@@ -47,6 +67,8 @@ def _run_action(
 
 
 def main() -> int:
+    _configure_logging_from_environment()
+
     if len(sys.argv) < 4:
         raise RuntimeError(
             "Action bootstrap requires ACTION_SCRIPT_PATH, ACTION_NAME, and ACTION_VERSION arguments."
@@ -87,7 +109,7 @@ def main() -> int:
         )
         return exit_code
     except BaseException as error:
-        traceback.print_exception(error, file=sys.stderr)
+        logger.debug("Action raised an exception.", exc_info=True)
         _write_result(
             {
                 "status": "error",
