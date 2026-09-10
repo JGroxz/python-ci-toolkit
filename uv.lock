@@ -257,7 +257,7 @@ wheels = [
 
 [[package]]
 name = "python-ci-toolkit"
-version = "0.35.0.dev0"
+version = "0.35.1.dev0"
 source = { editable = "." }
 dependencies = [
     { name = "charming-traceback" },
