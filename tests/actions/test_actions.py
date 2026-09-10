@@ -271,6 +271,44 @@ def test_retrieve_ci_action_script_from_git_checks_out_tag(remote_actions_git_re
     assert cloned_head.output_stripped == tag_head.output_stripped
 
 
+def test_retrieve_ci_action_script_from_git_updates_moved_tag(remote_actions_git_repo: Path):
+    from python_ci_toolkit.actions.retrieval.sources.git.cloning import retrieve_ci_action_script_from_git
+
+    action_version = "v1"
+    _create_remote_action_tag(remote_actions_git_repo, action_version, "Original v1 action.")
+
+    action_script_path = retrieve_ci_action_script_from_git(
+        git_repo_url=str(remote_actions_git_repo),
+        action_name="hello_world",
+        action_version=action_version,
+    )
+    original_tag_head = quiet_shell_command_runner(
+        f'git rev-parse "refs/tags/{action_version}"',
+        cwd=remote_actions_git_repo,
+    ).output_stripped
+    assert "Original v1 action." in action_script_path.read_text(encoding="utf-8")
+
+    _write_remote_hello_world_action(remote_actions_git_repo, "Moved v1 action.")
+    _commit_remote_action_repo(remote_actions_git_repo, "Move v1 action")
+    quiet_shell_command_runner(f'git tag --force "{action_version}"', cwd=remote_actions_git_repo)
+
+    action_script_path = retrieve_ci_action_script_from_git(
+        git_repo_url=str(remote_actions_git_repo),
+        action_name="hello_world",
+        action_version=action_version,
+    )
+    cloned_repo_root = _get_cloned_repo_root(action_script_path.parent.parent)
+    moved_tag_head = quiet_shell_command_runner(
+        f'git rev-parse "refs/tags/{action_version}"',
+        cwd=remote_actions_git_repo,
+    ).output_stripped
+    cloned_head = quiet_shell_command_runner("git rev-parse HEAD", cwd=cloned_repo_root)
+
+    assert moved_tag_head != original_tag_head
+    assert cloned_head.output_stripped == moved_tag_head
+    assert "Moved v1 action." in action_script_path.read_text(encoding="utf-8")
+
+
 def test_retrieve_ci_action_script_from_git_rejects_ambiguous_branch_and_tag(remote_actions_git_repo: Path):
     from python_ci_toolkit.actions.retrieval.sources.git.cloning import retrieve_ci_action_script_from_git
     from python_ci_toolkit.actions.retrieval.exceptions import AmbiguousGitActionRefError

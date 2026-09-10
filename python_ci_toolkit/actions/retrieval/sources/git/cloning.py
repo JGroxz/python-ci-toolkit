@@ -236,7 +236,7 @@ def retrieve_action_repo(git_repo_url: str) -> Path:
     repo_command_runner = quiet_shell_command_runner.with_options(cwd=cloned_repo_path)
     repo_command_runner("git reset --hard")
     repo_command_runner("git clean -fdx")
-    repo_command_runner("git fetch --prune --tags")
+    repo_command_runner("git fetch --prune --tags --force")
     repo_command_runner("git checkout -B main origin/main")
     repo_command_runner("git clean -fdx")
 
